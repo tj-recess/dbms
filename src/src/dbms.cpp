@@ -1,6 +1,6 @@
 //============================================================================
 // Name        : dbms.cpp
-// Author      : Arpit
+// Author      : Arpit and Malvika
 // Version     :
 // Copyright   : Feel free to distribute
 // Description : Hello World in C++, Ansi-style
