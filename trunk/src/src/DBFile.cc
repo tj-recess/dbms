@@ -16,7 +16,7 @@ int DBFile::Create(char *name, fType myType, void *startup)
 	if (myType != fType.heap)
 	{
 		cout << "Unsupported file type. Only heap is supported\n";
-		return 0;
+		return RET_UNSUPPORTED_FILE_TYPE;
 	}
 
 	// create a new file. If file with same name already exists,
@@ -25,21 +25,31 @@ int DBFile::Create(char *name, fType myType, void *startup)
 	if (p_currPtr == NULL)
 	{
 		cout << "Failed to open file\n";
-		return 0;
+		return RET_FAILED_FILE_OPEN;
 	}
 }
 
-int DBFile::Open(char *name)
+int DBFile::Open(char *fname)
 {
 	// check if file exists
-	// check if file is NOT open already
+	struct stat fileStat; 
+  	int iStatus; 
+
+	iStatus = stat(fname, &fileStat); 
+	if (iStatus != 0) 	// file doesn't exists
+	{ 
+        cout << "File " << fname <<" does not exist.\n";
+        return RET_FILE_NOT_FOUND;
+	} 
+
+	// TODO: check if file is NOT open already
 
 	// open file in apopend mode, preserving all prev content
 	p_currPtr = fopen (name, "a+");                          
     if (p_currPtr == NULL)
     {
         cout << "Failed to open file\n";
-        return 0;
+        return RET_FAILED_FILE_OPEN;
     }
 }
 
