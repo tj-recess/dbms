@@ -4,6 +4,8 @@
 #include <string.h>
 #include <iostream>
 #include <stdlib.h>
+#include "Defs.h"
+
 
 // Enum for file types
 enum fileType

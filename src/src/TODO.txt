@@ -1,1 +1,4 @@
 This file will contain list of all the stuff which is to be done.
+
+1. Add enum error_codes in defs.h. We can use those instead of just returning 0 or 1. -- DONE
+2. svn commit error.h (provided by Dobra). -- DONE
