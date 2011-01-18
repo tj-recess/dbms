@@ -5,10 +5,21 @@
 #include <iostream>
 #include <stdlib.h>
 
+// Enum for file types
+enum fileType
+{
+	heap 0,
+	sorted,
+	tree
+};
+
+typedef enum fileType fType;
+
 class DBFile
 {
 	private:
-		<type> * p_currPtr;		
+		FILE * p_currPtr;		
+
 	public:
 		DBFile();
 		~DBFile();
@@ -41,7 +52,7 @@ class DBFile
 
 		// Bulk loads the DBFile instance from a text file, 
 		// appending new data to it using the SuckNextRecord function from Record.h
-		// loadme is the name of the data file to bulk load. 
+		// loadMe is the name of the data file to bulk load. 
 		void Load (Schema &mySchema, char *loadMe);
 
 };
