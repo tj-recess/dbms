@@ -4,7 +4,6 @@
 #include "TwoWayList.h"
 #include "Record.h"
 #include "Schema.h"
-#include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
 
@@ -49,10 +48,11 @@ public:
 class File {
 private:
 
-	off_t curLength;
 	int myFilDes;
+	off_t curLength; 
 
 public:
+
 	File ();
 	~File ();
 

@@ -23,7 +23,7 @@ Page :: Page () {
 }
 
 Page :: ~Page () {
-	delete [] myRecs;
+	delete myRecs;
 }
 
 
@@ -152,11 +152,8 @@ void Page :: FromBinary (char *bits) {
 		curPos += len;
 	}
 
-	delete [] temp;
+	delete temp;
 }
-
-
-
 
 File :: File () {
 }
@@ -171,6 +168,7 @@ void File :: GetPage (Page *putItHere, off_t whichPage) {
 	whichPage++;
 
 	if (whichPage >= curLength) {
+		cerr << "whichPage " << whichPage << " length " << curLength << endl;
 		cerr << "BAD: you tried to read past the end of the file\n";
 		exit (1);
 	}
@@ -223,6 +221,9 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 	lseek (myFilDes, PAGE_SIZE * whichPage, SEEK_SET);
 	write (myFilDes, bits, PAGE_SIZE);
 	delete [] bits;
+#ifdef F_DEBUG
+	cerr << " File: curLength " << curLength << " whichPage " << whichPage << endl;
+#endif
 }
 
 

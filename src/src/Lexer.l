@@ -61,7 +61,8 @@ void yyerror(char*s);
 	 		if (yytext[yyleng - 2] == '\\') {
      				yymore();
    			} else {
-				yylval.actualChars = strdup(yytext);	
+				yylval.actualChars = strdup(yytext + 1);	
+				yylval.actualChars[strlen(yylval.actualChars) - 1] = 0;
      				return(String);
    			}
 			}

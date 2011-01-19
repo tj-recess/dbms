@@ -34,7 +34,6 @@ private:
 	void CopyBits(char *bits, int b_len);
 
 public:
-
 	Record ();
 	~Record();
 
