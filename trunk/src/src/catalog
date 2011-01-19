@@ -1,7 +1,7 @@
 
 BEGIN
 region
-Tables/region.bin
+region.tbl
 r_regionkey Int
 r_name String
 r_comment String
@@ -9,7 +9,7 @@ END
 
 BEGIN
 nation
-Tables/nation.bin
+nation.tbl
 n_nationkey Int
 n_name String
 n_regionkey Int
@@ -18,7 +18,7 @@ END
 
 BEGIN
 part
-Tables/part.bin
+part.tbl
 p_partkey Int
 p_name String
 p_mfgr String
@@ -32,7 +32,7 @@ END
 
 BEGIN
 supplier
-Tables/supplier.bin
+supplier.tbl
 s_suppkey Int
 s_name String
 s_address String
@@ -44,7 +44,7 @@ END
 
 BEGIN
 partsupp
-Tables/partsupp.bin
+partsupp.tbl
 ps_partkey Int
 ps_suppkey Int
 ps_availqty Int
@@ -54,7 +54,7 @@ END
 
 BEGIN
 customer
-Tables/customer.bin
+customer.tbl
 c_custkey Int
 c_name String
 c_address String
@@ -67,7 +67,7 @@ END
 
 BEGIN
 orders
-Tables/orders.bin
+orders.tbl
 o_orderkey Int
 o_custkey Int
 o_orderstatus String
@@ -81,7 +81,7 @@ END
 
 BEGIN
 lineitem
-Tables/lineitem.bin
+lineitem.tbl
 l_orderkey Int
 l_partkey Int
 l_suppkey Int

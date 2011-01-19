@@ -1,8 +1,7 @@
 
 #include <iostream>
-#include <stdlib.h>
 #include "Record.h"
-
+#include <stdlib.h>
 using namespace std;
 
 extern "C" {
@@ -36,6 +35,10 @@ int main () {
 
         Record temp;
         Schema mySchema ("catalog", "lineitem");
+
+	//char *bits = literal.GetBits ();
+	//cout << " numbytes in rec " << ((int *) bits)[0] << endl;
+	//literal.Print (&supplier);
 
         // read in all of the records from the text file and see if they match
 	// the CNF expression that was typed in

@@ -2,8 +2,8 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <iostream>
 #include <stdlib.h>
+#include <iostream>
 
 
 Record :: Record () {
@@ -11,7 +11,9 @@ Record :: Record () {
 }
 
 Record :: ~Record () {
-	delete [] bits;
+	if (bits != NULL) {
+		delete [] bits;
+	}
 	bits = NULL;
 
 }
@@ -35,7 +37,8 @@ int Record :: SuckNextRecord (Schema *mySchema, FILE *textFile) {
 	}
 
 	// clear out the present record
-	delete [] bits;
+	if (bits != NULL) 
+		delete [] bits;
 	bits = NULL;
 
 	int n = mySchema->GetNumAtts();

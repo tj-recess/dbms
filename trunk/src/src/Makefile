@@ -1,5 +1,6 @@
+all: test.out main
 
-CC = g++ -O0 -Wno-deprecated 
+CC = g++ -O2 -Wno-deprecated 
 
 tag = -i
 
@@ -7,25 +8,34 @@ ifdef linux
 tag = -n
 endif
 
+test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o y.tab.o lex.yy.o test.o
+	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o y.tab.o lex.yy.o test.o -lfl
+	
 main: Record.o Comparison.o ComparisonEngine.o Schema.o File.o y.tab.o lex.yy.o main.o
 	$(CC) -o main Record.o Comparison.o ComparisonEngine.o Schema.o File.o y.tab.o lex.yy.o main.o -lfl
 	
-main.o : main.cc
+test.o: test.cc
+	$(CC) -g -c test.cc
+
+main.o: main.cc
 	$(CC) -g -c main.cc
 	
-Comparison.o : Comparison.cc
+Comparison.o: Comparison.cc
 	$(CC) -g -c Comparison.cc
 	
-ComparisonEngine.o : ComparisonEngine.cc
+ComparisonEngine.o: ComparisonEngine.cc
 	$(CC) -g -c ComparisonEngine.cc
 	
-File.o : File.cc
+DBFile.o: DBFile.cc
+	$(CC) -g -c DBFile.cc
+
+File.o: File.cc
 	$(CC) -g -c File.cc
 
-Record.o : Record.cc
+Record.o: Record.cc
 	$(CC) -g -c Record.cc
 
-Schema.o : Schema.cc
+Schema.o: Schema.cc
 	$(CC) -g -c Schema.cc
 	
 y.tab.o: Parser.y
