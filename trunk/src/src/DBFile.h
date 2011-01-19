@@ -21,6 +21,8 @@ class DBFile
 {
 	private:
 		FILE * p_currPtr;		
+		File * m_pFile;
+		Record * m_pRecord;
 
 	public:
 		DBFile();
