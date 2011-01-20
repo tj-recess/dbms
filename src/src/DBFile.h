@@ -21,27 +21,17 @@ typedef enum
 class DBFile
 {
 	private:
-		FILE * m_pCurrPtr;
-		File * m_pFile;
-		Record * m_pRecord;
+		File *m_pFile;		// file where data will be loaded
+		Page *m_pPage;
+		int m_nTotalPages;
+
+	private:
+		void WritePageToFile();
 
 	public:
 		DBFile();
 		~DBFile();
-	
-		// Forces the pointer to correspond to the first record in the file
-		void MoveFirst();
 
-		// Add new record to the end of the file
-		// Note: addMe is consumed by this function and cannot be used again
-		void Add (Record &addMe);
-
-		// Fetch next record (relative to p_currPtr) into fetchMe
-		int GetNext (Record &fetchMe);
-
-		// Applies CNF and then fetches the next record
-		int GetNext (Record &fetchMe, CNF &applyMe, Record &literal); 
-		
 		// name = location of the file
 		// fType = heap, sorted, tree
 		// return value: 1 on success, 0 on failure
@@ -59,6 +49,19 @@ class DBFile
 		// appending new data to it using the SuckNextRecord function from Record.h
 		// loadMe is the name of the data file to bulk load. 
 		void Load (Schema &mySchema, char *loadMe);
+
+		// Forces the pointer to correspond to the first record in the file
+		void MoveFirst();
+
+		// Add new record to the end of the file
+		// Note: addMe is consumed by this function and cannot be used again
+		void Add (Record &addMe);
+
+		// Fetch next record (relative to p_currPtr) into fetchMe
+		int GetNext (Record &fetchMe);
+
+		// Applies CNF and then fetches the next record
+		int GetNext (Record &fetchMe, CNF &applyMe, Record &literal);
 
 };
 
