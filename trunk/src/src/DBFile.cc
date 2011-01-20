@@ -3,13 +3,11 @@
 DBFile::DBFile()
 {
 	m_pFile = new File();
+	m_pPage = new Page();
 }
 
 DBFile::~DBFile()
 {
-	// set FILE handle to null
-	m_pCurrPtr = 0;
-
 	// delete member File pointer
 	if (m_pFile)
 	{
@@ -17,11 +15,11 @@ DBFile::~DBFile()
 		m_pFile = NULL;
 	}
 
-	// delete memeber Record pointer
-	if (m_pRecord)
+	// delete member Page pointer
+	if (m_pPage)
 	{
-		delete m_pRecord;
-		m_pRecord = NULL;
+		delete m_pPage;
+		m_pPage = NULL;
 	}
 }
 
@@ -78,7 +76,7 @@ int DBFile::Close()
 
 void DBFile::Load (Schema &mySchema, char *loadMe)
 {
-	m_pCurrPtr = fopen (loadMe, "r");
+	/*m_pCurrPtr = fopen (loadMe, "r");
 	if (!m_pCurrPtr)
 	{
 		// file to load could not be opened
@@ -102,7 +100,54 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	// use m_pRecord->GetBits() and store data in page/file
 
 	delete m_pRecord;
-	m_pRecord = NULL;
+	m_pRecord = NULL;*/
+}
+
+void DBFile::Add (Record &rec)
+{
+	Record aRecord;
+	aRecord.Consume(&rec);
+
+	// TODO: fetch last used page into m_pPage
+
+	// Try to store the record into current page
+	int ret = m_pPage->Append(&aRecord);
+	if (!ret)	// current page does not have enough space
+	{
+		// write current page to file
+		// this function will create a new page too
+		WritePageToFile();
+		ret = m_pPage->Append(&aRecord);
+		if (!ret)
+		{
+			// error logger
+		}
+	}
+}
+
+void DBFile::MoveFirst ()
+{
+	WritePageToFile(); // --> need to write the dirty page?
+}
+
+int DBFile::GetNext (Record &fetchme)
+{
+	WritePageToFile();
+	return RET_SUCCESS;
+}
+
+int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
+{
+	WritePageToFile();
+	return RET_SUCCESS;
+}
+
+void DBFile::WritePageToFile()
+{
+	m_pFile->AddPage(m_pPage, m_nTotalPages + 1);
+    delete m_pPage;
+    m_pPage = new Page();
+    m_nTotalPages++;
 }
 
 
@@ -132,10 +177,11 @@ void DBFile::Load (Schema &f_schema, char *loadpath) {
 int DBFile::Open (char *f_path) {
 }
 
-void DBFile::MoveFirst () {
-}
 
 int DBFile::Close () {
+}
+
+void DBFile::MoveFirst () {
 }
 
 void DBFile::Add (Record &rec) {
