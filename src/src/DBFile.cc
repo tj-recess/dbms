@@ -31,19 +31,20 @@ int DBFile::Create(char *f_path, fType f_type, void *startup)
 		cout << "Unsupported file type. Only heap is supported\n";
 		return RET_UNSUPPORTED_FILE_TYPE;
 	}
-
+	//saving file path (name)
+	m_sFilePath = f_path;
 	// open a new file. If file with same name already exists
 	// it is wiped clean
-	int iOpenExistingFile = 0;
+
 	if (m_pFile)
-		m_pFile->Open(iOpenExistingFile, f_path);
+		m_pFile->Open(openInTruncateMode, f_path);
 
 	//TODO: close file here?
 	int ret = Close();
 	return ret;
 }
 
-int DBFile::Open(char *fname)
+int DBFile::Open(const char *fname)
 {
 	// check if file exists
 	struct stat fileStat; 
@@ -59,48 +60,57 @@ int DBFile::Open(char *fname)
 	// TODO: check if file is NOT open already
 
 	// open file in append mode, preserving all prev content
-	int iOpenExistingFile = 1;
 	if (m_pFile)
-		m_pFile->Open(iOpenExistingFile, fname);
+		m_pFile->Open(openInAppendMode, const_cast<char*>(fname));
 
 	// TODO: error checking if open failed?
 	
 	return RET_SUCCESS;
 }
 
+/*
+ * returns 1 if successfully closed the file,
+ * 0 otherwise
+ */
 int DBFile::Close()
 {
-	//TODO
-	return 0;
+	//TODO : how to find if m_pFile->Close failed ?
+	m_pFile->Close();
+	return 1;//if control is here, always return success
 }
 
+/*
+ * Load function bulk loads the DBFile instance from a text file, appending
+ * new data to it using the SuckNextRecord function from Record.h. The character
+ * string passed to Load is the name of the data file to bulk load.
+ */
 void DBFile::Load (Schema &mySchema, char *loadMe)
 {
-	/*m_pCurrPtr = fopen (loadMe, "r");
-	if (!m_pCurrPtr)
+	ErrorLogger *el = ErrorLogger::getErrorLogger();
+
+	FILE *fileToLoad = fopen(loadMe, "r");
+	if (!fileToLoad)
 	{
-		// file to load could not be opened
-		// print error
+		el->writeLog("Can't open file name :" + string(loadMe));
 	}
 
-	// Pass the schema and file ptr to SuckNextRecord
-	// set m_pRecord, if not alreadt set....?
-	if (!m_pRecord)
-		m_pRecord = new Record();
+	//open the dbfile instance
+	Open(m_sFilePath.c_str());
 
-	if (m_pRecord)
-		m_pRecord->SuckNextRecord(&mySchema, m_pCurrPtr);
-	else
-	{
-		// fatal error
-		// m_pRecord should not be NULL at this point
-	}
+	/*
+	 * logic : first read the record from the file using suckNextRecord()
+	 * then add this record to page and keep adding such records until page is full
+	 * once page is full, write it to file.
+	 */
 
-	// bits have been populated
-	// use m_pRecord->GetBits() and store data in page/file
+	Record aRecord;
+	el->writeLog("Can't create a record, not enough memory!");
 
-	delete m_pRecord;
-	m_pRecord = NULL;*/
+	while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
+		if(!m_pPage->Append(&aRecord))
+		{
+			WritePageToFile();
+		}
 }
 
 void DBFile::Add (Record &rec)
@@ -149,48 +159,4 @@ void DBFile::WritePageToFile()
     m_pPage = new Page();
     m_nTotalPages++;
 }
-
-
-
-/*
- * #include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
-#include "Comparison.h"
-#include "ComparisonEngine.h"
-#include "DBFile.h"
-#include "Defs.h"
-
-// stub file .. replace it with your own DBFile.cc
-
-DBFile::DBFile () {
-
-}
-
-int DBFile::Create (char *f_path, fType f_type, void *startup) {
-}
-
-void DBFile::Load (Schema &f_schema, char *loadpath) {
-}
-
-int DBFile::Open (char *f_path) {
-}
-
-
-int DBFile::Close () {
-}
-
-void DBFile::MoveFirst () {
-}
-
-void DBFile::Add (Record &rec) {
-}
-
-int DBFile::GetNext (Record &fetchme) {
-}
-
-int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) {
-}
- */
 

@@ -8,7 +8,13 @@
 #include <iostream>
 #include <stdlib.h>
 #include "Defs.h"
-
+#include "TwoWayList.h"
+#include "Record.h"
+#include "Schema.h"
+#include "File.h"
+#include "Comparison.h"
+#include "ComparisonEngine.h"
+#include "ErrorLogger.h"
 
 // Enum for file types
 typedef enum
@@ -18,14 +24,16 @@ typedef enum
 	tree
 } fType;
 
+const int openInAppendMode = 1;
+const int openInTruncateMode = 0;
+
 class DBFile
 {
 	private:
+		string m_sFilePath;
 		File *m_pFile;		// file where data will be loaded
 		Page *m_pPage;
 		int m_nTotalPages;
-
-	private:
 		void WritePageToFile();
 
 	public:
@@ -39,7 +47,7 @@ class DBFile
 
 		// This function assumes that the DBFile already exists
 		// and has previously been created and then closed.
-		int Open (char *name); 
+		int Open (const char *name);
 
 		// Closes the file. 
 		// The return value is a 1 on success and a zero on failure
