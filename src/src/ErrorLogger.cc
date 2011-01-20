@@ -8,12 +8,14 @@
 #include "ErrorLogger.h"
 using namespace std;
 
-ErrorLogger::ErrorLogger() : fout("errorlog.txt"){}
+ofstream ErrorLogger::fout("errorlog.txt");
+ErrorLogger* ErrorLogger::el = NULL;
+
+ErrorLogger::ErrorLogger() 
+{}
 
 ErrorLogger::~ErrorLogger()
-{
-
-}
+{}
 
 void ErrorLogger::writeLog(const string& msg)
 {
@@ -22,9 +24,9 @@ void ErrorLogger::writeLog(const string& msg)
 
 ErrorLogger* ErrorLogger::getErrorLogger()
 {
-	if(!ErrorLogger::el)
+	if(!el)
 	{
-		ErrorLogger::el = new ErrorLogger();
+		el = new ErrorLogger();
 	}
-	return ErrorLogger::el;
+	return el;
 }

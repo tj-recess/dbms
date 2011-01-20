@@ -44,7 +44,7 @@ int DBFile::Create(char *f_path, fType f_type, void *startup)
 	return ret;
 }
 
-int DBFile::Open(const char *fname)
+int DBFile::Open(char *fname)
 {
 	// check if file exists
 	struct stat fileStat; 
@@ -95,7 +95,7 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	}
 
 	//open the dbfile instance
-	Open(m_sFilePath.c_str());
+	Open((char*)m_sFilePath.c_str());
 
 	/*
 	 * logic : first read the record from the file using suckNextRecord()
