@@ -1,8 +1,6 @@
 #include "DBFile.h"
-#include <iostream>
-#include <stdlib.h>
 
-DBFile::DBfile()
+DBFile::DBFile()
 {
 	m_pFile = new File();
 }
@@ -10,7 +8,7 @@ DBFile::DBfile()
 DBFile::~DBFile()
 {
 	// set FILE handle to null
-	p_currPtr = 0;
+	m_pCurrPtr = 0;
 
 	// delete member File pointer
 	if (m_pFile)
@@ -27,24 +25,24 @@ DBFile::~DBFile()
 	}
 }
 
-int DBFile::Create(char *name, fType myType, void *startup)
+int DBFile::Create(char *f_path, fType f_type, void *startup)
 {
 	// check file type
-	if (myType != fType.heap)
+	if (f_type != heap)
 	{
 		cout << "Unsupported file type. Only heap is supported\n";
 		return RET_UNSUPPORTED_FILE_TYPE;
 	}
 
-	// create a new file. If file with same name already exists,
+	// open a new file. If file with same name already exists
 	// it is wiped clean
-	p_currPtr = fopen (name, "w+");	
-	if (p_currPtr == NULL)
-	{
-		cout << "Failed to open file\n";
-		return RET_FAILED_FILE_OPEN;
-	}
-	//close file
+	int iOpenExistingFile = 0;
+	if (m_pFile)
+		m_pFile->Open(iOpenExistingFile, f_path);
+
+	//TODO: close file here?
+	int ret = Close();
+	return ret;
 }
 
 int DBFile::Open(char *fname)
@@ -62,33 +60,26 @@ int DBFile::Open(char *fname)
 
 	// TODO: check if file is NOT open already
 
-	// open file in apopend mode, preserving all prev content
-	// TODO: use File::Open instead of opening it here
-	// int iOpenExistingFile = 1;
-	// m_pFile->Open(iOpenExistingFile, fname);
-	// but it will lseek using the 1st parameter... is that okay?
+	// open file in append mode, preserving all prev content
+	int iOpenExistingFile = 1;
+	if (m_pFile)
+		m_pFile->Open(iOpenExistingFile, fname);
 
-	p_currPtr = fopen (fname, "a+");                          
-    if (p_currPtr == NULL)
-    {
-        cout << "Failed to open file\n";
-        return RET_FAILED_FILE_OPEN;
-    }
+	// TODO: error checking if open failed?
 	
 	return RET_SUCCESS;
 }
 
 int DBFile::Close()
 {
-	int ret = fclose(p_currPtr);
-	return ret;	
+	//TODO
+	return 0;
 }
 
 void DBFile::Load (Schema &mySchema, char *loadMe)
 {
-	// Open the loadMe file, p_currPtr will be set
-	int ret = open(loadMe);	
-	if (ret != RET_SUCCESS)
+	m_pCurrPtr = fopen (loadMe, "r");
+	if (!m_pCurrPtr)
 	{
 		// file to load could not be opened
 		// print error
@@ -100,7 +91,7 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 		m_pRecord = new Record();
 
 	if (m_pRecord)
-		m_pRecord->SuckNextRecord(mySchema, p_currPtr);
+		m_pRecord->SuckNextRecord(&mySchema, m_pCurrPtr);
 	else
 	{
 		// fatal error
@@ -109,6 +100,9 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 
 	// bits have been populated
 	// use m_pRecord->GetBits() and store data in page/file
+
+	delete m_pRecord;
+	m_pRecord = NULL;
 }
 
 
@@ -153,4 +147,4 @@ int DBFile::GetNext (Record &fetchme) {
 int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) {
 }
  */
- */
+

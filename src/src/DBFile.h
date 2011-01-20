@@ -1,6 +1,9 @@
 #ifndef DB_FILE_H
-#define DB-FILE_H
+#define DB_FILE_H
 
+
+#include "Record.h"
+#include "File.h"
 #include <string.h>
 #include <iostream>
 #include <stdlib.h>
@@ -8,19 +11,17 @@
 
 
 // Enum for file types
-enum fileType
+typedef enum
 {
-	heap 0,
+	heap,
 	sorted,
 	tree
-};
-
-typedef enum fileType fType;
+} fType;
 
 class DBFile
 {
 	private:
-		FILE * p_currPtr;		
+		FILE * m_pCurrPtr;
 		File * m_pFile;
 		Record * m_pRecord;
 
@@ -33,7 +34,7 @@ class DBFile
 
 		// Add new record to the end of the file
 		// Note: addMe is consumed by this function and cannot be used again
-		void Add (Record &addMe) 
+		void Add (Record &addMe);
 
 		// Fetch next record (relative to p_currPtr) into fetchMe
 		int GetNext (Record &fetchMe);
@@ -97,4 +98,4 @@ public:
 };
 #endif
  */
- */
+
