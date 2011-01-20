@@ -8,11 +8,14 @@
 #ifndef ERRORLOGGER_H_
 #define ERRORLOGGER_H_
 
-#include<fstream>
+#include <fstream>
 
 using namespace std;
-class ErrorLogger {
-	ofstream fout;
+
+class ErrorLogger 
+{
+private:
+	static ofstream fout;
 	static ErrorLogger *el;
 	ErrorLogger();
 public:

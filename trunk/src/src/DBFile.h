@@ -47,7 +47,7 @@ class DBFile
 
 		// This function assumes that the DBFile already exists
 		// and has previously been created and then closed.
-		int Open (const char *name);
+		int Open (char *name);
 
 		// Closes the file. 
 		// The return value is a 1 on success and a zero on failure
