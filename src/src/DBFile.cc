@@ -214,8 +214,23 @@ int DBFile::GetNext (Record &fetchme)
 
 int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 {
-	WritePageToFile();
-	return RET_SUCCESS;
+	/*
+	 * logic :
+	 * first read the record from the file in "fetchme,
+	 * pass it for comparison using given cnf and literal.
+	 * if compEngine.compare returns 1, it means fetched record
+	 * satisfies CNF expression so we simple return success (=1) here
+	 */
+	ComparisonEngine compEngine;
+
+	while(GetNext(fetchme)) 	/*GetNext(Record&) handles dirty pages possibility*/
+	{
+		if(compEngine.Compare(&fetchme, &literal, &cnf))
+			return RET_SUCCESS;
+	}
+
+	//if control is here then no matching record was found
+	return RET_FAILURE;
 }
 
 void DBFile::WritePageToFile()
