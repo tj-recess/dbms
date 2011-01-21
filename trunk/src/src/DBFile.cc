@@ -21,6 +21,13 @@ DBFile::~DBFile()
 		delete m_pPage;
 		m_pPage = NULL;
 	}
+
+	// delete current page pointer
+	if (m_pCurrPage)
+	{
+		delete m_pCurrPage;
+		m_pCurrPage = NULL;
+	}
 }
 
 int DBFile::Create(char *f_path, fType f_type, void *startup)
@@ -142,7 +149,66 @@ void DBFile::MoveFirst ()
 
 int DBFile::GetNext (Record &fetchme)
 {
+	// write dirty page to file
+	// as it might happen that the record we want to fetch now
+	// is still in the dirty page which has not been flushed to disk
 	WritePageToFile();
+
+	// coming for the first time
+	// TODO: page stars from 0 or 1?
+	if (m_nCurrPage == 0)
+	{
+		// Store a copy of the page in member buffer
+		m_pCurrPage = new Page();
+		m_pFile->GetPage(m_pCurrPage, ++m_nCurrPage);
+	}
+
+	if (m_pCurrPage)
+	{
+		// Try to fetch the first record from current_page
+		// This function will delete this record from the page
+		int ret = m_pCurrPage->GetFirst(&fetchme);
+		if (!ret)
+		{
+			// Check if pages are still left in the file
+			if (m_nCurrPage < m_nTotalPages)
+			{
+				// page ran out of records, so fetch next page
+				delete m_pCurrPage;
+				m_pCurrPage = new Page();
+				m_pFile->GetPage(m_pCurrPage, ++m_nCurrPage);
+				ret = m_pCurrPage->GetFirst(&fetchme);
+				if (!ret) // failed to fetch next record
+				{
+					// check if we have reached the end of file
+					if (m_nCurrPage >= m_nTotalPages)
+					{
+						// end of file reached
+						return RET_FAILURE;
+					}
+					else
+					{
+						// end of file not reached, but record not found? fatal error!
+						return RET_FAILURE;
+					}
+				}
+			}
+			else
+			{
+				// end of file reached
+				return RET_FAILURE;
+			}
+		}
+		// Record fetched successfully
+		m_nCurrRecord++;
+		return RET_SUCCESS;
+	}
+	else
+	{
+		// m_nCurrPage cannot be NULL at this point <-- FATAL error
+		return RET_FAILURE;
+	}
+
 	return RET_SUCCESS;
 }
 
