@@ -5,8 +5,8 @@
  *      Author: arpit
  */
 
-#ifndef ERRORLOGGER_H_
-#define ERRORLOGGER_H_
+#ifndef EVENTLOGGER_H_
+#define EVENTLOGGER_H_
 
 #include <fstream>
 #include<iostream>
@@ -20,9 +20,10 @@ private:
 	static EventLogger *el;
 	EventLogger();
 public:
+	//EventLogger(const EventLogger&);
 	virtual ~EventLogger();
 	void writeLog(const string& msg);
 	static EventLogger* getEventLogger();
 };
 
-#endif /* ERRORLOGGER_H_ */
+#endif /* EVENTLOGGER_H_ */

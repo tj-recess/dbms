@@ -5,7 +5,7 @@
  *      Author: arpit
  */
 
-#include "ErrorLogger.h"
+#include "EventLogger.h"
 using namespace std;
 
 EventLogger* EventLogger::el = NULL;
