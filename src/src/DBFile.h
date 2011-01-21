@@ -32,8 +32,9 @@ class DBFile
 	private:
 		string m_sFilePath;
 		File *m_pFile;		// file where data will be loaded
-		Page *m_pPage;
-		int m_nTotalPages;
+		Page *m_pPage, *m_pCurrPage;
+		int m_nTotalPages, m_nCurrPage, m_nCurrRecord;
+
 		void WritePageToFile();
 
 	public:

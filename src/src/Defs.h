@@ -8,8 +8,8 @@
 #define PAGE_SIZE 131072
 
 // Error codes
-#define RET_SUCCESS 0
-#define RET_FAILURE 1
+#define RET_FAILURE 0
+#define RET_SUCCESS 1
 #define RET_FILE_NOT_FOUND 2
 #define RET_FAILED_FILE_OPEN 3
 #define RET_UNSUPPORTED_FILE_TYPE 4
