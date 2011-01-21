@@ -9,19 +9,20 @@
 #define ERRORLOGGER_H_
 
 #include <fstream>
+#include<iostream>
 
 using namespace std;
 
-class ErrorLogger 
+class EventLogger 
 {
 private:
-	static ofstream fout;
-	static ErrorLogger *el;
-	ErrorLogger();
+	ofstream fout;
+	static EventLogger *el;
+	EventLogger();
 public:
-	virtual ~ErrorLogger();
+	virtual ~EventLogger();
 	void writeLog(const string& msg);
-	static ErrorLogger* getErrorLogger();
+	static EventLogger* getEventLogger();
 };
 
 #endif /* ERRORLOGGER_H_ */

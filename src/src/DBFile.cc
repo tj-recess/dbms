@@ -86,7 +86,7 @@ int DBFile::Close()
  */
 void DBFile::Load (Schema &mySchema, char *loadMe)
 {
-	ErrorLogger *el = ErrorLogger::getErrorLogger();
+	EventLogger *el = EventLogger::getEventLogger();
 
 	FILE *fileToLoad = fopen(loadMe, "r");
 	if (!fileToLoad)
