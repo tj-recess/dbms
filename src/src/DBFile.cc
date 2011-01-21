@@ -44,11 +44,10 @@ int DBFile::Create(char *f_path, fType f_type, void *startup)
 	// it is wiped clean
 
 	if (m_pFile)
-		m_pFile->Open(openInTruncateMode, f_path);
+		m_pFile->Open(TRUNCATE, f_path);
 
 	//TODO: close file here?
-	int ret = Close();
-	return ret;
+	return Close();
 }
 
 int DBFile::Open(char *fname)
@@ -64,12 +63,13 @@ int DBFile::Open(char *fname)
         return RET_FILE_NOT_FOUND;
 	} 
 
-	// TODO: check if file is NOT open already
+	// TODO: check if file is NOT open already - why ?
 
 	// open file in append mode, preserving all prev content
 	if (m_pFile)
-		m_pFile->Open(openInAppendMode, const_cast<char*>(fname));
-
+	{
+		m_pFile->Open(APPEND, const_cast<char*>(fname));//openInAppendMode
+	}
 	// TODO: error checking if open failed?
 	
 	return RET_SUCCESS;
@@ -102,7 +102,7 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	}
 
 	//open the dbfile instance
-	Open((char*)m_sFilePath.c_str());
+	Open(const_cast<char*>(m_sFilePath.c_str()));
 
 	/*
 	 * logic : first read the record from the file using suckNextRecord()
@@ -111,12 +111,12 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	 */
 
 	Record aRecord;
-	el->writeLog("Can't create a record, not enough memory!");
 
 	while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
-		if(!m_pPage->Append(&aRecord))
+		if(!m_pPage->Append(&aRecord))	//if append fails then write page to disk
 		{
 			WritePageToFile();
+			m_pPage->Append(&aRecord);//also put this already sucked record into the new page
 		}
 }
 
@@ -125,19 +125,23 @@ void DBFile::Add (Record &rec)
 	Record aRecord;
 	aRecord.Consume(&rec);
 
-	// TODO: fetch last used page into m_pPage
+	// fetch last used page into m_pPage
+	if(m_pPage)
+	{
+		//TODO check if we need to write back before deleting the page directly
+		delete m_pPage;
+	}
+	m_pFile->GetPage(m_pPage, m_nTotalPages);
 
 	// Try to store the record into current page
-	int ret = m_pPage->Append(&aRecord);
-	if (!ret)	// current page does not have enough space
+	if (!m_pPage->Append(&aRecord))	// current page does not have enough space
 	{
 		// write current page to file
 		// this function will create a new page too
 		WritePageToFile();
-		ret = m_pPage->Append(&aRecord);
-		if (!ret)
+		if (!m_pPage->Append(&aRecord))
 		{
-			// error logger
+			//TODO Fatal Error
 		}
 	}
 }

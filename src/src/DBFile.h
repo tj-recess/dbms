@@ -2,8 +2,6 @@
 #define DB_FILE_H
 
 
-#include "Record.h"
-#include "File.h"
 #include <string.h>
 #include <iostream>
 #include <stdlib.h>
@@ -24,8 +22,7 @@ typedef enum
 	tree
 } fType;
 
-const int openInAppendMode = 1;
-const int openInTruncateMode = 0;
+enum FileOpenMode { TRUNCATE = 0, APPEND = 1};
 
 class DBFile
 {
