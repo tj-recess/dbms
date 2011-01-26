@@ -1,6 +1,8 @@
 #include "DBFile.h"
 
-DBFile::DBFile()
+DBFile::DBFile(): m_sFilePath(), m_pCurrPage(NULL), m_nTotalPages(0),
+				  m_nCurrPage(0), m_nCurrRecord(0), m_bDirtyPageExists(false),
+				  m_bIsDirtyMetadata(false)
 {
 	m_pFile = new File();
 	m_pPage = new Page();
@@ -108,16 +110,23 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	 * logic : first read the record from the file using suckNextRecord()
 	 * then add this record to page and keep adding such records until page is full
 	 * once page is full, write it to file.
+	 * Or after we finish the loop, write to file before leaving from this function
 	 */
 
 	Record aRecord;
 
 	while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
+	{
 		if(!m_pPage->Append(&aRecord))	//if append fails then write page to disk
 		{
 			WritePageToFile();
 			m_pPage->Append(&aRecord);//also put this already sucked record into the new page
 		}
+		// set dirty page to true
+		if (!m_bDirtyPageExists)
+			m_bDirtyPageExists = true;
+	}
+	WritePageToFile();
 }
 
 void DBFile::Add (Record &rec)
@@ -134,6 +143,7 @@ void DBFile::Add (Record &rec)
 	m_pFile->GetPage(m_pPage, m_nTotalPages);
 
 	// Try to store the record into current page
+	m_bDirtyPageExists = true;
 	if (!m_pPage->Append(&aRecord))	// current page does not have enough space
 	{
 		// write current page to file
@@ -168,7 +178,7 @@ int DBFile::GetNext (Record &fetchme)
 	{
 		// Store a copy of the page in member buffer
 		m_pCurrPage = new Page();
-		m_pFile->GetPage(m_pCurrPage, ++m_nCurrPage);
+		m_pFile->GetPage(m_pCurrPage, m_nCurrPage++);
 	}
 
 	if (m_pCurrPage)
@@ -244,9 +254,23 @@ int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 
 void DBFile::WritePageToFile()
 {
-	m_pFile->AddPage(m_pPage, m_nTotalPages + 1);
-    delete m_pPage;
-    m_pPage = new Page();
-    m_nTotalPages++;
+	if (m_bDirtyPageExists)
+	{
+		m_pFile->AddPage(m_pPage, m_nTotalPages + 1);
+		delete m_pPage;
+		m_pPage = new Page();
+		m_nTotalPages++;
+	}
+    m_bDirtyPageExists = false;
 }
 
+void DBFile::WriteMetaData()
+{
+   if(m_bIsDirtyMetadata && !m_sFilePath.empty())
+   {
+		   ofstream out;
+		   out.open(string(m_sFilePath + "meta.data").c_str(),ios::trunc);
+		   out<<m_nTotalPages;
+		   out.close();
+   }
+}
