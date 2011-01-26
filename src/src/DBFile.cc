@@ -173,12 +173,13 @@ int DBFile::GetNext (Record &fetchme)
 	WritePageToFile();
 
 	// coming for the first time
-	// TODO: page stars from 0 or 1?
+	// Page starts with 0, but data is stored from 1st page onwards
+	// Refer to File :: GetPage (File.cc line 168)
 	if (m_nCurrPage == 0)
 	{
 		// Store a copy of the page in member buffer
 		m_pCurrPage = new Page();
-		m_pFile->GetPage(m_pCurrPage, ++m_nCurrPage);
+		m_pFile->GetPage(m_pCurrPage, m_nCurrPage++);
 	}
 
 	if (m_pCurrPage)
@@ -189,17 +190,17 @@ int DBFile::GetNext (Record &fetchme)
 		if (!ret)
 		{
 			// Check if pages are still left in the file
-			if (m_nCurrPage < m_pFile->GetLength())
-			{
+			if (m_nCurrPage < m_pFile->GetLength()-1)	//first page in File doesn't store the data, so if GetLength() tells 2 pages,
+			{											//data is actually stored in only one page.
 				// page ran out of records, so fetch next page
 				delete m_pCurrPage;
 				m_pCurrPage = new Page();
-				m_pFile->GetPage(m_pCurrPage, ++m_nCurrPage);
+				m_pFile->GetPage(m_pCurrPage, m_nCurrPage++);
 				ret = m_pCurrPage->GetFirst(&fetchme);
 				if (!ret) // failed to fetch next record
 				{
 					// check if we have reached the end of file
-					if (m_nCurrPage >= m_nTotalPages)
+					if (m_nCurrPage >= m_pFile->GetLength())
 					{
 						// end of file reached
 						return RET_FAILURE;
@@ -256,7 +257,7 @@ void DBFile::WritePageToFile()
 {
 	if (m_bDirtyPageExists)
 	{
-		m_pFile->AddPage(m_pPage, m_nTotalPages + 1);
+		m_pFile->AddPage(m_pPage, m_nTotalPages);
 		delete m_pPage;
 		m_pPage = new Page();
 		m_nTotalPages++;
