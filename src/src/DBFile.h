@@ -31,8 +31,11 @@ class DBFile
 		File *m_pFile;		// file where data will be loaded
 		Page *m_pPage, *m_pCurrPage;
 		int m_nTotalPages, m_nCurrPage, m_nCurrRecord;
+		bool m_bDirtyPageExists;
+		bool m_bIsDirtyMetadata;
 
 		void WritePageToFile();
+		void WriteMetaData();
 
 	public:
 		DBFile();
