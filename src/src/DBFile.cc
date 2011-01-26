@@ -148,7 +148,11 @@ void DBFile::Add (Record &rec)
 
 void DBFile::MoveFirst ()
 {
-	WritePageToFile(); // --> need to write the dirty page?
+	// Reser current page and record pointers
+	m_nCurrPage = 0; // TODO: or -1?
+	m_nCurrRecord = 0;
+	delete m_pCurrPage;
+	m_pCurrPage = NULL;
 }
 
 int DBFile::GetNext (Record &fetchme)
@@ -225,6 +229,7 @@ int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	 * if compEngine.compare returns 1, it means fetched record
 	 * satisfies CNF expression so we simple return success (=1) here
 	 */
+
 	ComparisonEngine compEngine;
 
 	while(GetNext(fetchme)) 	/*GetNext(Record&) handles dirty pages possibility*/
