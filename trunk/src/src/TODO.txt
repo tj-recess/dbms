@@ -2,5 +2,18 @@ This file will contain list of all the stuff which is to be done.
 
 1. Add enum error_codes in defs.h. We can use those instead of just returning 0 or 1. -- DONE
 2. svn commit error.h (provided by Dobra). -- DONE
-3. GetNext(...)
-4. Metadata while writing file
+3. GetNext(...) - DONE
+4. Metadata while writing file - DONE
+
+----- 27th Jan ----
+
+Unused variables:
+ - m_nCurrRecord
+ - m_nCurrRecordCNF
+
+Where do we use the meta.data file?
+When do we delete the meta.data files? (make clean?)
+Need to delete error-logger instance. EventLogger.cc:27 --> el = new EventLogger();
+
+Run code through valgrind.
+
