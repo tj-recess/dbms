@@ -1,11 +1,10 @@
 #include "DBFile.h"
 
-DBFile::DBFile(): m_sFilePath(), m_pCurrPage(NULL), m_nTotalPages(0),
-				  m_nCurrPage(0), m_nCurrRecord(0), m_bDirtyPageExists(false),
-				  m_bIsDirtyMetadata(false)
+DBFile::DBFile(): m_sFilePath(), m_pPage(NULL), m_pCurrPage(NULL), 
+				  m_nTotalPages(0), m_nCurrPage(0), m_nCurrRecord(0), 
+				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false)
 {
 	m_pFile = new File();
-	m_pPage = new Page();
 }
 
 DBFile::~DBFile()
@@ -40,11 +39,12 @@ int DBFile::Create(char *f_path, fType f_type, void *startup)
 		cout << "Unsupported file type. Only heap is supported\n";
 		return RET_UNSUPPORTED_FILE_TYPE;
 	}
-	//saving file path (name)
+
+	// saving file path (name)
 	m_sFilePath = f_path;
+
 	// open a new file. If file with same name already exists
 	// it is wiped clean
-
 	if (m_pFile)
 		m_pFile->Open(TRUNCATE, f_path);
 
@@ -66,6 +66,19 @@ int DBFile::Open(char *fname)
 	} 
 
 	// TODO: check if file is NOT open already - why ?
+	// ans - coz we should not access an already open file
+	// eg - currently open by another thread (?)
+
+	// Read m_nTotalPages from metadata file, if meta.data file exists
+	string meta_file_name = m_sFilePath + ".meta.data";
+	iStatus = stat(meta_file_name.c_str(), &fileStat);
+	if (iStatus == 0)
+	{
+		ifstream meta_in;
+		meta_in.open(meta_file_name.c_str(), ifstream::in);
+		meta_in >> m_nTotalPages;
+		meta_in.close();
+	}
 
 	// open file in append mode, preserving all prev content
 	if (m_pFile)
@@ -85,7 +98,11 @@ int DBFile::Close()
 {
 	//TODO : how to find if m_pFile->Close failed ?
 	m_pFile->Close();
-	return 1;//if control is here, always return success
+	
+	// write total pages to meta.data
+	WriteMetaData();
+
+	return 1; // If control came here, return success
 }
 
 /*
@@ -108,24 +125,14 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 
 	/*
 	 * logic : first read the record from the file using suckNextRecord()
-	 * then add this record to page and keep adding such records until page is full
-	 * once page is full, write it to file.
-	 * Or after we finish the loop, write to file before leaving from this function
+	 * then add this record to page using Add() function
+	 * Write dirty data to file before leaving this function
 	 */
 
 	Record aRecord;
-
 	while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
-	{
-		if(!m_pPage->Append(&aRecord))	//if append fails then write page to disk
-		{
-			WritePageToFile();
-			m_pPage->Append(&aRecord);//also put this already sucked record into the new page
-		}
-		// set dirty page to true
-		if (!m_bDirtyPageExists)
-			m_bDirtyPageExists = true;
-	}
+		Add(aRecord);
+
 	WritePageToFile();
 }
 
@@ -134,32 +141,43 @@ void DBFile::Add (Record &rec)
 	Record aRecord;
 	aRecord.Consume(&rec);
 
-	// fetch last used page into m_pPage
-	if(m_pPage)
-	{
-		//TODO check if we need to write back before deleting the page directly
-		delete m_pPage;
-	}
-	m_pFile->GetPage(m_pPage, m_nTotalPages);
+	/* Logic: 
+	 * Try adding the record to the current page
+	 * if adding fails, write page to file and create new page
+     * mark m_bDirtyPageExists = true after adding record to page
+	 */
 
-	// Try to store the record into current page
-	m_bDirtyPageExists = true;
-	if (!m_pPage->Append(&aRecord))	// current page does not have enough space
+	// Writing data in the file for the first time
+	if (m_pPage == NULL)
 	{
-		// write current page to file
-		// this function will create a new page too
-		WritePageToFile();
-		if (!m_pPage->Append(&aRecord))
-		{
-			//TODO Fatal Error
-		}
+		m_pPage = new Page();
+		m_nTotalPages = 0;
+	}
+	else	// a page already exists in memory, add record to it
+	{
+	    if (!m_pPage->Append(&aRecord)) // current page does not have enough space
+    	{
+        	// write current page to file
+	        // this function will create a new page too
+    	    WritePageToFile();
+        	if (!m_pPage->Append(&aRecord))
+	        {
+    	        //TODO Fatal Error
+				cout << "DBFile::Add --> Adding record to page failed.\n";
+				return;
+        	}
+			else
+				m_bDirtyPageExists = true;
+	    }
+		else
+			m_bDirtyPageExists = true;
 	}
 }
 
 void DBFile::MoveFirst ()
 {
 	// Reser current page and record pointers
-	m_nCurrPage = 0; // TODO: or -1?
+	m_nCurrPage = 0; 
 	m_nCurrRecord = 0;
 	delete m_pCurrPage;
 	m_pCurrPage = NULL;
@@ -190,8 +208,10 @@ int DBFile::GetNext (Record &fetchme)
 		if (!ret)
 		{
 			// Check if pages are still left in the file
-			if (m_nCurrPage < m_pFile->GetLength()-1)	//first page in File doesn't store the data, so if GetLength() tells 2 pages,
-			{											//data is actually stored in only one page.
+			// Note: first page in File doesn't store the data
+			// So if GetLength() returns 2 pages, data is actually stored in only one page
+			if (m_nCurrPage < m_pFile->GetLength()-1)	
+			{											
 				// page ran out of records, so fetch next page
 				delete m_pCurrPage;
 				m_pCurrPage = new Page();
@@ -202,21 +222,20 @@ int DBFile::GetNext (Record &fetchme)
 					// check if we have reached the end of file
 					if (m_nCurrPage >= m_pFile->GetLength())
 					{
-						// end of file reached
+						cout << "DBFile::GetNext --> End of file reached."
+							 << "Error trying to fetch more records\n";
 						return RET_FAILURE;
 					}
 					else
 					{
-						// end of file not reached, but record not found? fatal error!
+						cout << "DBFile::GetNext --> End of file not reached, "
+							 << "but fetching record from file failed!\n";
 						return RET_FAILURE;
 					}
 				}
 			}
-			else
-			{
-				// end of file reached
+			else	// end of file reached, cannot read more
 				return RET_FAILURE;
-			}
 		}
 		// Record fetched successfully
 		m_nCurrRecord++;
@@ -224,7 +243,8 @@ int DBFile::GetNext (Record &fetchme)
 	}
 	else
 	{
-		// m_nCurrPage cannot be NULL at this point <-- FATAL error
+		cout << "DBFile::GetNext --> m_nCurrPage is NULL. "
+			 << "Fatal error!\n";
 		return RET_FAILURE;
 	}
 
@@ -257,21 +277,23 @@ void DBFile::WritePageToFile()
 {
 	if (m_bDirtyPageExists)
 	{
-		m_pFile->AddPage(m_pPage, m_nTotalPages);
+		m_pFile->AddPage(m_pPage, m_nTotalPages++);
 		delete m_pPage;
 		m_pPage = new Page();
-		m_nTotalPages++;
+		// everytime page count increases, set m_bIsDirtyMetadata to true
+		m_bIsDirtyMetadata = true;
 	}
     m_bDirtyPageExists = false;
 }
 
 void DBFile::WriteMetaData()
 {
-   if(m_bIsDirtyMetadata && !m_sFilePath.empty())
+   if (m_bIsDirtyMetadata && !m_sFilePath.empty())
    {
-	   ofstream out;
-	   out.open(string(m_sFilePath + "meta.data").c_str(),ios::trunc);
-	   out<<m_nTotalPages;
-	   out.close();
+		ofstream meta_out;
+		meta_out.open(string(m_sFilePath + ".meta.data").c_str(), ios::trunc);
+		meta_out << m_nTotalPages;
+		meta_out.close();
+		m_bIsDirtyMetadata = false;
    }
 }
