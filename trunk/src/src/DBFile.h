@@ -28,14 +28,22 @@ class DBFile
 {
 	private:
 		string m_sFilePath;
-		File *m_pFile;		// file where data will be loaded
-		Page *m_pPage, *m_pCurrPage;
-		int m_nTotalPages, m_nCurrPage, m_nCurrRecord;
+		File *m_pFile;		// .bin file where data will be loaded
+		Page *m_pPage;
+		int m_nTotalPages;
 		bool m_bDirtyPageExists;
 		bool m_bIsDirtyMetadata;
+		// Member variables to handle GetNext()
+		Page *m_pCurrPage;
+		int  m_nCurrPage, m_nCurrRecord;
+		// Member variables to handle GetNext(CNF)
+		Page *m_pCurrPageCNF;
+		int  m_nCurrPageCNF, m_nCurrRecordCNF;
 
+		// Private member functions
 		void WritePageToFile();
 		void WriteMetaData();
+		int FetchNextRec(Record &fetchme, Page**, int&, int&);
 
 	public:
 		DBFile();
