@@ -1,8 +1,9 @@
 #include "DBFile.h"
 
-DBFile::DBFile(): m_sFilePath(), m_pPage(NULL), m_pCurrPage(NULL), 
-				  m_nTotalPages(0), m_nCurrPage(0), m_nCurrRecord(0), 
-				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false)
+DBFile::DBFile(): m_sFilePath(), m_pPage(NULL), m_nTotalPages(0),
+				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false),
+				  m_pCurrPage(NULL), m_nCurrPage(0), m_nCurrRecord(0), 
+				  m_pCurrPageCNF(NULL), m_nCurrPageCNF(0), m_nCurrRecordCNF(0)
 {
 	m_pFile = new File();
 }
@@ -28,6 +29,13 @@ DBFile::~DBFile()
 	{
 		delete m_pCurrPage;
 		m_pCurrPage = NULL;
+	}
+
+	// delete current page CNF pointer
+	if (m_pCurrPageCNF)
+	{
+		delete m_pCurrPageCNF;
+		m_pCurrPageCNF = NULL;
 	}
 }
 
@@ -90,23 +98,19 @@ int DBFile::Open(char *fname)
 	return RET_SUCCESS;
 }
 
-/*
- * returns 1 if successfully closed the file,
- * 0 otherwise
- */
+// returns 1 if successfully closed the file, 0 otherwise 
 int DBFile::Close()
 {
 	//TODO : how to find if m_pFile->Close failed ?
 	m_pFile->Close();
 	
-	// write total pages to meta.data
+	// write total pages to <table_name>.meta.data
 	WriteMetaData();
 
 	return 1; // If control came here, return success
 }
 
-/*
- * Load function bulk loads the DBFile instance from a text file, appending
+/* Load function bulk loads the DBFile instance from a text file, appending
  * new data to it using the SuckNextRecord function from Record.h. The character
  * string passed to Load is the name of the data file to bulk load.
  */
@@ -123,8 +127,8 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	//open the dbfile instance
 	Open(const_cast<char*>(m_sFilePath.c_str()));
 
-	/*
-	 * logic : first read the record from the file using suckNextRecord()
+	/* Logic : 
+     * first read the record from the file using suckNextRecord()
 	 * then add this record to page using Add() function
 	 * Write dirty data to file before leaving this function
 	 */
@@ -153,16 +157,17 @@ void DBFile::Add (Record &rec)
 		m_pPage = new Page();
 		m_nTotalPages = 0;
 	}
-	else	// a page already exists in memory, add record to it
+
+	// a page exists in memory, add record to it
+	if (m_pPage)	
 	{
 	    if (!m_pPage->Append(&aRecord)) // current page does not have enough space
     	{
         	// write current page to file
-	        // this function will create a new page too
+	        // this function will fetch a new page too
     	    WritePageToFile();
         	if (!m_pPage->Append(&aRecord))
 	        {
-    	        //TODO Fatal Error
 				cout << "DBFile::Add --> Adding record to page failed.\n";
 				return;
         	}
@@ -176,14 +181,65 @@ void DBFile::Add (Record &rec)
 
 void DBFile::MoveFirst ()
 {
-	// Reser current page and record pointers
+	// Reset current page and record pointers
 	m_nCurrPage = 0; 
 	m_nCurrRecord = 0;
 	delete m_pCurrPage;
 	m_pCurrPage = NULL;
+
+	m_nCurrPageCNF = 0; 
+	m_nCurrRecordCNF = 0;
+	delete m_pCurrPageCNF;
+	m_pCurrPageCNF = NULL;
+	
+	// Malvika's note: This function can be optimized
+	// Don't delete m_pCurrPage(CNF) if it is the first page itself
 }
 
+// Function to fetch the next record in the file in "fetchme"
+// Returns 0 on failure
 int DBFile::GetNext (Record &fetchme)
+{
+	return FetchNextRec(fetchme, &m_pCurrPage, m_nCurrPage, m_nCurrRecord);
+}
+
+
+// Function to fetch the next record in "fetchme" that matches 
+// the given CNF, returns 0 on failure.
+int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
+{
+	/* logic :
+	 * first read the record from the file in "fetchme,
+	 * pass it for comparison using given cnf and literal.
+	 * if compEngine.compare returns 1, it means fetched record
+	 * satisfies CNF expression so we simple return success (=1) here
+	 */
+
+	ComparisonEngine compEngine;
+
+	// FetchNextRec(Record&) handles dirty pages possibility
+	while (FetchNextRec(fetchme, &m_pCurrPageCNF, 
+					   m_nCurrPageCNF, m_nCurrRecordCNF)) 
+	{
+		if (compEngine.Compare(&fetchme, &literal, &cnf))
+			return RET_SUCCESS;
+	}
+
+	//if control is here then no matching record was found
+	return RET_FAILURE;
+}
+
+
+/* Private function that fetched the next record in "fetchme"
+ * from the page "pCurrPage". It also updates the variables 
+ * nCurrPage and nCurrRecord which are passed to it by reference
+ * Returns 0 on failure
+ * This function is called by the following two functions:
+ * int DBFile::GetNext (Record &fetchme) and
+ * int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
+ */
+int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, 
+						  int &nCurrPage, int &nCurrRecord)
 {
 	// write dirty page to file
 	// as it might happen that the record we want to fetch now
@@ -193,34 +249,34 @@ int DBFile::GetNext (Record &fetchme)
 	// coming for the first time
 	// Page starts with 0, but data is stored from 1st page onwards
 	// Refer to File :: GetPage (File.cc line 168)
-	if (m_nCurrPage == 0)
+	if (nCurrPage == 0)
 	{
 		// Store a copy of the page in member buffer
-		m_pCurrPage = new Page();
-		m_pFile->GetPage(m_pCurrPage, m_nCurrPage++);
+		*pCurrPage = new Page();
+		(*pCurrPage)->EmptyItOut();
+		m_pFile->GetPage(*pCurrPage, nCurrPage++);
 	}
 
-	if (m_pCurrPage)
+	if (*pCurrPage)
 	{
 		// Try to fetch the first record from current_page
 		// This function will delete this record from the page
-		int ret = m_pCurrPage->GetFirst(&fetchme);
+		int ret = (*pCurrPage)->GetFirst(&fetchme);
 		if (!ret)
 		{
 			// Check if pages are still left in the file
 			// Note: first page in File doesn't store the data
 			// So if GetLength() returns 2 pages, data is actually stored in only one page
-			if (m_nCurrPage < m_pFile->GetLength()-1)	
+			if (nCurrPage < m_pFile->GetLength()-1)	
 			{											
-				// page ran out of records, so fetch next page
-				delete m_pCurrPage;
-				m_pCurrPage = new Page();
-				m_pFile->GetPage(m_pCurrPage, m_nCurrPage++);
-				ret = m_pCurrPage->GetFirst(&fetchme);
+				// page ran out of records, so empty it and fetch next page
+				(*pCurrPage)->EmptyItOut();
+				m_pFile->GetPage(*pCurrPage, nCurrPage++);
+				ret = (*pCurrPage)->GetFirst(&fetchme);
 				if (!ret) // failed to fetch next record
 				{
 					// check if we have reached the end of file
-					if (m_nCurrPage >= m_pFile->GetLength())
+					if (nCurrPage >= m_pFile->GetLength())
 					{
 						cout << "DBFile::GetNext --> End of file reached."
 							 << "Error trying to fetch more records\n";
@@ -238,12 +294,12 @@ int DBFile::GetNext (Record &fetchme)
 				return RET_FAILURE;
 		}
 		// Record fetched successfully
-		m_nCurrRecord++;
+		nCurrRecord++;
 		return RET_SUCCESS;
 	}
 	else
 	{
-		cout << "DBFile::GetNext --> m_nCurrPage is NULL. "
+		cout << "DBFile::FetchNextRec --> pCurrPage is NULL. "
 			 << "Fatal error!\n";
 		return RET_FAILURE;
 	}
@@ -251,41 +307,21 @@ int DBFile::GetNext (Record &fetchme)
 	return RET_SUCCESS;
 }
 
-int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
-{
-	/*
-	 * logic :
-	 * first read the record from the file in "fetchme,
-	 * pass it for comparison using given cnf and literal.
-	 * if compEngine.compare returns 1, it means fetched record
-	 * satisfies CNF expression so we simple return success (=1) here
-	 */
-
-	ComparisonEngine compEngine;
-
-	while(GetNext(fetchme)) 	/*GetNext(Record&) handles dirty pages possibility*/
-	{
-		if(compEngine.Compare(&fetchme, &literal, &cnf))
-			return RET_SUCCESS;
-	}
-
-	//if control is here then no matching record was found
-	return RET_FAILURE;
-}
-
+// Write dirty page to file
 void DBFile::WritePageToFile()
 {
 	if (m_bDirtyPageExists)
 	{
 		m_pFile->AddPage(m_pPage, m_nTotalPages++);
-		delete m_pPage;
-		m_pPage = new Page();
+		m_pPage->EmptyItOut();
 		// everytime page count increases, set m_bIsDirtyMetadata to true
 		m_bIsDirtyMetadata = true;
 	}
     m_bDirtyPageExists = false;
 }
 
+// Create <table_name>.meta.data file
+// And write total pages used for table loading in it
 void DBFile::WriteMetaData()
 {
    if (m_bIsDirtyMetadata && !m_sFilePath.empty())
