@@ -22,12 +22,13 @@ typedef enum
 	tree
 } fType;
 
+// Enum for file opening modes
 enum FileOpenMode { TRUNCATE = 0, APPEND = 1};
 
 class DBFile
 {
 	private:
-		string m_sFilePath;
+		string m_sFilePath;	// path of the .bin file
 		File *m_pFile;		// .bin file where data will be loaded
 		Page *m_pPage;
 		int m_nTotalPages;
@@ -35,15 +36,17 @@ class DBFile
 		bool m_bIsDirtyMetadata;
 		// Member variables to handle GetNext()
 		Page *m_pCurrPage;
-		int  m_nCurrPage, m_nCurrRecord;
+		int  m_nCurrPage;
 		// Member variables to handle GetNext(CNF)
 		Page *m_pCurrPageCNF;
-		int  m_nCurrPageCNF, m_nCurrRecordCNF;
+		int  m_nCurrPageCNF;
 
 		// Private member functions
 		void WritePageToFile();
-		void WriteMetaData();
-		int FetchNextRec(Record &fetchme, Page**, int&, int&);
+		int FetchNextRec(Record &fetchme, Page**, int&);
+
+		// This method is currently unused. But will be used later
+		//void WriteMetaData();
 
 	public:
 		DBFile();
@@ -83,39 +86,3 @@ class DBFile
 };
 
 #endif
-
-/*
- * #ifndef DBFILE_H
-#define DBFILE_H
-
-#include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
-#include "Comparison.h"
-#include "ComparisonEngine.h"
-
-typedef enum {heap, sorted, tree} fType;
-
-// stub DBFile header..replace it with your own DBFile.h
-
-class DBFile {
-
-public:
-	DBFile ();
-
-	int Create (char *fpath, fType file_type, void *startup);
-	int Open (char *fpath);
-	int Close ();
-
-	void Load (Schema &myschema, char *loadpath);
-
-	void MoveFirst ();
-	void Add (Record &addme);
-	int GetNext (Record &fetchme);
-	int GetNext (Record &fetchme, CNF &cnf, Record &literal);
-
-};
-#endif
- */
-

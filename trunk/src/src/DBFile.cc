@@ -2,8 +2,8 @@
 
 DBFile::DBFile(): m_sFilePath(), m_pPage(NULL), m_nTotalPages(0),
 				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false),
-				  m_pCurrPage(NULL), m_nCurrPage(0), m_nCurrRecord(0), 
-				  m_pCurrPageCNF(NULL), m_nCurrPageCNF(0), m_nCurrRecordCNF(0)
+				  m_pCurrPage(NULL), m_nCurrPage(0), 
+				  m_pCurrPageCNF(NULL), m_nCurrPageCNF(0)
 {
 	m_pFile = new File();
 }
@@ -56,7 +56,6 @@ int DBFile::Create(char *f_path, fType f_type, void *startup)
 	if (m_pFile)
 		m_pFile->Open(TRUNCATE, f_path);
 
-	//TODO: close file here?
 	return Close();
 }
 
@@ -77,6 +76,7 @@ int DBFile::Open(char *fname)
 	// ans - coz we should not access an already open file
 	// eg - currently open by another thread (?)
 
+	/* ------- Not Used Currently -----
 	// Read m_nTotalPages from metadata file, if meta.data file exists
 	string meta_file_name = m_sFilePath + ".meta.data";
 	iStatus = stat(meta_file_name.c_str(), &fileStat);
@@ -86,14 +86,13 @@ int DBFile::Open(char *fname)
 		meta_in.open(meta_file_name.c_str(), ifstream::in);
 		meta_in >> m_nTotalPages;
 		meta_in.close();
-	}
+	}*/
 
 	// open file in append mode, preserving all prev content
 	if (m_pFile)
 	{
 		m_pFile->Open(APPEND, const_cast<char*>(fname));//openInAppendMode
 	}
-	// TODO: error checking if open failed?
 	
 	return RET_SUCCESS;
 }
@@ -101,11 +100,11 @@ int DBFile::Open(char *fname)
 // returns 1 if successfully closed the file, 0 otherwise 
 int DBFile::Close()
 {
-	//TODO : how to find if m_pFile->Close failed ?
 	m_pFile->Close();
-	
+
+	/* ------- Not Used Currently -----	
 	// write total pages to <table_name>.meta.data
-	WriteMetaData();
+	WriteMetaData();  */
 
 	return 1; // If control came here, return success
 }
@@ -183,12 +182,10 @@ void DBFile::MoveFirst ()
 {
 	// Reset current page and record pointers
 	m_nCurrPage = 0; 
-	m_nCurrRecord = 0;
 	delete m_pCurrPage;
 	m_pCurrPage = NULL;
 
 	m_nCurrPageCNF = 0; 
-	m_nCurrRecordCNF = 0;
 	delete m_pCurrPageCNF;
 	m_pCurrPageCNF = NULL;
 	
@@ -200,7 +197,7 @@ void DBFile::MoveFirst ()
 // Returns 0 on failure
 int DBFile::GetNext (Record &fetchme)
 {
-	return FetchNextRec(fetchme, &m_pCurrPage, m_nCurrPage, m_nCurrRecord);
+	return FetchNextRec(fetchme, &m_pCurrPage, m_nCurrPage);
 }
 
 
@@ -218,8 +215,7 @@ int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	ComparisonEngine compEngine;
 
 	// FetchNextRec(Record&) handles dirty pages possibility
-	while (FetchNextRec(fetchme, &m_pCurrPageCNF, 
-					   m_nCurrPageCNF, m_nCurrRecordCNF)) 
+	while (FetchNextRec(fetchme, &m_pCurrPageCNF, m_nCurrPageCNF)) 
 	{
 		if (compEngine.Compare(&fetchme, &literal, &cnf))
 			return RET_SUCCESS;
@@ -231,15 +227,14 @@ int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 
 
 /* Private function that fetched the next record in "fetchme"
- * from the page "pCurrPage". It also updates the variables 
- * nCurrPage and nCurrRecord which are passed to it by reference
+ * from the page "pCurrPage". It also updates the variable 
+ * nCurrPage which is passed to it by reference.
  * Returns 0 on failure
  * This function is called by the following two functions:
  * int DBFile::GetNext (Record &fetchme) and
  * int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
  */
-int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, 
-						  int &nCurrPage, int &nCurrRecord)
+int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, int &nCurrPage)
 {
 	// write dirty page to file
 	// as it might happen that the record we want to fetch now
@@ -294,7 +289,6 @@ int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage,
 				return RET_FAILURE;
 		}
 		// Record fetched successfully
-		nCurrRecord++;
 		return RET_SUCCESS;
 	}
 	else
@@ -320,6 +314,7 @@ void DBFile::WritePageToFile()
     m_bDirtyPageExists = false;
 }
 
+/* ------- Not Used Currently -----
 // Create <table_name>.meta.data file
 // And write total pages used for table loading in it
 void DBFile::WriteMetaData()
@@ -332,4 +327,4 @@ void DBFile::WriteMetaData()
 		meta_out.close();
 		m_bIsDirtyMetadata = false;
    }
-}
+}*/
