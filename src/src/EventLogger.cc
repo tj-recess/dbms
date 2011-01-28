@@ -10,10 +10,14 @@ using namespace std;
 
 EventLogger* EventLogger::el = NULL;
 
-EventLogger::EventLogger() : fout("errorlog.txt"){}
+EventLogger::EventLogger() : fout("errorlog.txt"){
+//	cout<<"***creating EventLogger***\n";
+}
 
 EventLogger::~EventLogger()
-{}
+{
+//	cout<<"***Destroying EventLogger Object***\n";
+}
 
 void EventLogger::writeLog(const string& msg)
 {
@@ -24,7 +28,8 @@ EventLogger* EventLogger::getEventLogger()
 {
 	if(!el)
 	{
-		el = new EventLogger();
+		static EventLogger s;
+		el = &s;
 	}
 	return el;
 }
