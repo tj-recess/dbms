@@ -41,10 +41,11 @@ DBFile::~DBFile()
 
 int DBFile::Create(char *f_path, fType f_type, void *startup)
 {
+	EventLogger *el = EventLogger::getEventLogger();
 	// check file type
 	if (f_type != heap)
 	{
-		cout << "Unsupported file type. Only heap is supported\n";
+		el->writeLog("Unsupported file type. Only heap is supported\n");
 		return RET_UNSUPPORTED_FILE_TYPE;
 	}
 
@@ -61,6 +62,8 @@ int DBFile::Create(char *f_path, fType f_type, void *startup)
 
 int DBFile::Open(char *fname)
 {
+	EventLogger *el = EventLogger::getEventLogger();
+
 	// check if file exists
 	struct stat fileStat; 
   	int iStatus; 
@@ -68,13 +71,14 @@ int DBFile::Open(char *fname)
 	iStatus = stat(fname, &fileStat); 
 	if (iStatus != 0) 	// file doesn't exists
 	{ 
-        cout << "File " << fname <<" does not exist.\n";
+        el->writeLog("File " + string(fname) + " does not exist.\n");
         return RET_FILE_NOT_FOUND;
 	} 
 
-	// TODO: check if file is NOT open already - why ?
-	// ans - coz we should not access an already open file
-	// eg - currently open by another thread (?)
+	// TODO for multithreaded env: 
+	//		check if file is NOT open already - why ?
+	// 		ans - coz we should not access an already open file
+	// 		eg - currently open by another thread (?)
 
 	/* ------- Not Used Currently -----
 	// Read m_nTotalPages from metadata file, if meta.data file exists
@@ -141,6 +145,9 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 
 void DBFile::Add (Record &rec)
 {
+	EventLogger *el = EventLogger::getEventLogger();
+	
+	// Consume the record
 	Record aRecord;
 	aRecord.Consume(&rec);
 
@@ -167,7 +174,7 @@ void DBFile::Add (Record &rec)
     	    WritePageToFile();
         	if (!m_pPage->Append(&aRecord))
 	        {
-				cout << "DBFile::Add --> Adding record to page failed.\n";
+				el->writeLog("DBFile::Add --> Adding record to page failed.\n");
 				return;
         	}
 			else
@@ -236,6 +243,8 @@ int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal)
  */
 int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, int &nCurrPage)
 {
+	EventLogger *el = EventLogger::getEventLogger();
+
 	// write dirty page to file
 	// as it might happen that the record we want to fetch now
 	// is still in the dirty page which has not been flushed to disk
@@ -273,14 +282,14 @@ int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, int &nCurrPage)
 					// check if we have reached the end of file
 					if (nCurrPage >= m_pFile->GetLength())
 					{
-						cout << "DBFile::GetNext --> End of file reached."
-							 << "Error trying to fetch more records\n";
+						el->writeLog(string("DBFile::GetNext --> End of file reached.") +
+							 		string("Error trying to fetch more records\n"));
 						return RET_FAILURE;
 					}
 					else
 					{
-						cout << "DBFile::GetNext --> End of file not reached, "
-							 << "but fetching record from file failed!\n";
+						el->writeLog(string("DBFile::GetNext --> End of file not reached, ") +
+							 		 string("but fetching record from file failed!\n"));
 						return RET_FAILURE;
 					}
 				}
@@ -293,8 +302,7 @@ int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, int &nCurrPage)
 	}
 	else
 	{
-		cout << "DBFile::FetchNextRec --> pCurrPage is NULL. "
-			 << "Fatal error!\n";
+		el->writeLog("DBFile::FetchNextRec --> pCurrPage is NULL. Fatal error!\n");
 		return RET_FAILURE;
 	}
 
