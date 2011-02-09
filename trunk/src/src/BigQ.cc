@@ -1,6 +1,34 @@
 #include "BigQ.h"
 
-void* getRunsFromInputPipe(void*)
+BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
+	: m_runFile(), m_nRunLen(runlen)
+{
+
+	//init data structures
+	m_pInPipe = &in;
+	m_pOutPipe = &out;
+	m_pSortOrder = &sortorder;
+	m_runFile.Create(const_cast<char*>("runFile"), heap, NULL);
+
+	// read data from in pipe sort them into runlen pages
+	pthread_t sortingThread;
+	pthread_create(&sortingThread, NULL, &getRunsFromInputPipeHelper, (void*)this);
+
+    // construct priority queue over sorted runs and dump sorted data
+ 	// into the out pipe
+
+    // finally shut down the out pipe
+	out.ShutDown ();
+}
+
+BigQ::~BigQ (){}
+
+void* BigQ::getRunsFromInputPipeHelper(void* context)
+{
+	((BigQ *)context)->getRunsFromInputPipe();
+}
+
+void* BigQ::getRunsFromInputPipe()
 {
 	Record *recFromPipe;
 	vector<Record*> aRunVector;
@@ -31,30 +59,6 @@ void* getRunsFromInputPipe(void*)
 
 	//now call mergeRuns here!
 }
-
-BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
-	: m_runFile(), m_nRunLen(runlen)
-{
-
-	//init data structures
-	m_pInPipe = &in;
-	m_pOutPipe = &out;
-	m_pSortOrder = &sortorder;
-	m_runFile.Create(const_cast<char*>("runFile"), heap, NULL);
-
-	// read data from in pipe sort them into runlen pages
-	pthread_t sortingThread;
-	pthread_create(&sortingThread, NULL, getRunsFromInputPipe, NULL);
-
-    // construct priority queue over sorted runs and dump sorted data
- 	// into the out pipe
-
-    // finally shut down the out pipe
-	out.ShutDown ();
-}
-
-BigQ::~BigQ (){}
-
 
 
 void BigQ::swap(Record*& a, Record*& b)

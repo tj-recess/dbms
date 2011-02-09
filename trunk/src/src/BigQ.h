@@ -22,10 +22,11 @@ class BigQ {
 	void appendRunToFile(vector<Record*>&);
 	void quickSortRun(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce);
 	int partition(vector<Record*>&, int, int, ComparisonEngine&);
+	void* getRunsFromInputPipe();
+	static void* getRunsFromInputPipeHelper(void*);
 public:
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
 	~BigQ ();
-	friend void* getRunsFromInputPipe(void*);
 };
 
 #endif
