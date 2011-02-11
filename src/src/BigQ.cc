@@ -1,14 +1,18 @@
 #include "BigQ.h"
+#include "math.h"
+
+using namespace std;
 
 BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
-	: m_runFile(), m_nRunLen(runlen)
+	: m_runFile(), m_nRunLen(runlen), m_nPageCount(0), m_sFileName()
 {
 
 	//init data structures
 	m_pInPipe = &in;
 	m_pOutPipe = &out;
 	m_pSortOrder = &sortorder;
-	m_runFile.Create(const_cast<char*>("runFile"), heap, NULL);
+	m_sFileName = "runFile";
+    m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), heap, NULL);
 
 	// read data from in pipe sort them into runlen pages
 	pthread_t sortingThread;
@@ -21,7 +25,10 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 	out.ShutDown ();
 }
 
-BigQ::~BigQ (){}
+BigQ::~BigQ ()
+{
+	// loop over m_vRuns and empty it out
+}
 
 void* BigQ::getRunsFromInputPipeHelper(void* context)
 {
@@ -103,4 +110,174 @@ int BigQ::partition(vector<Record*> &aRun, int begin, int end, ComparisonEngine 
 	//now swap pivot and (i-1)th element (which is smaller than pivot)
 	swap(pivot, aRun[i-1]);
 	return i;
+}
+
+/* ----- Phase-2 of TPMMS: MergeRuns() -----
+ * 
+ * input parameters:
+ * output parameters:
+ * return type
+ */
+int BigQ::MergeRuns()
+{
+    m_runFile.Close();
+    m_runFile.Open((char*)m_sFileName.c_str());
+	setupRunOverMarker();
+
+    // we need to do an m-way merge
+    // m = total pages/run length
+    const int nMWayRun = ceil(m_nPageCount/m_nRunLen);
+    vector < pair<Record*, int> > vPQRecords;
+
+    // ---- Initial setup ----
+    // There are m_nRunLen pages in one run
+    // so fetch 1st page from each run
+    // and put them in m_vRuns vector (sized nMWayRun)
+
+    int runHeadPage = 0;
+    Run * pRun = NULL;
+    Record * pRec = NULL;
+    for (int i = 0; i < nMWayRun; i++)
+    {
+        pRun = new Run(m_nRunLen);
+        pRun->m_nCurrPage = runHeadPage;
+        m_runFile.GetPage(pRun->pPage, pRun->m_nCurrPage++);
+
+        // fetch 1st record and push in the priority queue
+        pRec = new Record();
+        int ret = m_vRuns.at(i)->getPage()->GetFirst(pRec);
+        if (!ret)
+        {
+            // initially every page should have at least one record
+            // error here... really bad!
+            return RET_FAILURE;
+        }
+
+        if (pRec)
+        {
+			pair<Record*, int> recordRunPair(pRec, i);
+            vPQRecords.push_back(recordRunPair);
+            pRec = NULL;
+        }
+        else
+        {
+            // pRec cannot be NULL here... very wrong
+            return RET_FAILURE;
+        }
+
+        // increment page-counter to go to the next run
+        runHeadPage += m_nRunLen;
+        m_vRuns.push_back(pRun);
+    }
+
+
+    // fetch 1st record from each page 
+    // and push it in the min priority queue
+    bool bFileEmpty = false;
+    int nRunToFetchRecFrom = 0;
+    while (bFileEmpty == false)
+    {
+        if (vPQRecords.size() < nMWayRun)
+        {
+            pRec = new Record;
+            int ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
+            if (!ret)
+            {
+                // records from this page are over
+                // see if new page from this run can be fetched
+                if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage())
+                {
+                    // fetch next page
+                    m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->pPage,
+                                     m_vRuns.at(nRunToFetchRecFrom)->m_nCurrPage++);
+                    // fetch first record from this page now
+                    ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
+                    if (!ret)
+                    {
+                        cout << "\nBigQ::MergeRuns --> fetching record from page x of "
+                             << "run " << nRunToFetchRecFrom << " failed. Fatal!\n\n";
+                        return RET_FAILURE;
+                    }
+                }
+                else
+                {
+                    // all the pages from this run have been fetched
+                    // size of M in the m-way run would reduce by one.. logically
+
+                    // mark the fact that this run is over
+                    // if all runs are over, funtion will return true
+                    bFileEmpty = MarkRunOver(nRunToFetchRecFrom);
+					
+					// TODO: this run is over, where to fetch next rec from?
+                }
+            }
+
+            // got the record, push it in the min priority queue
+            // for now, push it in a vector
+            if (pRec)
+            {
+				pair<Record*, int> recordRunPair(pRec, nRunToFetchRecFrom);
+                vPQRecords.push_back(recordRunPair);
+                pRec = NULL;
+            }
+        }
+
+        // priority queue is full, pop min record
+        if (vPQRecords.size() == nMWayRun)
+        {
+            // find min record
+            // push min element through out-pipe
+
+            // ------
+            // keep track of which run this record belonged too
+            // need to fetch next record from the run of that page
+            // update nRunToFetchRecFrom
+			int min = 0;
+			pair<Record*, int> recordRunPair = vPQRecords.at(min);
+			nRunToFetchRecFrom = recordRunPair.second;
+            // delete memory allocated for record, 
+            // safe operation - bcoz data has been consumed by the out-pipe
+            delete recordRunPair.first;
+        }
+    }
+
+    // empty the priority queue
+    while (vPQRecords.size() > 0)
+    {
+        // push min element through out pipe
+        // delete pRec, first element in the pair
+
+		int min = 0;
+        pair<Record*, int> recordRunPair = vPQRecords.at(min);
+        delete recordRunPair.first;
+    }
+
+    return RET_SUCCESS;
+}
+
+// Mark that the run "runNum" is over. That is, all the pages from this run
+// have been fetched. If all the runs are over, return true
+// return true = whole file has been read
+bool BigQ::MarkRunOver(int runNum)
+{
+	long int bitRunOver = 0x00000001;
+	for (int i=0; i < runNum; i++)
+		bitRunOver << 1;
+
+	m_nRunOverMarker = m_nRunOverMarker | bitRunOver;
+	if (m_nRunOverMarker == 0xFFFFFFFF)
+		return true;
+
+	return false;
+}
+
+// we do not need to consider the bits that do not corrospond to runs
+// those would be leftmost bits, so set them to 1
+void BigQ::setupRunOverMarker()
+{
+	long int mask = 0xFFFFFFFF;
+	for (int i = 0; i < m_nRunLen; i++)
+		mask << 1;
+	
+	m_nRunOverMarker = mask;
 }
