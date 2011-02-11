@@ -14,6 +14,10 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 	m_sFileName = "runFile";
     m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), heap, NULL);
 
+	// NOTE (Malvika): if we go by the bit-manipulation approach
+	// we cannot handle runLen > 64
+	// so error out here or something....
+
 	// read data from in pipe sort them into runlen pages
 	pthread_t sortingThread;
 	pthread_create(&sortingThread, NULL, &getRunsFromInputPipeHelper, (void*)this);
@@ -272,7 +276,7 @@ int BigQ::MergeRuns()
 // If all the runs are over, return true --> whole file has been read
 bool BigQ::MarkRunOver(int runNum)
 {
-	long int bitRunOver = 0x00000001;
+	unsigned long int bitRunOver = 0x00000001;
 
 	// left shift 1 by runNum bits
 	bitRunOver << runNum;
@@ -288,7 +292,7 @@ bool BigQ::MarkRunOver(int runNum)
 // those would be leftmost bits, so set them to 1
 void BigQ::setupRunOverMarker()
 {
-	long int mask = 0xFFFFFFFF;
+	unsigned long int mask = 0xFFFFFFFF;
 	// insert m_nRunLen 0s on the right
 	// for 4 runs, m_nRunOverMarker = 0xFFF0
 	// for 5 runs, m_nRunOverMarker = 0xFFE0
@@ -301,9 +305,9 @@ void BigQ::setupRunOverMarker()
 // return true if it is, else false
 bool BigQ::isRunAlive(int runNum)
 {
-	long int bitForRun = 0x00000001;
+	unsigned long int bitForRun = 0x00000001;
     bitForRun << runNum;
-	long int result = m_nRunOverMarker & bitForRun;
+	unsigned long int result = m_nRunOverMarker & bitForRun;
 	if (result == 0)
 		return true;
 
