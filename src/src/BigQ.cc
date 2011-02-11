@@ -207,8 +207,20 @@ int BigQ::MergeRuns()
                     // mark the fact that this run is over
                     // if all runs are over, funtion will return true
                     bFileEmpty = MarkRunOver(nRunToFetchRecFrom);
-					
-					// TODO: this run is over, where to fetch next rec from?
+				
+					if (bFileEmpty == false)
+					{
+						// this run is over, fetch next record from the next alive run
+						nRunToFetchRecFrom = 0;
+						bool bRunFound = false;
+						while (bRunFound == false)
+						{
+							bRunFound = isRunAlive(nRunToFetchRecFrom);
+							if (bRunFound)
+								break;
+							nRunToFetchRecFrom++;
+						}
+					}
                 }
             }
 
@@ -256,13 +268,14 @@ int BigQ::MergeRuns()
 }
 
 // Mark that the run "runNum" is over. That is, all the pages from this run
-// have been fetched. If all the runs are over, return true
-// return true = whole file has been read
+// have been fetched. Run over --> bit = 1
+// If all the runs are over, return true --> whole file has been read
 bool BigQ::MarkRunOver(int runNum)
 {
 	long int bitRunOver = 0x00000001;
-	for (int i=0; i < runNum; i++)
-		bitRunOver << 1;
+
+	// left shift 1 by runNum bits
+	bitRunOver << runNum;
 
 	m_nRunOverMarker = m_nRunOverMarker | bitRunOver;
 	if (m_nRunOverMarker == 0xFFFFFFFF)
@@ -276,8 +289,23 @@ bool BigQ::MarkRunOver(int runNum)
 void BigQ::setupRunOverMarker()
 {
 	long int mask = 0xFFFFFFFF;
-	for (int i = 0; i < m_nRunLen; i++)
-		mask << 1;
+	// insert m_nRunLen 0s on the right
+	// for 4 runs, m_nRunOverMarker = 0xFFF0
+	// for 5 runs, m_nRunOverMarker = 0xFFE0
+	mask << m_nRunLen;
 	
 	m_nRunOverMarker = mask;
+}
+
+// Check if the given run is alive
+// return true if it is, else false
+bool BigQ::isRunAlive(int runNum)
+{
+	long int bitForRun = 0x00000001;
+    bitForRun << runNum;
+	long int result = m_nRunOverMarker & bitForRun;
+	if (result == 0)
+		return true;
+
+	return false;
 }

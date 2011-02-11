@@ -80,6 +80,7 @@ private:
 	bool MarkRunOver(int runNum);
 	long int m_nRunOverMarker;
 	void setupRunOverMarker();
+	bool isRunAlive(int runNum);
 
 public:
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);

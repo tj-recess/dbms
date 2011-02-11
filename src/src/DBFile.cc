@@ -336,3 +336,9 @@ void DBFile::WriteMetaData()
 		m_bIsDirtyMetadata = false;
    }
 }*/
+
+//Temporary - delete this when FileUtils class is in place
+void DBFile::GetPage(Page *putItHere, off_t whichPage)
+{
+	m_pFile->GetPage(putItHere, whichPage);
+}

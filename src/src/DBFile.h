@@ -83,6 +83,8 @@ class DBFile
 		// Applies CNF and then fetches the next record
 		int GetNext (Record &fetchMe, CNF &applyMe, Record &literal);
 
+		// Temporary function - delete ASAP
+		void GetPage(Page *putItHere, off_t whichPage);
 };
 
 #endif
