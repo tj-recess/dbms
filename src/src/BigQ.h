@@ -78,7 +78,7 @@ private:
 	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen 
     int MergeRuns();
 	bool MarkRunOver(int runNum);
-	long int m_nRunOverMarker;
+	unsigned long int m_nRunOverMarker;
 	void setupRunOverMarker();
 	bool isRunAlive(int runNum);
 
