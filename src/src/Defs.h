@@ -19,8 +19,10 @@ enum CompOperator {LessThan, GreaterThan, Equals};
 enum Type {Int, Double, String};
 
 
+
 unsigned int Random_Generate();
 
+#define _DEBUG 1
 
 #endif
 
