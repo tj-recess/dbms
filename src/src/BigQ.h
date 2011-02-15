@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 #include "Pipe.h"
 #include "File.h"
 #include "Record.h"
@@ -15,7 +16,7 @@ using namespace std;
 // class to store run information
 class Run
 {
-//private:  
+//private:
 public:
     Page *pPage;	// current page from the run
     int m_nCurrPage; // page number wrt whole file, needed to fetch next page using m_runFile.GetPage()
@@ -56,7 +57,7 @@ public:
     // setPage() method needed...
 };
 
-class Record_n_Run 
+class Record_n_Run
 {
 private:
 	OrderMaker *m_pSortOrder;
@@ -76,7 +77,7 @@ public:
 	{
 		return m_pRec;
 	}
-	
+
 	int get_run()
 	{
 		return m_nRun;
@@ -86,13 +87,13 @@ public:
 	{
 		return m_pSortOrder;
 	}
-	
+
 	ComparisonEngine * get_CE()
 	{
 		return m_pCE;
 	}
 
-	/*bool operator() (Record * r1, Record * r2) 
+	/*bool operator() (Record * r1, Record * r2)
 	{
 		if(m_pCE->Compare(r1, r2, m_pSortOrder) > 0)
 			return true;
@@ -100,7 +101,7 @@ public:
 	}*/
 
 	// here or global?
-	/*bool operator > (Record * r) 
+	/*bool operator > (Record * r)
 	{
 		if(m_pCE->Compare(m_pRec, r, m_pSortOrder) > 0)
 			return true;
@@ -108,7 +109,7 @@ public:
 	}*/
 };
 
-class BigQ 
+class BigQ
 {
 private:
 	DBFile m_runFile;
@@ -116,20 +117,35 @@ private:
 	OrderMaker *m_pSortOrder;
 	int m_nRunLen, m_nPageCount;
 	string m_sFileName;
+	ComparisonEngine ce;
 
 private:
-	// -------- phase - 1 -------------- 
-	void quickSortRun(Record**, int, int, ComparisonEngine&);
-	int partition(Record**, int, int, ComparisonEngine&);
+	// -------- phase - 1 --------------
 	void swap(Record*&, Record*&);
 	void appendRunToFile(vector<Record*>&);
 	void quickSortRun(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce);
 	int partition(vector<Record*>&, int, int, ComparisonEngine&);
 	void* getRunsFromInputPipe();
 	static void* getRunsFromInputPipeHelper(void*);
+	struct CompareMyRecords
+	{
+	    CompareMyRecords(BigQ& self_):self(self_){}
 
-	// -------- phase - 2 -------------- 
-	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen 
+	 	bool operator()(Record* const& r1, Record* const& r2)
+        {
+            Record* r11 = const_cast<Record*>(r1);
+            Record* r22 = const_cast<Record*>(r2);
+            if(self.ce.Compare(r11, r22, self.m_pSortOrder) <= 0)    //i.e. records are already sorted (r1 <= r2)
+                return true;
+            else
+                return false;
+        }
+
+        BigQ& self;
+	};
+
+	// -------- phase - 2 --------------
+	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen
     int MergeRuns();
 	bool MarkRunOver(int runNum);
 	unsigned long int m_nRunOverMarker;
