@@ -117,23 +117,27 @@ int BigQ::partition(vector<Record*> &aRun, int begin, int end, ComparisonEngine 
 	return i;
 }
 
+/* --------------- Phase-2 of TPMMS: MergeRuns() --------------- */
+
 #ifndef LESS_OP
 #define LESS_OP
+
+ComparisonEngine ce;
+ComparisonEngine * Record_n_Run::m_pCE = &ce;
+
 bool operator < (Record_n_Run r1, Record_n_Run r2)
 {
-    if(r1.get_CE()->Compare(r1.get_rec(), r2.get_rec(), r1.get_order()) > 0)
+    if(r1.get_CE()->Compare(r1.get_rec(), r2.get_rec(), r1.get_order()) < 0)
         return true;
     return false;
 }
 #endif
 
-/* ----- Phase-2 of TPMMS: MergeRuns() -----
- * 
- * input parameters:
- * output parameters:
- * return type
+/* Input parameters: None
+ * Return type: RET_SUCCESS or RET_FAILURE
+ * Function: push sorted records through outPipe
  */
-int BigQ::MergeRuns(ComparisonEngine *pCE)
+int BigQ::MergeRuns()
 {
     m_runFile.Close();
     m_runFile.Open((char*)m_sFileName.c_str());
@@ -142,12 +146,8 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
     // we need to do an m-way merge
     // m = total pages/run length
     const int nMWayRun = ceil(m_nPageCount/m_nRunLen);
-    //vector < pair<Record*, int> > vPQRecords;
-    //vector < Record_n_Run > vPQRecords;
 
-	////priority_queue < pair<Record*, int>, vector < pair<Record*, int> >, 
-	////					rec_compare(m_pSortOrder, pce) > pqRecords;
-
+	// Priority queue that contains sorted records
 	priority_queue < Record_n_Run, vector <Record_n_Run>, 
 					 less<vector<Record_n_Run>::value_type> > pqRecords;
 
@@ -163,11 +163,11 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
     {
         pRun = new Run(m_nRunLen);
         pRun->m_nCurrPage = runHeadPage;
-        m_runFile.GetPage(pRun->pPage, pRun->m_nCurrPage++);
+        m_runFile.GetPage(pRun->getPage(), pRun->m_nCurrPage++);
 
         // fetch 1st record and push in the priority queue
         pRec = new Record();
-        int ret = m_vRuns.at(i)->getPage()->GetFirst(pRec);
+        int ret = pRun->getPage()->GetFirst(pRec);
         if (!ret)
         {
             // initially every page should have at least one record
@@ -177,9 +177,7 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
 
         if (pRec)
         {
-			//pair<Record*, int> recordRunPair(pRec, i);
-            //vPQRecords.push_back(recordRunPair);
-			Record_n_Run rr(m_pSortOrder, pCE, pRec, i);
+			Record_n_Run rr(m_pSortOrder, pRec, i);
             pqRecords.push(rr);
             pRec = NULL;
         }
@@ -218,8 +216,8 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
                     ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
                     if (!ret)
                     {
-                        cout << "\nBigQ::MergeRuns --> fetching record from page x of "
-                             << "run " << nRunToFetchRecFrom << " failed. Fatal!\n\n";
+                        cout << "\nBigQ::MergeRuns --> fetching record from page x of run "
+                             << nRunToFetchRecFrom << " failed. Fatal!\n\n";
                         return RET_FAILURE;
                     }
                 }
@@ -254,7 +252,7 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
             {
 				//pair<Record*, int> recordRunPair(pRec, nRunToFetchRecFrom);
                 //vPQRecords.push_back(recordRunPair);
-				Record_n_Run rr(m_pSortOrder, pCE, pRec, nRunToFetchRecFrom);
+				Record_n_Run rr(m_pSortOrder, pRec, nRunToFetchRecFrom);
 	            pqRecords.push(rr);
                 pRec = NULL;
             }
@@ -264,14 +262,13 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
         if (pqRecords.size() == nMWayRun)
         {
             // find min record
-            // push min element through out-pipe
 			Record_n_Run rr = pqRecords.top();
+            // push min element through out-pipe
+			m_pOutPipe->Insert(rr.get_rec());
             // keep track of which run this record belonged too
             // need to fetch next record from the run of that page
 			nRunToFetchRecFrom = rr.get_run();
-            // delete memory allocated for record, 
-            // safe operation - bcoz data has been consumed by the out-pipe
-			delete rr.get_rec();
+            // do not delete memory allocated for record, 
         }
     }
 
@@ -279,14 +276,13 @@ int BigQ::MergeRuns(ComparisonEngine *pCE)
     while (pqRecords.size() > 0)
     {
 		// find min record
-        // push min element through out-pipe
         Record_n_Run rr = pqRecords.top();
+        // push min element through out-pipe
+		m_pOutPipe->Insert(rr.get_rec());
         // keep track of which run this record belonged too
         // need to fetch next record from the run of that page
         nRunToFetchRecFrom = rr.get_run();
-        // delete memory allocated for record, 
-        // safe operation - bcoz data has been consumed by the out-pipe
-        delete rr.get_rec();
+        // do not delete memory allocated for record, 
     }
 
     return RET_SUCCESS;
