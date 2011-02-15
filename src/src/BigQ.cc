@@ -1,5 +1,6 @@
 #include "BigQ.h"
 #include "math.h"
+#include <queue>
 
 using namespace std;
 
@@ -116,13 +117,23 @@ int BigQ::partition(vector<Record*> &aRun, int begin, int end, ComparisonEngine 
 	return i;
 }
 
+#ifndef LESS_OP
+#define LESS_OP
+bool operator < (Record_n_Run r1, Record_n_Run r2)
+{
+    if(r1.get_CE()->Compare(r1.get_rec(), r2.get_rec(), r1.get_order()) > 0)
+        return true;
+    return false;
+}
+#endif
+
 /* ----- Phase-2 of TPMMS: MergeRuns() -----
  * 
  * input parameters:
  * output parameters:
  * return type
  */
-int BigQ::MergeRuns()
+int BigQ::MergeRuns(ComparisonEngine *pCE)
 {
     m_runFile.Close();
     m_runFile.Open((char*)m_sFileName.c_str());
@@ -131,7 +142,14 @@ int BigQ::MergeRuns()
     // we need to do an m-way merge
     // m = total pages/run length
     const int nMWayRun = ceil(m_nPageCount/m_nRunLen);
-    vector < pair<Record*, int> > vPQRecords;
+    //vector < pair<Record*, int> > vPQRecords;
+    //vector < Record_n_Run > vPQRecords;
+
+	////priority_queue < pair<Record*, int>, vector < pair<Record*, int> >, 
+	////					rec_compare(m_pSortOrder, pce) > pqRecords;
+
+	priority_queue < Record_n_Run, vector <Record_n_Run>, 
+					 less<vector<Record_n_Run>::value_type> > pqRecords;
 
     // ---- Initial setup ----
     // There are m_nRunLen pages in one run
@@ -159,8 +177,10 @@ int BigQ::MergeRuns()
 
         if (pRec)
         {
-			pair<Record*, int> recordRunPair(pRec, i);
-            vPQRecords.push_back(recordRunPair);
+			//pair<Record*, int> recordRunPair(pRec, i);
+            //vPQRecords.push_back(recordRunPair);
+			Record_n_Run rr(m_pSortOrder, pCE, pRec, i);
+            pqRecords.push(rr);
             pRec = NULL;
         }
         else
@@ -181,7 +201,7 @@ int BigQ::MergeRuns()
     int nRunToFetchRecFrom = 0;
     while (bFileEmpty == false)
     {
-        if (vPQRecords.size() < nMWayRun)
+        if (pqRecords.size() < nMWayRun)
         {
             pRec = new Record;
             int ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
@@ -232,40 +252,41 @@ int BigQ::MergeRuns()
             // for now, push it in a vector
             if (pRec)
             {
-				pair<Record*, int> recordRunPair(pRec, nRunToFetchRecFrom);
-                vPQRecords.push_back(recordRunPair);
+				//pair<Record*, int> recordRunPair(pRec, nRunToFetchRecFrom);
+                //vPQRecords.push_back(recordRunPair);
+				Record_n_Run rr(m_pSortOrder, pCE, pRec, nRunToFetchRecFrom);
+	            pqRecords.push(rr);
                 pRec = NULL;
             }
         }
 
         // priority queue is full, pop min record
-        if (vPQRecords.size() == nMWayRun)
+        if (pqRecords.size() == nMWayRun)
         {
             // find min record
             // push min element through out-pipe
-
-            // ------
+			Record_n_Run rr = pqRecords.top();
             // keep track of which run this record belonged too
             // need to fetch next record from the run of that page
-            // update nRunToFetchRecFrom
-			int min = 0;
-			pair<Record*, int> recordRunPair = vPQRecords.at(min);
-			nRunToFetchRecFrom = recordRunPair.second;
+			nRunToFetchRecFrom = rr.get_run();
             // delete memory allocated for record, 
             // safe operation - bcoz data has been consumed by the out-pipe
-            delete recordRunPair.first;
+			delete rr.get_rec();
         }
     }
 
     // empty the priority queue
-    while (vPQRecords.size() > 0)
+    while (pqRecords.size() > 0)
     {
-        // push min element through out pipe
-        // delete pRec, first element in the pair
-
-		int min = 0;
-        pair<Record*, int> recordRunPair = vPQRecords.at(min);
-        delete recordRunPair.first;
+		// find min record
+        // push min element through out-pipe
+        Record_n_Run rr = pqRecords.top();
+        // keep track of which run this record belonged too
+        // need to fetch next record from the run of that page
+        nRunToFetchRecFrom = rr.get_run();
+        // delete memory allocated for record, 
+        // safe operation - bcoz data has been consumed by the out-pipe
+        delete rr.get_rec();
     }
 
     return RET_SUCCESS;

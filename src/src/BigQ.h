@@ -1,5 +1,6 @@
 #ifndef BIGQ_H
 #define BIGQ_H
+
 #include <pthread.h>
 #include <iostream>
 #include <vector>
@@ -53,6 +54,57 @@ public:
     // setPage() method needed...
 };
 
+class Record_n_Run 
+{
+private:
+	OrderMaker *m_pSortOrder;
+	ComparisonEngine *m_pCE;
+	Record * m_pRec;
+	int m_nRun;
+
+public:
+
+	Record_n_Run(OrderMaker *pOrderMaker, ComparisonEngine *pCE, Record *rec, int run)
+		: m_pSortOrder(pOrderMaker), m_pCE(pCE), m_pRec(rec), m_nRun(run)
+	{}
+
+	~Record_n_Run() {}
+
+	Record * get_rec()
+	{
+		return m_pRec;
+	}
+	
+	int get_run()
+	{
+		return m_nRun;
+	}
+
+	OrderMaker * get_order()
+	{
+		return m_pSortOrder;
+	}
+	
+	ComparisonEngine * get_CE()
+	{
+		return m_pCE;
+	}
+
+	/*bool operator() (Record * r1, Record * r2) 
+	{
+		if(m_pCE->Compare(r1, r2, m_pSortOrder) > 0)
+			return true;
+		return false;
+	}*/
+
+	// here or global?
+	/*bool operator > (Record * r) 
+	{
+		if(m_pCE->Compare(m_pRec, r, m_pSortOrder) > 0)
+			return true;
+		return false;
+	}*/
+};
 
 class BigQ 
 {
@@ -76,7 +128,7 @@ private:
 
 	// -------- phase - 2 -------------- 
 	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen 
-    int MergeRuns();
+    int MergeRuns(ComparisonEngine *pCE);
 	bool MarkRunOver(int runNum);
 	unsigned long int m_nRunOverMarker;
 	void setupRunOverMarker();
