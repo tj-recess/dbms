@@ -127,19 +127,31 @@ private:
 	int partition(vector<Record*>&, int, int, ComparisonEngine&);
 	void* getRunsFromInputPipe();
 	static void* getRunsFromInputPipeHelper(void*);
-	struct CompareMyRecords
-	{
-	    CompareMyRecords(BigQ& self_):self(self_){}
 
-	 	bool operator()(Record* const& r1, Record* const& r2)
+        //to compare records
+        bool operator()(Record* const& r1, Record* const& r2)
         {
             Record* r11 = const_cast<Record*>(r1);
             Record* r22 = const_cast<Record*>(r2);
-            if(self.ce.Compare(r11, r22, self.m_pSortOrder) <= 0)    //i.e. records are already sorted (r1 <= r2)
+            if(ce.Compare(r11, r22, m_pSortOrder) <= 0)    //i.e. records are already sorted (r1 <= r2)
                 return true;
             else
                 return false;
         }
+
+	struct CompareMyRecords
+	{
+	    CompareMyRecords(BigQ& self_):self(self_){}
+
+            bool operator()(Record* const& r1, Record* const& r2)
+            {
+                Record* r11 = const_cast<Record*>(r1);
+                Record* r22 = const_cast<Record*>(r2);
+                if(self.ce.Compare(r11, r22, self.m_pSortOrder) <= 0)    //i.e. records are already sorted (r1 <= r2)
+                    return true;
+                else
+                    return false;
+            }
 
         BigQ& self;
 	};
