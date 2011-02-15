@@ -17,8 +17,10 @@ class Run
 {
 //private:  
 public:
-    Page *pPage;
-    int m_nCurrPage, m_nPagesFetched, m_nRunLen;
+    Page *pPage;	// current page from the run
+    int m_nCurrPage; // page number wrt whole file, needed to fetch next page using m_runFile.GetPage()
+	int m_nPagesFetched; // keep track of how many pages have been fetched from this run
+	int  m_nRunLen; // run length of TPMMS
 
 public:
     Run(int nRunLen)
@@ -58,14 +60,14 @@ class Record_n_Run
 {
 private:
 	OrderMaker *m_pSortOrder;
-	ComparisonEngine *m_pCE;
+	static ComparisonEngine *m_pCE;
 	Record * m_pRec;
 	int m_nRun;
 
 public:
 
-	Record_n_Run(OrderMaker *pOrderMaker, ComparisonEngine *pCE, Record *rec, int run)
-		: m_pSortOrder(pOrderMaker), m_pCE(pCE), m_pRec(rec), m_nRun(run)
+	Record_n_Run(OrderMaker *pOrderMaker, Record *rec, int run)
+		: m_pSortOrder(pOrderMaker), m_pRec(rec), m_nRun(run)
 	{}
 
 	~Record_n_Run() {}
@@ -128,7 +130,7 @@ private:
 
 	// -------- phase - 2 -------------- 
 	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen 
-    int MergeRuns(ComparisonEngine *pCE);
+    int MergeRuns();
 	bool MarkRunOver(int runNum);
 	unsigned long int m_nRunOverMarker;
 	void setupRunOverMarker();
