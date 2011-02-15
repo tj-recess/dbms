@@ -14,7 +14,7 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 	m_pSortOrder = &sortorder;
 	m_sFileName = "runFile";
     m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), heap, NULL);
-
+    m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
 	// NOTE (Malvika): if we go by the bit-manipulation approach
 	// we cannot handle runLen > 64
 	// so error out here or something....
@@ -27,7 +27,7 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
  	// into the out pipe
 
     // finally shut down the out pipe
-	out.ShutDown ();
+	// out.ShutDown ();
 }
 
 BigQ::~BigQ ()
@@ -42,19 +42,37 @@ void* BigQ::getRunsFromInputPipeHelper(void* context)
 
 void* BigQ::getRunsFromInputPipe()
 {
-	Record *recFromPipe;
+	Record recFromPipe;
 	vector<Record*> aRunVector;
+	Page currentPage;
+	int pageCount = 0;
+	bool allSorted = true;
+    ComparisonEngine ce;
 
-	while(m_pInPipe->Remove(recFromPipe))
+	cout<<"now we'll fetch from pipe"<<endl;
+	while(m_pInPipe->Remove(&recFromPipe))
 	{
-		if(aRunVector.size() < m_nRunLen)
+		cout<<"fetched 1 record from pipe"<<endl;
+		if(pageCount < m_nRunLen)
 		{
-			aRunVector.push_back(recFromPipe);
+		    Record *copyRec = new Record();
+		    copyRec->Copy(&recFromPipe); //because currentPage.Append() would consume the record
+			if(!currentPage.Append(&recFromPipe))
+			{
+			    //page full, start new page and increase the page count
+			    pageCount++;
+				currentPage.EmptyItOut();
+				currentPage.Append(&recFromPipe);
+			}
+            aRunVector.push_back(copyRec); //whether it's a new page or old page, just push back the copy onto vector
+            allSorted = false;
 		}
 		else
 		{
+		    //one run is full, sort it and write to file
+		    //then fetch the data for next run
+
 			//sort the records inside aRun
-			ComparisonEngine ce;
 			quickSortRun(aRunVector, 0, aRunVector.size(), ce);
 
 			//write the sorted run onto disk in runFile
@@ -62,16 +80,31 @@ void* BigQ::getRunsFromInputPipe()
 
 			//now clear the vector to begin for new run
 			aRunVector.clear();
+			allSorted = true;
 		}
 	}
 
 	//done with all records in pipe, if there is anything in vector
-	//it should be written out to file
-	appendRunToFile(aRunVector);//check would be done internally in function
+	//it should be sorted and written out to file
+	if(!allSorted)
+	{
+	    //first print entire vector
+	    for(int i = 0; i < aRunVector.size(); i++)
+            cout<<aRunVector[i]<<endl;
+
+        //then sort the vector
+	    sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(*this));
+
+        //now print entire vector again
+	    for(int i = 0; i < aRunVector.size(); i++)
+            cout<<aRunVector[i]<<endl;
+
+	    //quickSortRun(aRunVector, 0, aRunVector.size(), ce);
+        appendRunToFile(aRunVector);//check would be done internally in function
+	}
 
 	//now call mergeRuns here!
 }
-
 
 void BigQ::swap(Record*& a, Record*& b)
 {
@@ -88,8 +121,10 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 }
 
 
-void BigQ::quickSortRun(vector<Record*> &aRun, int begin, int end, ComparisonEngine &ce)
+void BigQ::quickSortRun(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce)
 {
+    cout<<"aRun.size()"<<aRun.size()<<endl;
+//    cout<<"aRun[0] : "<< (*aRun[0]) <<endl;
 	if(begin < end)
 	{
 		int split = partition(aRun, begin, end, ce);
@@ -98,7 +133,7 @@ void BigQ::quickSortRun(vector<Record*> &aRun, int begin, int end, ComparisonEng
 	}
 }
 
-int BigQ::partition(vector<Record*> &aRun, int begin, int end, ComparisonEngine &ce)
+int BigQ::partition(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce)
 {
 	Record *pivot = aRun[begin];
 	int i = begin + 1;
@@ -116,6 +151,12 @@ int BigQ::partition(vector<Record*> &aRun, int begin, int end, ComparisonEngine 
 	swap(pivot, aRun[i-1]);
 	return i;
 }
+
+/* ----- Phase-2 of TPMMS: MergeRuns() -----
+ *
+ * input parameters:
+ * output parameters:
+ * return type
 
 /* --------------- Phase-2 of TPMMS: MergeRuns() --------------- */
 
@@ -148,7 +189,7 @@ int BigQ::MergeRuns()
     const int nMWayRun = ceil(m_nPageCount/m_nRunLen);
 
 	// Priority queue that contains sorted records
-	priority_queue < Record_n_Run, vector <Record_n_Run>, 
+	priority_queue < Record_n_Run, vector <Record_n_Run>,
 					 less<vector<Record_n_Run>::value_type> > pqRecords;
 
     // ---- Initial setup ----
@@ -193,7 +234,7 @@ int BigQ::MergeRuns()
     }
 
 
-    // fetch 1st record from each page 
+    // fetch 1st record from each page
     // and push it in the min priority queue
     bool bFileEmpty = false;
     int nRunToFetchRecFrom = 0;
@@ -229,7 +270,7 @@ int BigQ::MergeRuns()
                     // mark the fact that this run is over
                     // if all runs are over, funtion will return true
                     bFileEmpty = MarkRunOver(nRunToFetchRecFrom);
-				
+
 					if (bFileEmpty == false)
 					{
 						// this run is over, fetch next record from the next alive run
@@ -268,7 +309,7 @@ int BigQ::MergeRuns()
             // keep track of which run this record belonged too
             // need to fetch next record from the run of that page
 			nRunToFetchRecFrom = rr.get_run();
-            // do not delete memory allocated for record, 
+            // do not delete memory allocated for record,
         }
     }
 
@@ -282,7 +323,7 @@ int BigQ::MergeRuns()
         // keep track of which run this record belonged too
         // need to fetch next record from the run of that page
         nRunToFetchRecFrom = rr.get_run();
-        // do not delete memory allocated for record, 
+        // do not delete memory allocated for record,
     }
 
     return RET_SUCCESS;
@@ -314,7 +355,7 @@ void BigQ::setupRunOverMarker()
 	// for 4 runs, m_nRunOverMarker = 0xFFF0
 	// for 5 runs, m_nRunOverMarker = 0xFFE0
 	mask << m_nRunLen;
-	
+
 	m_nRunOverMarker = mask;
 }
 
