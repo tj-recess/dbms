@@ -16,7 +16,6 @@ using namespace std;
 // class to store run information
 class Run
 {
-//private:
 public:
     Page *pPage;	// current page from the run
     int m_nCurrPage; // page number wrt whole file, needed to fetch next page using m_runFile.GetPage()
@@ -61,7 +60,7 @@ class Record_n_Run
 {
 private:
 	OrderMaker *m_pSortOrder;
-	static ComparisonEngine *m_pCE;
+	ComparisonEngine *m_pCE;
 	Record * m_pRec;
 	int m_nRun;
 
@@ -101,12 +100,13 @@ public:
 	}*/
 
 	// here or global?
-	/*bool operator > (Record * r)
+	bool operator< (const Record_n_Run& r) const
 	{
-		if(m_pCE->Compare(m_pRec, r, m_pSortOrder) > 0)
-			return true;
-		return false;
-	}*/
+            Record_n_Run* rr = const_cast<Record_n_Run*>(&r);
+            if(m_pCE->Compare(m_pRec, rr->get_rec(), m_pSortOrder) > 0)
+                    return true;
+            return false;
+	}
 };
 
 class BigQ
