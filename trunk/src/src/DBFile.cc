@@ -104,9 +104,13 @@ int DBFile::Open(char *fname)
 // returns 1 if successfully closed the file, 0 otherwise 
 int DBFile::Close()
 {
-	m_pFile->Close();
+    /*check if the current file instance has any dirty page,
+     if yes, flush it to disk and close the file.*/
+    WritePageToFile();  //takes care of everything
+    m_pFile->Close();
 
 	/* ------- Not Used Currently -----	
+
 	// write total pages to <table_name>.meta.data
 	WriteMetaData();  */
 
@@ -168,20 +172,20 @@ void DBFile::Add (Record &rec)
 	if (m_pPage)	
 	{
 	    if (!m_pPage->Append(&aRecord)) // current page does not have enough space
-    	{
+            {
         	// write current page to file
 	        // this function will fetch a new page too
-    	    WritePageToFile();
+                WritePageToFile();
         	if (!m_pPage->Append(&aRecord))
 	        {
 				el->writeLog("DBFile::Add --> Adding record to page failed.\n");
 				return;
         	}
-			else
-				m_bDirtyPageExists = true;
-	    }
 		else
-			m_bDirtyPageExists = true;
+                    m_bDirtyPageExists = true;
+	    }
+            else
+		m_bDirtyPageExists = true;
 	}
 }
 
@@ -291,6 +295,7 @@ int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, int &nCurrPage)
 						el->writeLog(string("DBFile::GetNext --> End of file not reached, ") +
 							 		 string("but fetching record from file failed!\n"));
 						return RET_FAILURE;
+						//TODO : try changing the error code
 					}
 				}
 			}
@@ -312,13 +317,13 @@ int DBFile::FetchNextRec (Record &fetchme, Page ** pCurrPage, int &nCurrPage)
 // Write dirty page to file
 void DBFile::WritePageToFile()
 {
-	if (m_bDirtyPageExists)
-	{
-		m_pFile->AddPage(m_pPage, m_nTotalPages++);
-		m_pPage->EmptyItOut();
-		// everytime page count increases, set m_bIsDirtyMetadata to true
-		m_bIsDirtyMetadata = true;
-	}
+    if (m_bDirtyPageExists)
+    {
+        m_pFile->AddPage(m_pPage, m_nTotalPages++);
+        m_pPage->EmptyItOut();
+        // everytime page count increases, set m_bIsDirtyMetadata to true
+        m_bIsDirtyMetadata = true;
+    }
     m_bDirtyPageExists = false;
 }
 
