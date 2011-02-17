@@ -16,11 +16,12 @@ using namespace std;
 // class to store run information
 class Run
 {
-public:
+private:
     Page *pPage;	// current page from the run
     int m_nCurrPage; // page number wrt whole file, needed to fetch next page using m_runFile.GetPage()
 	int m_nPagesFetched; // keep track of how many pages have been fetched from this run
 	int  m_nRunLen; // run length of TPMMS
+	bool m_bIsAlive;
 
 public:
     Run(int nRunLen)
@@ -28,7 +29,8 @@ public:
         pPage = new Page();
         m_nCurrPage = 0;
         m_nPagesFetched = 0;
-        m_nRunLen = m_nRunLen;
+        m_nRunLen = nRunLen;
+		m_bIsAlive = true;
     }
 
     ~Run()
@@ -38,6 +40,7 @@ public:
         m_nCurrPage = 0;
         m_nPagesFetched = 0;
         m_nRunLen = 0;
+		m_bIsAlive = false;
     }
 
     bool canFetchPage(int total_pages)
@@ -46,6 +49,9 @@ public:
         if (m_nPagesFetched < m_nRunLen && 
 			m_nCurrPage < total_pages)
             return true;
+	
+		// otherwise mark that run is over
+		m_bIsAlive = false;
         return false;
     }
 
@@ -53,6 +59,23 @@ public:
     {
         return pPage;
     }
+
+	bool is_alive()
+	{
+		return m_bIsAlive;
+	}
+
+	void set_curPage(int currentPageNum)
+	{
+		m_nCurrPage = currentPageNum;
+	}
+
+	int get_and_inc_pagecount()
+	{
+		int tmp = m_nCurrPage;
+		m_nCurrPage++;
+		return tmp;
+	}
 
     // setPage() method needed...
 };
@@ -127,11 +150,7 @@ private:
 
 	// -------- phase - 2 --------------
 	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen
-        int MergeRuns();
-	bool MarkRunOver(int runNum);
-	unsigned long int m_nRunOverMarker;
-	void setupRunOverMarker();
-	bool isRunAlive(int runNum);
+    int MergeRuns();
 
 public:
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);

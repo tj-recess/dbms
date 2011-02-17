@@ -17,9 +17,6 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 #ifdef _DEBUG
     m_pSortOrder->Print();
 #endif
-    // NOTE (Malvika): if we go by the bit-manipulation approach
-    // we cannot handle runLen > 64
-    // so error out here or something....
     //TODO:
     //Arpit - change this bit manipulation approach to something more generic
     //which can accomodate any m-way merge
@@ -155,8 +152,9 @@ int BigQ::MergeRuns()
 {
     m_runFile.Close();
     m_runFile.Open((char*)m_sFileName.c_str());
-	setupRunOverMarker();
 	ComparisonEngine ce;
+	int nPagesFetched = 0;
+	int nRunsAlive = 0;
 
     // we need to do an m-way merge
     // m = total pages/run length
@@ -180,8 +178,10 @@ int BigQ::MergeRuns()
     for (int i = 0; i < nMWayRun; i++)
     {
         pRun = new Run(m_nRunLen);
-        pRun->m_nCurrPage = runHeadPage;
-        m_runFile.GetPage(pRun->pPage, pRun->m_nCurrPage++);
+        pRun->set_curPage(runHeadPage);
+        m_runFile.GetPage(pRun->getPage(), pRun->get_and_inc_pagecount());
+		nPagesFetched++;
+		nRunsAlive++;
 
         // fetch 1st record and push in the priority queue
         pRec = new Record();
@@ -217,7 +217,7 @@ int BigQ::MergeRuns()
     int nRunToFetchRecFrom = 0;
     while (bFileEmpty == false)
     {
-        if (pqRecords.size() < nMWayRun)
+        if (pqRecords.size() < nRunsAlive)
         {
             pRec = new Record;
             int ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
@@ -228,8 +228,10 @@ int BigQ::MergeRuns()
                 if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage(m_nPageCount))
                 {
                     // fetch next page
-                    m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->pPage,
-                                     m_vRuns.at(nRunToFetchRecFrom)->m_nCurrPage++);
+                    m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->getPage(),
+                                      m_vRuns.at(nRunToFetchRecFrom)->get_and_inc_pagecount());
+					nPagesFetched++;
+
                     // fetch first record from this page now
                     ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
                     if (!ret)
@@ -243,24 +245,28 @@ int BigQ::MergeRuns()
                 {
                     // all the pages from this run have been fetched
                     // size of M in the m-way run would reduce by one.. logically
+					nRunsAlive--;
 
-                    // mark the fact that this run is over
-                    // if all runs are over, funtion will return true
-                    bFileEmpty = MarkRunOver(nRunToFetchRecFrom);
+					if (nPagesFetched == m_nPageCount)
+						bFileEmpty = true;
 
                     if (bFileEmpty == false)
                     {
                             // this run is over, fetch next record from the next alive run
                             nRunToFetchRecFrom = 0;
-                            bool bRunFound = false;
-                            while (bRunFound == false)
-                            {
-                                    bRunFound = isRunAlive(nRunToFetchRecFrom);
-                                    if (bRunFound)
-                                            break;
-                                    nRunToFetchRecFrom++;
-                            }
+							while (nRunToFetchRecFrom < nMWayRun)
+							{
+								if (m_vRuns.at(nRunToFetchRecFrom)->is_alive())
+									break;
+								nRunToFetchRecFrom++;
+							}
+							if (nRunToFetchRecFrom == nMWayRun)
+							{
+								// File still has pages, still can't fine run - ERROR
+								return RET_FAILURE;
+							}
                     }
+					delete pRec;
 					pRec = NULL;	// because no record was fetched
                 }
             }
@@ -276,7 +282,7 @@ int BigQ::MergeRuns()
         }
 
         // priority queue is full, pop min record
-        if (pqRecords.size() == nMWayRun)
+        if (nRunsAlive != 0 && pqRecords.size() == nRunsAlive)
         {
             // find min record
             Record_n_Run rr = pqRecords.top();
@@ -307,45 +313,3 @@ int BigQ::MergeRuns()
     return RET_SUCCESS;
 }
 
-// Mark that the run "runNum" is over. That is, all the pages from this run
-// have been fetched. Run over --> bit = 1
-// If all the runs are over, return true --> whole file has been read
-bool BigQ::MarkRunOver(int runNum)
-{
-	unsigned long int bitRunOver = 0x00000001;
-
-	// left shift 1 by runNum bits
-	bitRunOver << runNum;
-
-	m_nRunOverMarker = m_nRunOverMarker | bitRunOver;
-	if (m_nRunOverMarker == 0xFFFFFFFF)
-		return true;
-
-	return false;
-}
-
-// we do not need to consider the bits that do not corrospond to runs
-// those would be leftmost bits, so set them to 1
-void BigQ::setupRunOverMarker()
-{
-	unsigned long int mask = 0xFFFFFFFF;
-	// insert m_nRunLen 0s on the right
-	// for 4 runs, m_nRunOverMarker = 0xFFF0
-	// for 5 runs, m_nRunOverMarker = 0xFFE0
-	mask << m_nRunLen;
-
-	m_nRunOverMarker = mask;
-}
-
-// Check if the given run is alive
-// return true if it is, else false
-bool BigQ::isRunAlive(int runNum)
-{
-	unsigned long int bitForRun = 0x00000001;
-    bitForRun << runNum;
-	unsigned long int result = m_nRunOverMarker & bitForRun;
-	if (result == 0)
-		return true;
-
-	return false;
-}
