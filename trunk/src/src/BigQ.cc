@@ -46,14 +46,20 @@ void* BigQ::getRunsFromInputPipe()
     bool allSorted = true;
     bool overflowRec = false;
 
+	int recs = 0;
+
     while(m_pInPipe->Remove(&recFromPipe))
     {
+		recs++;
         Record *copyRec = new Record();
         copyRec->Copy(&recFromPipe); //because currentPage.Append() would consume the record
 
         //initially pageCountPerRun is always less than m_nRunLen (as runLen can't be 0)
         if(!currentPage.Append(&recFromPipe))
         {
+			cout << "\n\n record " << recs << " did not fit in page " << m_nPageCount
+				 << "\n\n current pages in the run are " << pageCountPerRun <<endl;
+
             //page full, start new page and increase the page count both global and local
             m_nPageCount++;
             pageCountPerRun++;
@@ -77,7 +83,7 @@ void* BigQ::getRunsFromInputPipe()
         //control here means one run is full, sort it and write to file
         //then insert the overflow Rec and start over
 
-        sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(*this));
+        sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(m_pSortOrder));
         appendRunToFile(aRunVector);
 
         //now clear the vector to begin for new run
@@ -88,6 +94,7 @@ void* BigQ::getRunsFromInputPipe()
         {
             aRunVector.push_back(copyRec);  //value in copyRec is still intact
             allSorted = false;
+			overflowRec = false;
         }
     }
 
@@ -96,19 +103,22 @@ void* BigQ::getRunsFromInputPipe()
     if(!allSorted)
     {
         //sort the vector
-        sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(*this));
+        sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(m_pSortOrder));
         appendRunToFile(aRunVector);    //flush everything to file
 
 //#ifdef _DEBUG
-//            //get the records from runfile and feed 'em to outpipe
-//            int vectorLen = aRunVector.size();
-//            m_runFile.MoveFirst();
-//            for(int i = 0; i < vectorLen; i++)
-//            {
-//                Record *rc = new Record();
-//                m_runFile.GetNext(*rc);
-//                m_pOutPipe->Insert(rc);
-//            }
+            //get the records from runfile and feed 'em to outpipe
+	/*		m_runFile.Open(const_cast<char*>(m_sFileName.c_str())); 
+            m_runFile.MoveFirst();
+            Record *rc = new Record();
+			int recCtr = 0;
+			while (m_runFile.GetNext(*rc) == 1)
+			{
+		        m_pOutPipe->Insert(rc);
+				recCtr++;
+			}
+			cout << "\n\n Records sent to outpipe = " << recCtr <<endl;
+			m_runFile.Close();*/
 //#endif
 
     }
@@ -122,6 +132,8 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 {
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
+	cout << "\n\nBigQ::appendRunToFile aRun.size() = " << length 
+		 << " and m_nPageCount = " << m_nPageCount << endl;
     for(int i = 0; i < length; i++)
             m_runFile.Add(*aRun[i]);
     m_runFile.Close();
@@ -156,9 +168,14 @@ int BigQ::MergeRuns()
 	int nPagesFetched = 0;
 	int nRunsAlive = 0;
 
+	// delete this
+	int recs = 0;
+
     // we need to do an m-way merge
     // m = total pages/run length
     const int nMWayRun = ceil((double)m_nPageCount/m_nRunLen);
+
+	cout << "\n\n M = " << nMWayRun << endl;
 
 	// Priority queue that contains sorted records
 	priority_queue < Record_n_Run, vector <Record_n_Run>,
@@ -182,6 +199,10 @@ int BigQ::MergeRuns()
         m_runFile.GetPage(pRun->getPage(), pRun->get_and_inc_pagecount());
 		nPagesFetched++;
 		nRunsAlive++;
+
+		cout << "\n\n runHeadPage = " << runHeadPage
+			 << "\n nPagesFetched = "<< nPagesFetched
+			 << "\n nRunsAlive = "<< nRunsAlive;
 
         // fetch 1st record and push in the priority queue
         pRec = new Record();
@@ -210,7 +231,8 @@ int BigQ::MergeRuns()
         m_vRuns.push_back(pRun);
     }
 
-
+	cout << "\n\n m_vRuns.size() = " << m_vRuns.size()
+		 << "\n pqRecords.size() = " << pqRecords.size() << endl;
     // fetch 1st record from each page
     // and push it in the min priority queue
     bool bFileEmpty = false;
@@ -231,10 +253,12 @@ int BigQ::MergeRuns()
                     m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->getPage(),
                                       m_vRuns.at(nRunToFetchRecFrom)->get_and_inc_pagecount());
 					nPagesFetched++;
+					cout << "\n\ncanFetchPage is true for run " << nRunToFetchRecFrom
+						 << "\n so nPagesFetched = " << nPagesFetched <<endl;
 
                     // fetch first record from this page now
-                    ret = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
-                    if (!ret)
+                    int ret2 = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
+                    if (!ret2)
                     {
                         cout << "\nBigQ::MergeRuns --> fetching record from page x of run "
                              << nRunToFetchRecFrom << " failed. Fatal!\n\n";
@@ -246,8 +270,11 @@ int BigQ::MergeRuns()
                     // all the pages from this run have been fetched
                     // size of M in the m-way run would reduce by one.. logically
 					nRunsAlive--;
+					cout << "\n\ncanFetchPage is *false* for run " << nRunToFetchRecFrom
+						 << "\n--- nPagesFetched = "<< nPagesFetched
+            			 << "\n--- nRunsAlive = "<< nRunsAlive;
 
-					if (nPagesFetched == m_nPageCount)
+					if (nPagesFetched == m_nPageCount && nRunsAlive == 0)
 						bFileEmpty = true;
 
                     if (bFileEmpty == false)
@@ -293,8 +320,11 @@ int BigQ::MergeRuns()
             // need to fetch next record from the run of that page
             nRunToFetchRecFrom = rr.get_run();
             // do not delete memory allocated for record,
+			recs++;
         }
     }
+
+	cout << "\n\n records outed till now = "<< recs;
 
     // empty the priority queue
     while (pqRecords.size() > 0)
@@ -308,7 +338,9 @@ int BigQ::MergeRuns()
         // need to fetch next record from the run of that page
         nRunToFetchRecFrom = rr.get_run();
         // do not delete memory allocated for record,
+		recs++;
     }
+	cout << "\n\n records outed till now = "<< recs;
 
     return RET_SUCCESS;
 }
