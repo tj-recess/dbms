@@ -209,6 +209,7 @@ int BigQ::MergeRuns()
     int runHeadPage = 0;
     Run * pRun = NULL;
     Record * pRec = NULL;
+
     for (int i = 0; i < nMWayRun; i++)
     {
         pRun = new Run(m_nRunLen);
@@ -257,7 +258,7 @@ int BigQ::MergeRuns()
             {
                 // records from this page are over
                 // see if new page from this run can be fetched
-                if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage())
+                if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage(m_nPageCount))
                 {
                     // fetch next page
                     m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->pPage,
@@ -293,6 +294,7 @@ int BigQ::MergeRuns()
                                     nRunToFetchRecFrom++;
                             }
                     }
+					pRec = NULL;	// because no record was fetched
                 }
             }
 
