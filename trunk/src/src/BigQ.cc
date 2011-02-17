@@ -164,18 +164,12 @@ int BigQ::partition(vector<Record*>& aRun, int begin, int end, ComparisonEngine 
 	return i;
 }
 
-/* ----- Phase-2 of TPMMS: MergeRuns() -----
- *
- * input parameters:
- * output parameters:
- * return type
-
 /* --------------- Phase-2 of TPMMS: MergeRuns() --------------- */
 
 #ifndef LESS_OP
 #define LESS_OP
 
-ComparisonEngine ce;
+//ComparisonEngine ce;
 //ComparisonEngine * Record_n_Run::m_pCE = &ce;
 
 //bool operator < (Record_n_Run r1, Record_n_Run r2)
@@ -195,6 +189,7 @@ int BigQ::MergeRuns()
     m_runFile.Close();
     m_runFile.Open((char*)m_sFileName.c_str());
 	setupRunOverMarker();
+	ComparisonEngine ce;
 
     // we need to do an m-way merge
     // m = total pages/run length
@@ -232,7 +227,7 @@ int BigQ::MergeRuns()
 
         if (pRec)
         {
-            Record_n_Run rr(m_pSortOrder, pRec, i);
+            Record_n_Run rr(m_pSortOrder, &ce, pRec, i);
             pqRecords.push(rr);
             pRec = NULL;
         }
@@ -305,10 +300,8 @@ int BigQ::MergeRuns()
             // for now, push it in a vector
             if (pRec)
             {
-		//pair<Record*, int> recordRunPair(pRec, nRunToFetchRecFrom);
-                //vPQRecords.push_back(recordRunPair);
-		Record_n_Run rr(m_pSortOrder, pRec, nRunToFetchRecFrom);
-	        pqRecords.push(rr);
+				Record_n_Run rr(m_pSortOrder, &ce, pRec, nRunToFetchRecFrom);
+		        pqRecords.push(rr);
                 pRec = NULL;
             }
         }
@@ -318,6 +311,7 @@ int BigQ::MergeRuns()
         {
             // find min record
             Record_n_Run rr = pqRecords.top();
+			pqRecords.pop();
             // push min element through out-pipe
             m_pOutPipe->Insert(rr.get_rec());
             // keep track of which run this record belonged too
@@ -332,6 +326,7 @@ int BigQ::MergeRuns()
     {
 		// find min record
         Record_n_Run rr = pqRecords.top();
+		pqRecords.pop();
         // push min element through out-pipe
 		m_pOutPipe->Insert(rr.get_rec());
         // keep track of which run this record belonged too
