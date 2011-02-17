@@ -66,8 +66,8 @@ private:
 
 public:
 
-	Record_n_Run(OrderMaker *pOrderMaker, Record *rec, int run)
-		: m_pSortOrder(pOrderMaker), m_pRec(rec), m_nRun(run)
+	Record_n_Run(OrderMaker *pOrderMaker, ComparisonEngine *pCE, Record *rec, int run)
+		: m_pSortOrder(pOrderMaker), m_pCE(pCE), m_pRec(rec), m_nRun(run)
 	{}
 
 	~Record_n_Run() {}
@@ -92,14 +92,6 @@ public:
 		return m_pCE;
 	}
 
-	/*bool operator() (Record * r1, Record * r2)
-	{
-		if(m_pCE->Compare(r1, r2, m_pSortOrder) > 0)
-			return true;
-		return false;
-	}*/
-
-	// here or global?
 	bool operator< (const Record_n_Run& r) const
 	{
             Record_n_Run* rr = const_cast<Record_n_Run*>(&r);
