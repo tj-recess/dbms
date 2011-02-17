@@ -40,10 +40,11 @@ public:
         m_nRunLen = 0;
     }
 
-    bool canFetchPage()
+    bool canFetchPage(int total_pages)
     {
         // more pages can be fetched from this run
-        if (m_nPagesFetched < m_nRunLen)
+        if (m_nPagesFetched < m_nRunLen && 
+			m_nCurrPage < total_pages)
             return true;
         return false;
     }
@@ -80,16 +81,6 @@ public:
 	int get_run()
 	{
 		return m_nRun;
-	}
-
-	OrderMaker * get_order()
-	{
-		return m_pSortOrder;
-	}
-
-	ComparisonEngine * get_CE()
-	{
-		return m_pCE;
 	}
 
 	bool operator< (const Record_n_Run& r) const
