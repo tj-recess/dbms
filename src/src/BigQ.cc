@@ -7,102 +7,104 @@ using namespace std;
 BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 	: m_runFile(), m_nRunLen(runlen), m_nPageCount(1), m_sFileName()
 {
-
-	//init data structures
-	m_pInPipe = &in;
-	m_pOutPipe = &out;
-	m_pSortOrder = &sortorder;
-	m_sFileName = "runFile";
+    //init data structures
+    m_pInPipe = &in;
+    m_pOutPipe = &out;
+    m_pSortOrder = &sortorder;
+    m_sFileName = "runFile";
     m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), heap, NULL);
 
 #ifdef _DEBUG
     m_pSortOrder->Print();
 #endif
-	// NOTE (Malvika): if we go by the bit-manipulation approach
-	// we cannot handle runLen > 64
-	// so error out here or something....
+    // NOTE (Malvika): if we go by the bit-manipulation approach
+    // we cannot handle runLen > 64
+    // so error out here or something....
+    //TODO:
+    //Arpit - change this bit manipulation approach to something more generic
+    //which can accomodate any m-way merge
 
-	// read data from in pipe sort them into runlen pages
-	pthread_t sortingThread;
-	pthread_create(&sortingThread, NULL, &getRunsFromInputPipeHelper, (void*)this);
-
-    // construct priority queue over sorted runs and dump sorted data
- 	// into the out pipe
-
-    // finally shut down the out pipe
-	// out.ShutDown ();
+    // read data from in pipe sort them into runlen pages
+    pthread_t sortingThread;
+    pthread_create(&sortingThread, NULL, &getRunsFromInputPipeHelper, (void*)this);
+    
 }
 
 BigQ::~BigQ ()
 {
-	// loop over m_vRuns and empty it out
+    // loop over m_vRuns and empty it out
 }
 
 void* BigQ::getRunsFromInputPipeHelper(void* context)
 {
-	((BigQ *)context)->getRunsFromInputPipe();
+    ((BigQ *)context)->getRunsFromInputPipe();
 }
 
 void* BigQ::getRunsFromInputPipe()
 {
-	Record recFromPipe;
-	vector<Record*> aRunVector;
-	Page currentPage;
-//	int pageCount = 0;
-	bool allSorted = true;
-        ComparisonEngine ce;
+    Record recFromPipe;
+    vector<Record*> aRunVector;
+    Page currentPage;
+    int pageCountPerRun = 0;
+    bool allSorted = true;
+    bool overflowRec = false;
 
-	while(m_pInPipe->Remove(&recFromPipe))
-	{
-            if(m_nPageCount <= m_nRunLen)
+    while(m_pInPipe->Remove(&recFromPipe))
+    {
+        Record *copyRec = new Record();
+        copyRec->Copy(&recFromPipe); //because currentPage.Append() would consume the record
+
+        //initially pageCountPerRun is always less than m_nRunLen (as runLen can't be 0)
+        if(!currentPage.Append(&recFromPipe))
+        {
+            //page full, start new page and increase the page count both global and local
+            m_nPageCount++;
+            pageCountPerRun++;
+            currentPage.EmptyItOut();
+            currentPage.Append(&recFromPipe);
+            if(pageCountPerRun >= m_nRunLen)
             {
-                Record *copyRec = new Record();
-                copyRec->Copy(&recFromPipe); //because currentPage.Append() would consume the record
-                if(!currentPage.Append(&recFromPipe))
-                {
-                    //page full, start new page and increase the page count
-                    m_nPageCount++;
-                    currentPage.EmptyItOut();
-                    currentPage.Append(&recFromPipe);
-                }
-                aRunVector.push_back(copyRec); //whether it's a new page or old page, just push back the copy onto vector
-                allSorted = false;
+                //this is the only check for pageCount >= runLen and is sufficient
+                //because pageCount can never increase until a record spills over
+                overflowRec = true;
+                pageCountPerRun = 0;    //reset pageCountPerRun for next run as current run is full
             }
-            else
-            {
-                //one run is full, sort it and write to file
-                //then fetch the data for next run
+        }
+        if(!overflowRec)
+        {
+            aRunVector.push_back(copyRec); //whether it's a new page or old page, just push back the copy onto vector
+            allSorted = false;
+            continue;   //don't sort i.e. go down until the run is full
+        }
 
-                //sort the records inside aRun
-                quickSortRun(aRunVector, 0, aRunVector.size(), ce);
+        //control here means one run is full, sort it and write to file
+        //then insert the overflow Rec and start over
 
-                //write the sorted run onto disk in runFile
-                appendRunToFile(aRunVector);
+        sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(*this));
+        appendRunToFile(aRunVector);
 
-                //now clear the vector to begin for new run
-                aRunVector.clear();
-                allSorted = true;
-            }
-	}
+        //now clear the vector to begin for new run
+        //pageRecord must have been reset already as run was full
+        aRunVector.clear();
+        allSorted = true;
+        if(overflowRec)     //this would always be the case
+        {
+            aRunVector.push_back(copyRec);  //value in copyRec is still intact
+            allSorted = false;
+        }
+    }
 
-	//done with all records in pipe, if there is anything in vector
-	//it should be sorted and written out to file
-	if(!allSorted)
-	{
-            //sort the vector
-	    sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(*this));
+    //done with all records in pipe, if there is anything in vector
+    //it should be sorted and written out to file
+    if(!allSorted)
+    {
+        //sort the vector
+        sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(*this));
+        appendRunToFile(aRunVector);    //flush everything to file
 
-//            for(int i = 0; i < aRunVector.size(); i++)
-//                m_pOutPipe->Insert(aRunVector[i]);
-
-	    //quickSortRun(aRunVector, 0, aRunVector.size(), ce);
-
-#ifdef _DEBUG
-            int vectorLen = aRunVector.size();
-#endif
-            appendRunToFile(aRunVector);//check would be done internally in function
-#ifdef _DEBUG
-            //get the records from runfile and feed 'em to outpipe
+//#ifdef _DEBUG
+//            //get the records from runfile and feed 'em to outpipe
+//            int vectorLen = aRunVector.size();
 //            m_runFile.MoveFirst();
 //            for(int i = 0; i < vectorLen; i++)
 //            {
@@ -110,19 +112,13 @@ void* BigQ::getRunsFromInputPipe()
 //                m_runFile.GetNext(*rc);
 //                m_pOutPipe->Insert(rc);
 //            }
-#endif
-	}
+//#endif
 
-        //now call mergeRuns here!
-        MergeRuns();
-        m_pOutPipe->ShutDown();
-}
+    }
 
-void BigQ::swap(Record*& a, Record*& b)
-{
-	Record* temp = a;
-	a = b;
-	b = temp;
+    //now call mergeRuns here!
+    MergeRuns();
+    m_pOutPipe->ShutDown();
 }
 
 void BigQ::appendRunToFile(vector<Record*>& aRun)
@@ -134,35 +130,6 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
     m_runFile.Close();
 }
 
-
-void BigQ::quickSortRun(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce)
-{
-	if(begin < end)
-	{
-		int split = partition(aRun, begin, end, ce);
-		quickSortRun(aRun, begin, split, ce);
-		quickSortRun(aRun, split + 1, end, ce);
-	}
-}
-
-int BigQ::partition(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce)
-{
-	Record *pivot = aRun[begin];
-	int i = begin + 1;
-	for (int j = begin + 1; j < end; j++)
-	{
-		if(ce.Compare(pivot, aRun[j], m_pSortOrder) > 0)	//i.e. pivot is bigger than aRun[j]
-		{
-			//swap aRun[i] and aRun[j] and increment i
-			swap(aRun[i], aRun[j]);
-
-			i++;
-		}
-	}
-	//now swap pivot and (i-1)th element (which is smaller than pivot)
-	swap(pivot, aRun[i-1]);
-	return i;
-}
 
 /* --------------- Phase-2 of TPMMS: MergeRuns() --------------- */
 

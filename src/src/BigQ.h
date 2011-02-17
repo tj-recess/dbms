@@ -104,23 +104,9 @@ private:
 
 private:
 	// -------- phase - 1 --------------
-	void swap(Record*&, Record*&);
 	void appendRunToFile(vector<Record*>&);
-	void quickSortRun(vector<Record*>& aRun, int begin, int end, ComparisonEngine &ce);
-	int partition(vector<Record*>&, int, int, ComparisonEngine&);
 	void* getRunsFromInputPipe();
 	static void* getRunsFromInputPipeHelper(void*);
-
-        //to compare records
-        bool operator()(Record* const& r1, Record* const& r2)
-        {
-            Record* r11 = const_cast<Record*>(r1);
-            Record* r22 = const_cast<Record*>(r2);
-            if(ce.Compare(r11, r22, m_pSortOrder) <= 0)    //i.e. records are already sorted (r1 <= r2)
-                return true;
-            else
-                return false;
-        }
 
 	struct CompareMyRecords
 	{
@@ -141,7 +127,7 @@ private:
 
 	// -------- phase - 2 --------------
 	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen
-    int MergeRuns();
+        int MergeRuns();
 	bool MarkRunOver(int runNum);
 	unsigned long int m_nRunOverMarker;
 	void setupRunOverMarker();
