@@ -94,7 +94,7 @@ void* BigQ::getRunsFromInputPipe()
         {
             aRunVector.push_back(copyRec);  //value in copyRec is still intact
             allSorted = false;
-			overflowRec = false;
+            overflowRec = false;
         }
     }
 
@@ -106,20 +106,21 @@ void* BigQ::getRunsFromInputPipe()
         sort(aRunVector.begin(), aRunVector.end(), CompareMyRecords(m_pSortOrder));
         appendRunToFile(aRunVector);    //flush everything to file
 
-//#ifdef _DEBUG
-            //get the records from runfile and feed 'em to outpipe
-	/*		m_runFile.Open(const_cast<char*>(m_sFileName.c_str())); 
-            m_runFile.MoveFirst();
-            Record *rc = new Record();
-			int recCtr = 0;
-			while (m_runFile.GetNext(*rc) == 1)
-			{
-		        m_pOutPipe->Insert(rc);
-				recCtr++;
-			}
-			cout << "\n\n Records sent to outpipe = " << recCtr <<endl;
-			m_runFile.Close();*/
-//#endif
+#ifdef _DEBUG
+//    //get the records from runfile and feed 'em to outpipe
+//    m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));
+//    m_runFile.MoveFirst();
+//    Record *rc = new Record();
+//    int recCtr = 0;
+//    while (m_runFile.GetNext(*rc) == 1)
+//    {
+//    m_pOutPipe->Insert(rc);
+//            recCtr++;
+//    }
+//    cout << "\n\n Records sent to outpipe = " << recCtr <<endl;
+//    m_runFile.Close();
+#endif
+
 
     }
 
@@ -130,13 +131,24 @@ void* BigQ::getRunsFromInputPipe()
 
 void BigQ::appendRunToFile(vector<Record*>& aRun)
 {
+    static int appendCount = 0;
+#ifdef _DEBUG
+//    cout<<"Append Run to File count : "<< ++appendCount<<endl;
+#endif
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
-	cout << "\n\nBigQ::appendRunToFile aRun.size() = " << length 
-		 << " and m_nPageCount = " << m_nPageCount << endl;
-    for(int i = 0; i < length; i++)
+    //insert first record into new page so that a clear demarcation can be established
+    //start this demarcation from 2nd run (don't do it for first run )
+    int i = 0;
+    if(appendCount > 0)
+    {
+        m_runFile.Add(*aRun[0], true);
+        i = 1;
+    }
+    for(; i < length; i++)  //initial value of i is already set above
             m_runFile.Add(*aRun[i]);
     m_runFile.Close();
+    appendCount++;
 }
 
 
