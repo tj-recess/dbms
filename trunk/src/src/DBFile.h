@@ -75,7 +75,7 @@ class DBFile
 
 		// Add new record to the end of the file
 		// Note: addMe is consumed by this function and cannot be used again
-		void Add (Record &addMe);
+		void Add (Record &addMe, bool startFromNewPage = false);
 
 		// Fetch next record (relative to p_currPtr) into fetchMe
 		int GetNext (Record &fetchMe);

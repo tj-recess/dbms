@@ -96,6 +96,14 @@ int DBFile::Open(char *fname)
 	if (m_pFile)
 	{
 		m_pFile->Open(APPEND, const_cast<char*>(fname));//openInAppendMode
+                m_nTotalPages = m_pFile->GetLength() - 2;   //get total number of pages which are in the file
+
+                if(!m_pPage)
+                    m_pPage = new Page();
+                if(m_nTotalPages >= 0)
+                    m_pFile->GetPage(m_pPage, m_nTotalPages);   //fetch last page from DB
+                else
+                    m_nTotalPages = 0;
 	}
 	
 	return RET_SUCCESS;
@@ -147,7 +155,7 @@ void DBFile::Load (Schema &mySchema, char *loadMe)
 	WritePageToFile();
 }
 
-void DBFile::Add (Record &rec)
+void DBFile::Add (Record &rec, bool startFromNewPage)
 {
 	EventLogger *el = EventLogger::getEventLogger();
 	
@@ -168,25 +176,31 @@ void DBFile::Add (Record &rec)
 		m_nTotalPages = 0;
 	}
 
-	// a page exists in memory, add record to it
-	if (m_pPage)	
-	{
-	    if (!m_pPage->Append(&aRecord)) // current page does not have enough space
+        if(startFromNewPage)
+        {
+            WritePageToFile();  //this will write only if dirty page exists
+            m_pPage->EmptyItOut();
+            m_nTotalPages++;
+        }
+        // a page exists in memory, add record to it
+        if (m_pPage)
+        {
+            if (!m_pPage->Append(&aRecord)) // current page does not have enough space
             {
-        	// write current page to file
-	        // this function will fetch a new page too
+                // write current page to file
+                // this function will fetch a new page too
                 WritePageToFile();
-        	if (!m_pPage->Append(&aRecord))
-	        {
-				el->writeLog("DBFile::Add --> Adding record to page failed.\n");
-				return;
-        	}
-		else
+                if (!m_pPage->Append(&aRecord))
+                {
+                                el->writeLog("DBFile::Add --> Adding record to page failed.\n");
+                                return;
+                }
+                else
                     m_bDirtyPageExists = true;
-	    }
+            }
             else
-		m_bDirtyPageExists = true;
-	}
+                m_bDirtyPageExists = true;
+        }   //else part would never occur so we can remove this IF condition
 }
 
 void DBFile::MoveFirst ()
