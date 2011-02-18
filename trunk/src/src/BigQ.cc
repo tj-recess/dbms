@@ -17,9 +17,6 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 #ifdef _DEBUG
     m_pSortOrder->Print();
 #endif
-    //TODO:
-    //Arpit - change this bit manipulation approach to something more generic
-    //which can accomodate any m-way merge
 
     // read data from in pipe sort them into runlen pages
     pthread_t sortingThread;
@@ -40,7 +37,7 @@ void* BigQ::getRunsFromInputPipeHelper(void* context)
 void* BigQ::getRunsFromInputPipe()
 {
     Record recFromPipe;
-    vector<Record*> aRunVector;
+    vector<Record*> aRunVector;		// to deletes this?
     Page currentPage;
     int pageCountPerRun = 0;
     bool allSorted = true;
@@ -124,6 +121,11 @@ void* BigQ::getRunsFromInputPipe()
 
     }
 
+	for (int i = 0; i < m_vRunLengths.size(); i++)
+	{
+		cout << "\nRun " << i << " length " << m_vRunLengths.at(i);
+	}
+
     //now call mergeRuns here!
     MergeRuns();
     m_pOutPipe->ShutDown();
@@ -137,7 +139,13 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 #endif
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
-    //insert first record into new page so that a clear demarcation can be established
+	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length 
+		 << " and m_nPageCount = " << m_nPageCount 
+		 << "runFile page size: " << m_runFile.TotalPages() << endl;
+
+	int nPagesBefore = m_runFile.TotalPages();
+
+	//insert first record into new page so that a clear demarcation can be established
     //start this demarcation from 2nd run (don't do it for first run )
     int i = 0;
     if(appendCount > 0)
@@ -145,10 +153,20 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
         m_runFile.Add(*aRun[0], true);
         i = 1;
     }
-    for(; i < length; i++)  //initial value of i is already set above
+    for(; i < length; i++)
             m_runFile.Add(*aRun[i]);
+
+	cout << "runFile page size: " << m_runFile.TotalPages() 
+		 << "----" << endl;
+	int nPagesAfter = m_runFile.TotalPages();
     m_runFile.Close();
-    appendCount++;
+	appendCount++;
+
+	// first run has one extra page count, as 0th page is blank
+	if ( m_vRunLengths.size() == 0)
+		m_vRunLengths.push_back(nPagesAfter - nPagesBefore);
+	else
+		m_vRunLengths.push_back((nPagesAfter - nPagesBefore)+1);
 }
 
 
@@ -180,20 +198,23 @@ int BigQ::MergeRuns()
 	int nPagesFetched = 0;
 	int nRunsAlive = 0;
 
+		cout << "\n\n Page counts do not match: " << m_runFile.TotalPages() 
+			 << " != " << m_nPageCount << "\n\n";
+
 	// delete this
 	int recs = 0;
 
     // we need to do an m-way merge
     // m = total pages/run length
-    const int nMWayRun = ceil((double)m_nPageCount/m_nRunLen);
+    //const int nMWayRun = ceil((double)m_nPageCount/m_nRunLen);
+	const int nMWayRun = m_vRunLengths.size();
 
 	cout << "\n\n M = " << nMWayRun << endl;
-
+	cout << "\n\n m_vRunLengths.size() " << m_vRunLengths.size() <<endl;
+	
 	// Priority queue that contains sorted records
 	priority_queue < Record_n_Run, vector <Record_n_Run>,
 					 less<vector<Record_n_Run>::value_type> > pqRecords;
-
-//    priority_queue<Record*, vector<Record*>, CompareMyRecords(*this)> pqRecords;
 
     // ---- Initial setup ----
     // There are m_nRunLen pages in one run
@@ -206,7 +227,8 @@ int BigQ::MergeRuns()
 
     for (int i = 0; i < nMWayRun; i++)
     {
-        pRun = new Run(m_nRunLen);
+		// Run length of 0th run is 1 extra, as 0th page doesn't contain data
+        pRun = new Run(m_vRunLengths.at(i));
         pRun->set_curPage(runHeadPage);
         m_runFile.GetPage(pRun->getPage(), pRun->get_and_inc_pagecount());
 		nPagesFetched++;
@@ -239,7 +261,7 @@ int BigQ::MergeRuns()
         }
 
         // increment page-counter to go to the next run
-        runHeadPage += m_nRunLen;
+        runHeadPage += m_vRunLengths.at(i);
         m_vRuns.push_back(pRun);
     }
 
@@ -261,6 +283,7 @@ int BigQ::MergeRuns()
                 // see if new page from this run can be fetched
                 if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage(m_nPageCount))
                 {
+					cout << "\n\n records outed till now = "<< recs;
                     // fetch next page
                     m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->getPage(),
                                       m_vRuns.at(nRunToFetchRecFrom)->get_and_inc_pagecount());
@@ -286,25 +309,21 @@ int BigQ::MergeRuns()
 						 << "\n--- nPagesFetched = "<< nPagesFetched
             			 << "\n--- nRunsAlive = "<< nRunsAlive;
 
-					if (nPagesFetched == m_nPageCount && nRunsAlive == 0)
+					cout << "\n\n records outed till now = "<< recs;
+
+                            // this run is over, fetch next record from the next alive run
+                    nRunToFetchRecFrom = 0;
+					while (nRunToFetchRecFrom < nMWayRun)
+					{
+						if (m_vRuns.at(nRunToFetchRecFrom)->is_alive())
+							break;
+						nRunToFetchRecFrom++;
+					}
+
+					// if no run is alive, all pages from all runs have been fetched
+					if (nRunToFetchRecFrom == nMWayRun)
 						bFileEmpty = true;
 
-                    if (bFileEmpty == false)
-                    {
-                            // this run is over, fetch next record from the next alive run
-                            nRunToFetchRecFrom = 0;
-							while (nRunToFetchRecFrom < nMWayRun)
-							{
-								if (m_vRuns.at(nRunToFetchRecFrom)->is_alive())
-									break;
-								nRunToFetchRecFrom++;
-							}
-							if (nRunToFetchRecFrom == nMWayRun)
-							{
-								// File still has pages, still can't fine run - ERROR
-								return RET_FAILURE;
-							}
-                    }
 					delete pRec;
 					pRec = NULL;	// because no record was fetched
                 }

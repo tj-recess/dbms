@@ -77,8 +77,6 @@ public:
 		m_nPagesFetched++;
 		return tmp;
 	}
-
-    // setPage() method needed...
 };
 
 class Record_n_Run
@@ -125,6 +123,7 @@ private:
 	int m_nRunLen, m_nPageCount;
 	string m_sFileName;
 	ComparisonEngine ce;
+	vector<int> m_vRunLengths;
 
 private:
 	// -------- phase - 1 --------------
@@ -134,24 +133,20 @@ private:
 
 	struct CompareMyRecords
 	{
-            OrderMaker *pSortOrder;
-	    //CompareMyRecords(BigQ& self_):self(self_){}
+        OrderMaker *pSortOrder;
 		CompareMyRecords(OrderMaker *pOM): pSortOrder(pOM) {}
 
-            bool operator()(Record* const& r1, Record* const& r2)
-            {
-                Record* r11 = const_cast<Record*>(r1);
-                Record* r22 = const_cast<Record*>(r2);
+        bool operator()(Record* const& r1, Record* const& r2)
+        {
+        	Record* r11 = const_cast<Record*>(r1);
+            Record* r22 = const_cast<Record*>(r2);
 
-                //if(self.ce.Compare(r11, r22, self.m_pSortOrder) <= 0)    //i.e. records are already sorted (r1 <= r2)
-                ComparisonEngine ce;
-                if (ce.Compare(r11, r22, pSortOrder) < 0)
-                    return true;
-                else
-                    return false;
-            }
-
-        //BigQ& self;
+            ComparisonEngine ce;
+            if (ce.Compare(r11, r22, pSortOrder) < 0)
+            	return true;
+            else
+                return false;
+        }
 	};
 
 	// -------- phase - 2 --------------
