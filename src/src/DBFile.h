@@ -85,6 +85,10 @@ class DBFile
 
 		// Temporary function - delete ASAP
 		void GetPage(Page *putItHere, off_t whichPage);
+		int TotalPages()
+		{
+			return m_pFile->GetLength();
+		}
 };
 
 #endif
