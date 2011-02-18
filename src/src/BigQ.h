@@ -150,6 +150,9 @@ private:
         }
 	};
 
+	// Function to fetch timestamp and append it to filename
+	string getTime();
+
 	// -------- phase - 2 --------------
 	vector<Run *> m_vRuns;  // max size of this vector will be m_nPageCount/m_nRunLen
     int MergeRuns();

@@ -11,7 +11,8 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
     m_pInPipe = &in;
     m_pOutPipe = &out;
     m_pSortOrder = &sortorder;
-    m_sFileName = "runFile";
+    m_sFileName = "runFile" + getTime();
+
     m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), heap, NULL);
 
 #ifdef _DEBUG
@@ -378,3 +379,19 @@ int BigQ::MergeRuns()
     return RET_SUCCESS;
 }
 
+string BigQ::getTime()
+{
+   time_t now;
+   char time_val[50];
+
+   time_val[0] = '\0';
+
+   now = time(NULL);
+
+   if (now != -1)
+   {
+      strftime(time_val, 50, "%k.%M.%S", gmtime(&now));
+   }
+
+   return std::string(time_val);
+}
