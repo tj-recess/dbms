@@ -27,6 +27,13 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
 BigQ::~BigQ ()
 {
     // loop over m_vRuns and empty it out
+	Run * r = NULL;
+	for (int i=0; i < m_vRuns.size(); i++)
+	{
+		r = m_vRuns.at(i);
+		delete r;
+		r = NULL;
+	}
 }
 
 void* BigQ::getRunsFromInputPipeHelper(void* context)
@@ -117,10 +124,12 @@ void* BigQ::getRunsFromInputPipe()
 
     }
 
+	#ifdef _DEBUG
 	for (int i = 0; i < m_vRunLengths.size(); i++)
 	{
 		cout << "\nRun " << i << " length " << m_vRunLengths.at(i);
 	}
+	#endif
 
     //now call mergeRuns here!
     MergeRuns();
@@ -130,13 +139,14 @@ void* BigQ::getRunsFromInputPipe()
 void BigQ::appendRunToFile(vector<Record*>& aRun)
 {
     static int appendCount = 0;
-#ifdef _DEBUG
-//    cout<<"Append Run to File count : "<< ++appendCount<<endl;
-#endif
+
+	#ifdef _DEBUG
+	//  cout<<"Append Run to File count : "<< ++appendCount<<endl;
+	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
+	#endif
+
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
-	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length 
-		 << " runFile page size: " << m_runFile.TotalPages() << endl;
 
 	int nPagesBefore = m_runFile.TotalPages();
 
@@ -151,8 +161,6 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
     for(; i < length; i++)
             m_runFile.Add(*aRun[i]);
 
-	cout << "runFile page size: " << m_runFile.TotalPages() 
-		 << "----" << endl;
 	int nPagesAfter = m_runFile.TotalPages();
     m_runFile.Close();
 	appendCount++;
@@ -187,9 +195,6 @@ int BigQ::MergeRuns()
     // m = total pages/run length
 	const int nMWayRun = m_vRunLengths.size();
 
-	cout << "\n\n M = " << nMWayRun << endl;
-	cout << "\n\n m_vRunLengths.size() " << m_vRunLengths.size() <<endl;
-	
 	// Priority queue that contains sorted records
 	priority_queue < Record_n_Run, vector <Record_n_Run>,
 					 less<vector<Record_n_Run>::value_type> > pqRecords;
@@ -212,9 +217,11 @@ int BigQ::MergeRuns()
 		nPagesFetched++;
 		nRunsAlive++;
 
+		#ifdef _DEBUG
 		cout << "\n\n runHeadPage = " << runHeadPage
 			 << "\n nPagesFetched = "<< nPagesFetched
 			 << "\n nRunsAlive = "<< nRunsAlive;
+		#endif
 
         // fetch 1st record and push in the priority queue
         pRec = new Record();
@@ -243,8 +250,12 @@ int BigQ::MergeRuns()
         m_vRuns.push_back(pRun);
     }
 
+	#ifdef _DEBUG
 	cout << "\n\n m_vRuns.size() = " << m_vRuns.size()
 		 << "\n pqRecords.size() = " << pqRecords.size() << endl;
+	#endif
+
+
     // fetch 1st record from each page
     // and push it in the min priority queue
     bool bFileEmpty = false;
@@ -261,13 +272,19 @@ int BigQ::MergeRuns()
                 // see if new page from this run can be fetched
                 if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage(nTotalPages))
                 {
+					#ifdef _DEBUG
 					cout << "\n\n records outed till now = "<< recs;
+					#endif
+
                     // fetch next page
                     m_runFile.GetPage(m_vRuns.at(nRunToFetchRecFrom)->getPage(),
                                       m_vRuns.at(nRunToFetchRecFrom)->get_and_inc_pagecount());
 					nPagesFetched++;
+
+					#ifdef _DEBUG
 					cout << "\n\ncanFetchPage is true for run " << nRunToFetchRecFrom
 						 << "\n so nPagesFetched = " << nPagesFetched <<endl;
+					#endif
 
                     // fetch first record from this page now
                     int ret2 = m_vRuns.at(nRunToFetchRecFrom)->getPage()->GetFirst(pRec);
@@ -283,13 +300,15 @@ int BigQ::MergeRuns()
                     // all the pages from this run have been fetched
                     // size of M in the m-way run would reduce by one.. logically
 					nRunsAlive--;
+
+					#ifdef _DEBUG
 					cout << "\n\ncanFetchPage is *false* for run " << nRunToFetchRecFrom
 						 << "\n--- nPagesFetched = "<< nPagesFetched
             			 << "\n--- nRunsAlive = "<< nRunsAlive;
-
 					cout << "\n\n records outed till now = "<< recs;
+					#endif
 
-                            // this run is over, fetch next record from the next alive run
+                    // this run is over, fetch next record from the next alive run
                     nRunToFetchRecFrom = 0;
 					while (nRunToFetchRecFrom < nMWayRun)
 					{
@@ -332,8 +351,10 @@ int BigQ::MergeRuns()
 			recs++;
         }
     }
-
+	
+	#ifdef _DEBUG
 	cout << "\n\n records outed till now = "<< recs;
+	#endif
 
     // empty the priority queue
     while (pqRecords.size() > 0)
@@ -349,7 +370,10 @@ int BigQ::MergeRuns()
         // do not delete memory allocated for record,
 		recs++;
     }
+	
+	#ifdef _DEBUG
 	cout << "\n\n records outed till now = "<< recs;
+	#endif
 
     return RET_SUCCESS;
 }
