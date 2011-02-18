@@ -5,7 +5,7 @@
 using namespace std;
 
 BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
-	: m_runFile(), m_nRunLen(runlen), m_nPageCount(1), m_sFileName()
+	: m_runFile(), m_nRunLen(runlen), m_sFileName()
 {
     //init data structures
     m_pInPipe = &in;
@@ -37,7 +37,7 @@ void* BigQ::getRunsFromInputPipeHelper(void* context)
 void* BigQ::getRunsFromInputPipe()
 {
     Record recFromPipe;
-    vector<Record*> aRunVector;		// to deletes this?
+    vector<Record*> aRunVector;		
     Page currentPage;
     int pageCountPerRun = 0;
     bool allSorted = true;
@@ -54,11 +54,7 @@ void* BigQ::getRunsFromInputPipe()
         //initially pageCountPerRun is always less than m_nRunLen (as runLen can't be 0)
         if(!currentPage.Append(&recFromPipe))
         {
-			cout << "\n\n record " << recs << " did not fit in page " << m_nPageCount
-				 << "\n\n current pages in the run are " << pageCountPerRun <<endl;
-
             //page full, start new page and increase the page count both global and local
-            m_nPageCount++;
             pageCountPerRun++;
             currentPage.EmptyItOut();
             currentPage.Append(&recFromPipe);
@@ -140,8 +136,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
 	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length 
-		 << " and m_nPageCount = " << m_nPageCount 
-		 << "runFile page size: " << m_runFile.TotalPages() << endl;
+		 << " runFile page size: " << m_runFile.TotalPages() << endl;
 
 	int nPagesBefore = m_runFile.TotalPages();
 
@@ -172,20 +167,6 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 
 /* --------------- Phase-2 of TPMMS: MergeRuns() --------------- */
 
-#ifndef LESS_OP
-#define LESS_OP
-
-//ComparisonEngine ce;
-//ComparisonEngine * Record_n_Run::m_pCE = &ce;
-
-//bool operator < (Record_n_Run r1, Record_n_Run r2)
-//{
-//    if(r1.get_CE()->Compare(r1.get_rec(), r2.get_rec(), r1.get_order()) < 0)
-//        return true;
-//    return false;
-//}
-#endif
-
 /* Input parameters: None
  * Return type: RET_SUCCESS or RET_FAILURE
  * Function: push sorted records through outPipe
@@ -197,16 +178,13 @@ int BigQ::MergeRuns()
 	ComparisonEngine ce;
 	int nPagesFetched = 0;
 	int nRunsAlive = 0;
-
-		cout << "\n\n Page counts do not match: " << m_runFile.TotalPages() 
-			 << " != " << m_nPageCount << "\n\n";
+	int nTotalPages = m_runFile.TotalPages() - 1;
 
 	// delete this
 	int recs = 0;
 
     // we need to do an m-way merge
     // m = total pages/run length
-    //const int nMWayRun = ceil((double)m_nPageCount/m_nRunLen);
 	const int nMWayRun = m_vRunLengths.size();
 
 	cout << "\n\n M = " << nMWayRun << endl;
@@ -281,7 +259,7 @@ int BigQ::MergeRuns()
             {
                 // records from this page are over
                 // see if new page from this run can be fetched
-                if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage(m_nPageCount))
+                if (m_vRuns.at(nRunToFetchRecFrom)->canFetchPage(nTotalPages))
                 {
 					cout << "\n\n records outed till now = "<< recs;
                     // fetch next page
