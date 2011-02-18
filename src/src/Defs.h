@@ -22,7 +22,7 @@ enum Type {Int, Double, String};
 
 unsigned int Random_Generate();
 
-#define _DEBUG 1
+//#define _DEBUG 0
 
 #endif
 

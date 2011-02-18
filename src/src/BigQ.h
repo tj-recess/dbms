@@ -79,6 +79,7 @@ public:
 	}
 };
 
+// Class to store records and comparator for priority queue
 class Record_n_Run
 {
 private:
@@ -120,7 +121,7 @@ private:
 	DBFile m_runFile;
 	Pipe *m_pInPipe, *m_pOutPipe;
 	OrderMaker *m_pSortOrder;
-	int m_nRunLen, m_nPageCount;
+	int m_nRunLen;
 	string m_sFileName;
 	ComparisonEngine ce;
 	vector<int> m_vRunLengths;
