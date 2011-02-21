@@ -13,7 +13,7 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
     m_pSortOrder = &sortorder;
     m_sFileName = "runFile" + getTime();
 
-    m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), heap, NULL);
+    m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), NULL);
 
 #ifdef _DEBUG
     m_pSortOrder->Print();
@@ -152,7 +152,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
 
-	int nPagesBefore = m_runFile.TotalPages();
+	int nPagesBefore = m_runFile.GetFileLength();
 
 	//insert first record into new page so that a clear demarcation can be established
     //start this demarcation from 2nd run (don't do it for first run )
@@ -163,9 +163,9 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
         i = 1;
     }
     for(; i < length; i++)
-            m_runFile.Add(*aRun[i]);
+        m_runFile.Add(*aRun[i]);
 
-	int nPagesAfter = m_runFile.TotalPages();
+	int nPagesAfter = m_runFile.GetFileLength();
     m_runFile.Close();
 	appendCount++;
 
@@ -190,7 +190,7 @@ int BigQ::MergeRuns()
 	ComparisonEngine ce;
 	int nPagesFetched = 0;
 	int nRunsAlive = 0;
-	int nTotalPages = m_runFile.TotalPages() - 1;
+	int nTotalPages = m_runFile.GetFileLength() - 1;
 
 	// delete this
 	int recs = 0;

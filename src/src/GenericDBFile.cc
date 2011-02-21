@@ -24,42 +24,36 @@ GenericDBFile::~GenericDBFile()
 	}
 }
 
-int GenericDBFile::Create(char *f_path, fType f_type, void *startup)
+int GenericDBFile::Create(char *f_path, SortInfo* startup)
 {
-/*	EventLogger *el = EventLogger::getEventLogger();
-	// check file type
-	if (f_type != heap)
-	{
-		el->writeLog("Unsupported file type. Only heap is supported\n");
-		return RET_UNSUPPORTED_FILE_TYPE;
-	}
+	EventLogger *el = EventLogger::getEventLogger();
 
 	// saving file path (name)
 	m_sFilePath = f_path;
-
+        
+        //ignore the startup parameter, subclasses can use as per their need
 	// open a new file. If file with same name already exists
 	// it is wiped clean
 	if (m_pFile)
 		m_pFile->Open(TRUNCATE, f_path);
 
-	return Close();*/
+	return Close();
 }
 
 int GenericDBFile::Open(char *fname)
 {
-/*	EventLogger *el = EventLogger::getEventLogger();
+	EventLogger *el = EventLogger::getEventLogger();
 
 	// check if file exists
-	struct stat fileStat; 
-  	int iStatus; 
+	struct stat fileStat;
+  	int iStatus;
 
-	iStatus = stat(fname, &fileStat); 
+	iStatus = stat(fname, &fileStat);
 	if (iStatus != 0) 	// file doesn't exists
-	{ 
+	{
         el->writeLog("File " + string(fname) + " does not exist.\n");
         return RET_FILE_NOT_FOUND;
-	} 
-*/
+	}
 
 	// TODO for multithreaded env: 
 	//		check if file is NOT open already - why ?
@@ -80,94 +74,111 @@ int GenericDBFile::Open(char *fname)
 	-------------------------------------*/
 
 	// open file in append mode, preserving all prev content
-/*	if (m_pFile)
+	if (m_pFile)
 	{
-		m_pFile->Open(APPEND, const_cast<char*>(fname));//openInAppendMode
+		m_pFile->Open(APPEND, const_cast<char*>(fname));
+                //mode is passed by subclass. Possibilites are - 0 = TRUNCATE, 1= APPEND
                 m_nTotalPages = m_pFile->GetLength() - 2;   //get total number of pages which are in the file
+                //as File class returns length 0 if no data is written and at least 2 even if 1 byte is written
 
                 if(!m_pPage)
                     m_pPage = new Page();
                 if(m_nTotalPages >= 0)
-                    m_pFile->GetPage(m_pPage, m_nTotalPages);   //fetch last page from DB
+                    m_pFile->GetPage(m_pPage, m_nTotalPages);   //fetch last page from file on disk
                 else
                     m_nTotalPages = 0;
 	}
 	
 	return RET_SUCCESS;
-*/
 }
 
 // returns 1 if successfully closed the file, 0 otherwise 
 int GenericDBFile::Close()
 {
-/*
     //check if the current file instance has any dirty page,
-     if yes, flush it to disk and close the file.
+    //if yes, flush it to disk and close the file.
     WritePageToFile();  //takes care of everything
     m_pFile->Close();
 
-	// ------- Not Used Currently -----	
-
-	// write total pages to <table_name>.meta.data
-	//WriteMetaData(); 
-
-	return 1; // If control came here, return success
-*/
+    return 1; // If control came here, return success
 }
 
 void GenericDBFile::Add (Record &rec, bool startFromNewPage)
 {
-	EventLogger *el = EventLogger::getEventLogger();
-	
-	// Consume the record
-	Record aRecord;
-	aRecord.Consume(&rec);
+    EventLogger *el = EventLogger::getEventLogger();
 
-	/* Logic: 
-	 * Try adding the record to the current page
-	 * if adding fails, write page to file and create new page
-     * mark m_bDirtyPageExists = true after adding record to page
-	 */
+    // Consume the record
+    Record aRecord;
+    aRecord.Consume(&rec);
 
-	// Writing data in the file for the first time
-	if (m_pPage == NULL)
-	{
-		m_pPage = new Page();
-		m_nTotalPages = 0;
-	}
+    /* Logic:
+     * Try adding the record to the current page
+     * if adding fails, write page to file and create new page
+ * mark m_bDirtyPageExists = true after adding record to page
+     */
 
-        if(startFromNewPage)
+    // Writing data in the file for the first time
+    if (m_pPage == NULL)
+    {
+        m_pPage = new Page();
+        m_nTotalPages = 0;
+    }
+
+    if(startFromNewPage)
+    {
+        WritePageToFile();  //this will write only if dirty page exists
+        m_pPage->EmptyItOut();
+        m_nTotalPages++;
+    }
+    // a page exists in memory, add record to it
+    if (m_pPage)
+    {
+        if (!m_pPage->Append(&aRecord)) // current page does not have enough space
         {
-            WritePageToFile();  //this will write only if dirty page exists
-            m_pPage->EmptyItOut();
-            m_nTotalPages++;
-        }
-        // a page exists in memory, add record to it
-        if (m_pPage)
-        {
-            if (!m_pPage->Append(&aRecord)) // current page does not have enough space
+            // write current page to file
+            // this function will fetch a new page too
+            WritePageToFile();
+            if (!m_pPage->Append(&aRecord))
             {
-                // write current page to file
-                // this function will fetch a new page too
-                WritePageToFile();
-                if (!m_pPage->Append(&aRecord))
-                {
-                                el->writeLog("GenericDBFile::Add --> Adding record to page failed.\n");
-                                return;
-                }
-                else
-                    m_bDirtyPageExists = true;
+                el->writeLog("GenericDBFile::Add --> Adding record to page failed.\n");
+                return;
             }
             else
                 m_bDirtyPageExists = true;
-        }   //else part would never occur so we can remove this IF condition
+        }
+        else
+            m_bDirtyPageExists = true;
+    }   //else part would never occur so we can remove this IF condition
+}
+
+void GenericDBFile::Load (Schema &mySchema, char *loadMe)
+{
+    EventLogger *el = EventLogger::getEventLogger();
+
+    FILE *fileToLoad = fopen(loadMe, "r");
+    if (!fileToLoad)
+    {
+            el->writeLog("Can't open file name :" + string(loadMe));
+    }
+
+    //open the dbfile instance
+    Open(const_cast<char*>(m_sFilePath.c_str()));
+
+    /* Logic :
+     * first read the record from the file using suckNextRecord()
+     * then add this record to page using Add() function
+     */
+
+    Record aRecord;
+    while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
+        Add(aRecord);
 }
 
 void GenericDBFile::MoveFirst ()
 {
-	// Reset current page and record pointers
-	m_nCurrPage = 0; 
-	m_pPage->EmptyItOut();
+    // Reset current page and record pointers
+    m_nCurrPage = 0;
+    m_pPage->EmptyItOut();
 }
 
 // Function to fetch the next record in the file in "fetchme"
@@ -187,12 +198,12 @@ int GenericDBFile::GetNext (Record &fetchme)
 	// Refer to File :: GetPage (File.cc line 168)
 	if (m_nCurrPage == 0)
 	{
-		m_pFile->GetPage(*m_pPage, m_nCurrPage++);
+		m_pFile->GetPage(m_pPage, m_nCurrPage++);
 	}
 
 	// Try to fetch the first record from current_page
 	// This function will delete this record from the page
-	int ret = (*m_pPage)->GetFirst(&fetchme);
+	int ret = m_pPage->GetFirst(&fetchme);
 	if (!ret)
 	{
 		// Check if pages are still left in the file
@@ -201,9 +212,9 @@ int GenericDBFile::GetNext (Record &fetchme)
 		if (m_nCurrPage < GetFileLength() - 1)	
 		{											
 			// page ran out of records, so empty it and fetch next page
-			(*m_pPage)->EmptyItOut();
-			m_pFile->GetPage(*m_pPage, m_nCurrPage++);
-			ret = (*m_pPage)->GetFirst(&fetchme);
+			m_pPage->EmptyItOut();
+			m_pFile->GetPage(m_pPage, m_nCurrPage++);
+			ret = m_pPage->GetFirst(&fetchme);
 			if (!ret) // failed to fetch next record
 			{
 				// check if we have reached the end of file

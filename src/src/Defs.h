@@ -18,6 +18,8 @@ enum Target {Left, Right, Literal};
 enum CompOperator {LessThan, GreaterThan, Equals};
 enum Type {Int, Double, String};
 
+// Enum for file opening modes
+enum FileOpenMode { TRUNCATE = 0, APPEND = 1};
 
 
 unsigned int Random_Generate();
