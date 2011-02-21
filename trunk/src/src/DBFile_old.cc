@@ -1,4 +1,4 @@
-#include "DBFile.h"
+#include "DBFile_old.h"
 
 DBFile::DBFile(): m_sFilePath(), m_pPage(NULL), m_nTotalPages(0),
 				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false),

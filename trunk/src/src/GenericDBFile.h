@@ -1,7 +1,22 @@
 #ifndef GENERIC_DBFILE_H
 #define GENERIC_DBFILE_H
 
-#include "DBFile.h"
+#include <string.h>
+#include <iostream>
+#include <stdlib.h>
+#include "Defs.h"
+#include "TwoWayList.h"
+#include "Record.h"
+#include "Schema.h"
+#include "File.h"
+#include "Comparison.h"
+#include "ComparisonEngine.h"
+#include "EventLogger.h"
+
+struct SortInfo {
+OrderMaker *myOrder;
+int runLength;
+};
 
 class GenericDBFile
 {
@@ -12,7 +27,6 @@ class GenericDBFile
         int m_nTotalPages;
         bool m_bDirtyPageExists;
         bool m_bIsDirtyMetadata;
-        // Member variable to handle GetNext()
         int  m_nCurrPage;
 
         // Private member functions
@@ -28,7 +42,7 @@ class GenericDBFile
 
         // name = location of the .bin file
         // return value: 1 on success, 0 on failure
-        int Create (char *name, void *startup);
+        int Create (char *name, SortInfo *startup);
 
         // This function assumes that the GenericDBFile already exists
         // and has previously been created and then closed.
@@ -45,20 +59,26 @@ class GenericDBFile
         // Note: addMe is consumed by this function and cannot be used again
         void Add (Record &addMe, bool startFromNewPage = false);
 
+        // Bulk loads the DBFile instance from a text file,
+        // appending new data to it using the SuckNextRecord function from Record.h
+        // loadMe is the name of the data file to bulk load.
+        void Load (Schema &mySchema, char *loadMe);
+
         // Fetch next record (relative to p_currPtr) into fetchMe
         int GetNext (Record &fetchMe);
 
-		// Given a page number "whichPage", fetch that page
+        // Given a page number "whichPage", fetch that page
         inline void GetPage(Page *putItHere, off_t whichPage)
-		{
-			m_pFile->GetPage(putItHere, whichPage);
-		}
+        {
+                m_pFile->GetPage(putItHere, whichPage);
+        }
 		
-		// Return total pages in the file
+	// Return total pages in the file
         inline int GetFileLength()
         {
             return m_pFile->GetLength();
         }
 };
+
 
 #endif
