@@ -2,7 +2,7 @@
 
 GenericDBFile::GenericDBFile(): m_sFilePath(), m_pPage(NULL), m_nTotalPages(0),
 				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false),
-				  m_pCurrPage(NULL), m_nCurrPage(0) 
+				  m_nCurrPage(0) 
 {
 	m_pFile = new File();
 }
@@ -21,13 +21,6 @@ GenericDBFile::~GenericDBFile()
 	{
 		delete m_pPage;
 		m_pPage = NULL;
-	}
-
-	// delete current page pointer
-	if (m_pCurrPage)
-	{
-		delete m_pCurrPage;
-		m_pCurrPage = NULL;
 	}
 }
 
@@ -174,8 +167,7 @@ void GenericDBFile::MoveFirst ()
 {
 	// Reset current page and record pointers
 	m_nCurrPage = 0; 
-	delete m_pCurrPage;
-	m_pCurrPage = NULL;
+	m_pPage->EmptyItOut();
 }
 
 // Function to fetch the next record in the file in "fetchme"
@@ -195,58 +187,45 @@ int GenericDBFile::GetNext (Record &fetchme)
 	// Refer to File :: GetPage (File.cc line 168)
 	if (m_nCurrPage == 0)
 	{
-		// Store a copy of the page in member buffer
-		*m_pCurrPage = new Page();
-		(*m_pCurrPage)->EmptyItOut();
-		m_pFile->GetPage(*m_pCurrPage, m_nCurrPage++);
+		m_pFile->GetPage(*m_pPage, m_nCurrPage++);
 	}
 
-	if (*m_pCurrPage)
+	// Try to fetch the first record from current_page
+	// This function will delete this record from the page
+	int ret = (*m_pPage)->GetFirst(&fetchme);
+	if (!ret)
 	{
-		// Try to fetch the first record from current_page
-		// This function will delete this record from the page
-		int ret = (*m_pCurrPage)->GetFirst(&fetchme);
-		if (!ret)
-		{
-			// Check if pages are still left in the file
-			// Note: first page in File doesn't store the data
-			// So if GetFileLength() returns 2 pages, data is actually stored in only one page
-			if (m_nCurrPage < GetFileLength() - 1)	
-			{											
-				// page ran out of records, so empty it and fetch next page
-				(*m_pCurrPage)->EmptyItOut();
-				m_pFile->GetPage(*m_pCurrPage, m_nCurrPage++);
-				ret = (*m_pCurrPage)->GetFirst(&fetchme);
-				if (!ret) // failed to fetch next record
+		// Check if pages are still left in the file
+		// Note: first page in File doesn't store the data
+		// So if GetFileLength() returns 2 pages, data is actually stored in only one page
+		if (m_nCurrPage < GetFileLength() - 1)	
+		{											
+			// page ran out of records, so empty it and fetch next page
+			(*m_pPage)->EmptyItOut();
+			m_pFile->GetPage(*m_pPage, m_nCurrPage++);
+			ret = (*m_pPage)->GetFirst(&fetchme);
+			if (!ret) // failed to fetch next record
+			{
+				// check if we have reached the end of file
+				if (m_nCurrPage >= GetFileLength())
 				{
-					// check if we have reached the end of file
-					if (m_nCurrPage >= m_pFile->GetLength())
-					{
-						el->writeLog(string("GenericDBFile::GetNext --> End of file reached.") +
-							 		string("Error trying to fetch more records\n"));
-						return RET_FAILURE;
-					}
-					else
-					{
-						el->writeLog(string("GenericDBFile::GetNext --> End of file not reached, ") +
-							 		 string("but fetching record from file failed!\n"));
-						return RET_FAILURE;
-						//TODO : try changing the error code
-					}
+					el->writeLog(string("GenericDBFile::GetNext --> End of file reached.") +
+								string("Error trying to fetch more records\n"));
+					return RET_FAILURE;
+				}
+				else
+				{
+					el->writeLog(string("GenericDBFile::GetNext --> End of file not reached, ") +
+								string("but fetching record from file failed!\n"));
+					return RET_FAILURE;
+					//TODO : try changing the error code
 				}
 			}
-			else	// end of file reached, cannot read more
-				return RET_FAILURE;
 		}
-		// Record fetched successfully
-		return RET_SUCCESS;
+		else	// end of file reached, cannot read more
+			return RET_FAILURE;
 	}
-	else
-	{
-		el->writeLog("GenericDBFile::FetchNextRec --> pCurrPage is NULL. Fatal error!\n");
-		return RET_FAILURE;
-	}
-
+	// Record fetched successfully
 	return RET_SUCCESS;
 }
 
@@ -277,9 +256,3 @@ void GenericDBFile::WriteMetaData()
 		m_bIsDirtyMetadata = false;
    }
 }*/
-
-//Temporary - delete this when FileUtils class is in place
-void GenericDBFile::GetPage(Page *putItHere, off_t whichPage)
-{
-	m_pFile->GetPage(putItHere, whichPage);
-}
