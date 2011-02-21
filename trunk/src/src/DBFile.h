@@ -2,6 +2,7 @@
 #define DB_FILE_H
 
 #include "GenericDBFile.h"
+#include "Heap.h"
 
 // Enum for file types
 typedef enum
