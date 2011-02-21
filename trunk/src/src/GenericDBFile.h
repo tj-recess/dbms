@@ -49,10 +49,13 @@ class GenericDBFile
         int GetNext (Record &fetchMe);
 
 		// Given a page number "whichPage", fetch that page
-        void GetPage(Page *putItHere, off_t whichPage);
+        inline void GetPage(Page *putItHere, off_t whichPage)
+		{
+			m_pFile->GetPage(putItHere, whichPage);
+		}
 		
 		// Return total pages in the file
-        int GetFileLength()
+        inline int GetFileLength()
         {
             return m_pFile->GetLength();
         }
