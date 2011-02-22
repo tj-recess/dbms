@@ -13,11 +13,6 @@
 #include "ComparisonEngine.h"
 #include "EventLogger.h"
 
-struct SortInfo {
-OrderMaker *myOrder;
-int runLength;
-};
-
 class GenericDBFile
 {
     private:
@@ -38,34 +33,34 @@ class GenericDBFile
 
     public:
         GenericDBFile();
-        ~GenericDBFile();
+        virtual ~GenericDBFile();
 
         // name = location of the .bin file
         // return value: 1 on success, 0 on failure
-        int Create (char *name, SortInfo *startup);
+        virtual int Create (char *name, void *startup);
 
         // This function assumes that the GenericDBFile already exists
         // and has previously been created and then closed.
-        int Open (char *name);
+        virtual int Open (char *name);
 
         // Closes the file. 
         // The return value is a 1 on success and a zero on failure
-        int Close ();
+        virtual int Close ();
 
         // Forces the pointer to correspond to the first record in the file
-        void MoveFirst();
+        virtual void MoveFirst();
 
         // Add new record to the end of the file
         // Note: addMe is consumed by this function and cannot be used again
-        void Add (Record &addMe, bool startFromNewPage = false);
+        virtual void Add (Record &addMe, bool startFromNewPage = false);
 
         // Bulk loads the DBFile instance from a text file,
         // appending new data to it using the SuckNextRecord function from Record.h
         // loadMe is the name of the data file to bulk load.
-        void Load (Schema &mySchema, char *loadMe);
+        virtual void Load (Schema &mySchema, char *loadMe);
 
         // Fetch next record (relative to p_currPtr) into fetchMe
-        int GetNext (Record &fetchMe);
+        virtual int GetNext (Record &fetchMe);
 
         // Given a page number "whichPage", fetch that page
         inline void GetPage(Page *putItHere, off_t whichPage)
@@ -73,11 +68,16 @@ class GenericDBFile
                 m_pFile->GetPage(putItHere, whichPage);
         }
 		
-	// Return total pages in the file
+		// Return total pages in the file
         inline int GetFileLength()
         {
             return m_pFile->GetLength();
         }
+		
+		inline string GetBinFilePath()
+		{
+			return m_sFilePath;
+		}
 };
 
 

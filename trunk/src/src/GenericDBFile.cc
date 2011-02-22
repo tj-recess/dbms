@@ -24,14 +24,15 @@ GenericDBFile::~GenericDBFile()
 	}
 }
 
-int GenericDBFile::Create(char *f_path, SortInfo* startup)
+int GenericDBFile::Create(char *f_path, void *startup)
 {
 	EventLogger *el = EventLogger::getEventLogger();
 
 	// saving file path (name)
 	m_sFilePath = f_path;
         
-        //ignore the startup parameter, subclasses can use as per their need
+    // ignore the startup parameter, subclasses can use as per their need
+
 	// open a new file. If file with same name already exists
 	// it is wiped clean
 	if (m_pFile)

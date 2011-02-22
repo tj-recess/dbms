@@ -1,12 +1,12 @@
 #include "Heap.h"
 
-Heap::Heap()
+Heap::Heap() 
 {}
 
 Heap::~Heap()
 { }
 
-int Heap::Create(char *f_path, SortInfo* sortInfo)
+int Heap::Create(char *f_path, void *sortInfo)
 {
     //ignore parameter sortInfo - not required for this file type
     GenericDBFile::Create(f_path, NULL);
@@ -78,13 +78,12 @@ int Heap::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 // And write total pages used for table loading in it
 void Heap::WriteMetaData()
 {
-   if (m_bIsDirtyMetadata && !m_sFilePath.empty())
+   if (!GetBinFilePath().empty())
    {
         ofstream meta_out;
-        meta_out.open(string(m_sFilePath + ".meta.data").c_str(), ios::trunc);
+        meta_out.open(string(GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
         meta_out << "heap";
         meta_out.close();
-        m_bIsDirtyMetadata = false;
    }
 }
 
