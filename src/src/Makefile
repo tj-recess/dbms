@@ -8,8 +8,8 @@ ifdef linux
 tag = -n
 endif
 
-test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o GenericDBFile.o Heap.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o
-	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o GenericDBFile.o Heap.o -lfl -lpthread
+test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o GenericDBFile.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o
+	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o GenericDBFile.o Heap.o Sorted.o -lfl -lpthread
 
 test1.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o
 	$(CC) -o test1.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o -lfl
@@ -22,6 +22,9 @@ test1.o: test1.cc
 
 Heap.o: Heap.cc
 	$(CC) -g -c Heap.cc
+
+Sorted.o: Sorted.cc
+	$(CC) -g -c Sorted.cc
 
 GenericDBFile.o: GenericDBFile.cc
 	$(CC) -g -c GenericDBFile.cc

@@ -6,23 +6,6 @@
 class Heap : public GenericDBFile
 {
 	private:
-		string m_sFilePath;	// path of the .bin file
-		File *m_pFile;		// .bin file where data will be loaded
-		Page *m_pPage;
-		int m_nTotalPages;
-		bool m_bDirtyPageExists;
-		bool m_bIsDirtyMetadata;
-		// Member variables to handle GetNext()
-		Page *m_pCurrPage;
-		int  m_nCurrPage;
-		// Member variables to handle GetNext(CNF)
-		Page *m_pCurrPageCNF;
-		int  m_nCurrPageCNF;
-
-		// Private member functions
-		void WritePageToFile();
-		int FetchNextRec(Record &fetchme, Page**, int&);
-
 		// This method is currently unused. But will be used later
 		void WriteMetaData();
 
@@ -32,7 +15,7 @@ class Heap : public GenericDBFile
 
 		// name = location of the file
 		// return value: 1 on success, 0 on failure
-		int Create (char *name,  SortInfo *startup);
+		int Create (char *name,  void *startup);
 
 		// This function assumes that the DBFile already exists
 		// and has previously been created and then closed.
@@ -59,13 +42,6 @@ class Heap : public GenericDBFile
 
 		// Applies CNF and then fetches the next record
 		int GetNext (Record &fetchMe, CNF &applyMe, Record &literal);
-
-		// Used in assignment-2
-		void GetPage(Page *putItHere, off_t whichPage);
-		int TotalPages()
-		{
-			return m_pFile->GetLength();
-		}
 };
 
 #endif
