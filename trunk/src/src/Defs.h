@@ -13,6 +13,8 @@
 #define RET_FILE_NOT_FOUND 2
 #define RET_FAILED_FILE_OPEN 3
 #define RET_UNSUPPORTED_FILE_TYPE 4
+#define RET_READING_PAST_EOF 0
+#define RET_FETCHING_REC_FAIL 0
 
 enum Target {Left, Right, Literal};
 enum CompOperator {LessThan, GreaterThan, Equals};
