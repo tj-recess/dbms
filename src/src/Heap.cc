@@ -1,27 +1,33 @@
 #include "Heap.h"
 
-Heap::Heap() 
-{}
+Heap::Heap()
+{
+	m_pFile = new FileUtil();
+}
 
 Heap::~Heap()
-{ }
+{ 
+	delete m_pFile;
+	m_pFile = NULL;
+}
 
 int Heap::Create(char *f_path, void *sortInfo)
 {
     //ignore parameter sortInfo - not required for this file type
-    GenericDBFile::Create(f_path, NULL);
+    m_pFile->Create(f_path);
+    WriteMetaData();
+	return RET_SUCCESS;
 }
 
 int Heap::Open(char *fname)
 {
-    return GenericDBFile::Open(fname);
+    return m_pFile->Open(fname);
 }
 
 // returns 1 if successfully closed the file, 0 otherwise 
 int Heap::Close()
 {
-    WriteMetaData();
-    return GenericDBFile::Close();
+    return m_pFile->Close();
 }
 
 /* Load function bulk loads the Heap instance from a text file, appending
@@ -30,24 +36,44 @@ int Heap::Close()
  */
 void Heap::Load (Schema &mySchema, char *loadMe)
 {
-    GenericDBFile::Load(mySchema, loadMe);
+    EventLogger *el = EventLogger::getEventLogger();
+
+    FILE *fileToLoad = fopen(loadMe, "r");
+    if (!fileToLoad)
+    {
+            el->writeLog("Can't open file name :" + string(loadMe));
+    }
+
+    //open the dbfile instance
+    Open(const_cast<char*>(m_pFile->GetBinFilePath().c_str()));
+
+    /* Logic :
+     * first read the record from the file using suckNextRecord()
+     * then add this record to page using Add() function
+     */
+
+    Record aRecord;
+    while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
+        Add(aRecord);
+
+	fclose(fileToLoad);
 }
 
 void Heap::Add (Record &rec, bool startFromNewPage)
 {
-    GenericDBFile::Add(rec, startFromNewPage);
+    m_pFile->Add(rec, startFromNewPage);
 }
 
 void Heap::MoveFirst ()
 {
-	GenericDBFile::MoveFirst();
+	m_pFile->MoveFirst();
 }
 
 // Function to fetch the next record in the file in "fetchme"
 // Returns 0 on failure
 int Heap::GetNext (Record &fetchme)
 {
-	return GenericDBFile::GetNext(fetchme);
+	m_pFile->GetNext(fetchme);
 }
 
 
@@ -78,10 +104,10 @@ int Heap::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 // And write total pages used for table loading in it
 void Heap::WriteMetaData()
 {
-   if (!GetBinFilePath().empty())
+   if (!m_pFile->GetBinFilePath().empty())
    {
         ofstream meta_out;
-        meta_out.open(string(GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
+        meta_out.open(string(m_pFile->GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
         meta_out << "heap";
         meta_out.close();
    }

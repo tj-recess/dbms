@@ -8,8 +8,8 @@ ifdef linux
 tag = -n
 endif
 
-test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o GenericDBFile.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o
-	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o GenericDBFile.o Heap.o Sorted.o -lfl -lpthread
+test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o
+	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o FileUtil.o Heap.o Sorted.o -lfl -lpthread
 
 test1.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o
 	$(CC) -o test1.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o -lfl
@@ -26,8 +26,8 @@ Heap.o: Heap.cc
 Sorted.o: Sorted.cc
 	$(CC) -g -c Sorted.cc
 
-GenericDBFile.o: GenericDBFile.cc
-	$(CC) -g -c GenericDBFile.cc
+FileUtil.o: FileUtil.cc
+	$(CC) -g -c FileUtil.cc
 
 Comparison.o: Comparison.cc
 	$(CC) -g -c Comparison.cc

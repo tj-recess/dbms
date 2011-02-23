@@ -1,32 +1,40 @@
 #include "Sorted.h"
 
 Sorted::Sorted() : m_pSortInfo(NULL)
-{}
+{
+	m_pFile = new FileUtil();
+}
 
 Sorted::~Sorted()
-{}
+{
+	delete m_pFile;
+    m_pFile = NULL;
+}
 
 int Sorted::Create(char *f_path, void *sortInfo)
 {
     //ignore parameter sortInfo - not required for this file type
-    GenericDBFile::Create(f_path, NULL);
+    m_pFile->Create(f_path);
 
 	if (sortInfo == NULL)
+	{
 		cout << "\nSorted::Create --> sortInfo is NULL. ERROR!\n";
-
+		return RET_FAILURE;
+	}
 	m_pSortInfo = (SortInfo*)sortInfo; 	// TODO: or make a deep copy?
 	WriteMetaData();
+	return RET_SUCCESS;
 }
 
 int Sorted::Open(char *fname)
 {
-    return GenericDBFile::Open(fname);
+    return m_pFile->Open(fname);
 }
 
 // returns 1 if successfully closed the file, 0 otherwise 
 int Sorted::Close()
 {
-    return GenericDBFile::Close();
+    return m_pFile->Close();
 }
 
 /* Load function bulk loads the Sorted instance from a text file, appending
@@ -35,24 +43,23 @@ int Sorted::Close()
  */
 void Sorted::Load (Schema &mySchema, char *loadMe)
 {
-    GenericDBFile::Load(mySchema, loadMe);
 }
 
 void Sorted::Add (Record &rec, bool startFromNewPage)
 {
-    GenericDBFile::Add(rec, startFromNewPage);
+    m_pFile->Add(rec, startFromNewPage);
 }
 
 void Sorted::MoveFirst ()
 {
-	GenericDBFile::MoveFirst();
+	m_pFile->MoveFirst();
 }
 
 // Function to fetch the next record in the file in "fetchme"
 // Returns 0 on failure
 int Sorted::GetNext (Record &fetchme)
 {
-	return GenericDBFile::GetNext(fetchme);
+	return m_pFile->GetNext(fetchme);
 }
 
 
@@ -83,10 +90,10 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 // And write total pages used for table loading in it
 void Sorted::WriteMetaData()
 {
-   if (!GetBinFilePath().empty())
+   if (!m_pFile->GetBinFilePath().empty())
    {
         ofstream meta_out;
-        meta_out.open(string(GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
+        meta_out.open(string(m_pFile->GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
         meta_out << "sorted\n";
 		meta_out << "write m_pSortInfo here\n";
         meta_out.close();

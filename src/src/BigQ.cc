@@ -13,7 +13,7 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
     m_pSortOrder = &sortorder;
     m_sFileName = "runFile" + getTime();
 
-    m_runFile.Create(const_cast<char*>(m_sFileName.c_str()), NULL);
+    m_runFile.Create(const_cast<char*>(m_sFileName.c_str()));
 
 #ifdef _DEBUG
     m_pSortOrder->Print();

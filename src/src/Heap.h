@@ -6,7 +6,7 @@
 class Heap : public GenericDBFile
 {
 	private:
-		// This method is currently unused. But will be used later
+		FileUtil *m_pFile;		
 		void WriteMetaData();
 
 	public:

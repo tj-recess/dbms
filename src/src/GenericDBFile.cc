@@ -1,29 +1,5 @@
 #include "GenericDBFile.h"
 
-GenericDBFile::GenericDBFile(): m_sFilePath(), m_pPage(NULL), m_nTotalPages(0),
-				  m_bDirtyPageExists(false), m_bIsDirtyMetadata(false),
-				  m_nCurrPage(0) 
-{
-	m_pFile = new File();
-}
-
-GenericDBFile::~GenericDBFile()
-{
-	// delete member File pointer
-	if (m_pFile)
-	{
-		delete m_pFile;
-		m_pFile = NULL;
-	}
-
-	// delete member Page pointer
-	if (m_pPage)
-	{
-		delete m_pPage;
-		m_pPage = NULL;
-	}
-}
-
 int GenericDBFile::Create(char *f_path, void *startup)
 {
 	EventLogger *el = EventLogger::getEventLogger();
