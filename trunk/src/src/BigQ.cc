@@ -146,7 +146,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 
 	#ifdef _DEBUG
 	//  cout<<"Append Run to File count : "<< ++appendCount<<endl;
-	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
+//	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
 	#endif
 
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
