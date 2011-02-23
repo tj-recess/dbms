@@ -16,7 +16,8 @@ typedef enum
 class DBFile
 {
 private:
-    GenericDBFile* genDBFile;
+    GenericDBFile* m_pGenDBFile;
+
 public:
     DBFile();
     ~DBFile();
@@ -51,9 +52,6 @@ public:
 
     // Applies CNF and then fetches the next record
     int GetNext (Record &fetchMe, CNF &applyMe, Record &literal);
-
-    // Used in assignment-2
-    void GetPage(Page *putItHere, off_t whichPage);
 
 };
 
