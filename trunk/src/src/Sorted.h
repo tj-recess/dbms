@@ -13,8 +13,7 @@ class Sorted : public GenericDBFile
 {
 	private:
 		SortInfo *m_pSortInfo;
-
-		// This method is currently unused. But will be used later
+		FileUtil *m_pFile;
 		void WriteMetaData();
 
 	public:

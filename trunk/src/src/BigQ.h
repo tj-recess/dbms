@@ -9,7 +9,7 @@
 #include "File.h"
 #include "Record.h"
 #include "Defs.h"
-#include "GenericDBFile.h"
+#include "FileUtil.h"
 
 using namespace std;
 
@@ -118,7 +118,7 @@ public:
 class BigQ
 {
 private:
-	GenericDBFile m_runFile;
+	FileUtil m_runFile;
 	Pipe *m_pInPipe, *m_pOutPipe;
 	OrderMaker *m_pSortOrder;
 	int m_nRunLen;
