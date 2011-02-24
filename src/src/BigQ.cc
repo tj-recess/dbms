@@ -36,7 +36,7 @@ BigQ::~BigQ ()
 		r = NULL;
 	}
 	// remove runFile
-	string command = "rm " + m_sFileName;
+	string command = "rm \"" + m_sFileName + "\"";
 	system(command.c_str());
 }
 
