@@ -2,6 +2,9 @@
 #define SORTED_H
 
 #include "GenericDBFile.h"
+#include "Pipe.h"
+#include "BigQ.h"
+#define PIPE_SIZE 100
 
 struct SortInfo
 {
@@ -13,7 +16,11 @@ class Sorted : public GenericDBFile
 {
 	private:
 		SortInfo *m_pSortInfo;
+		bool m_bReadingMode;
+		BigQ *m_pBigQ;
 		FileUtil *m_pFile;
+		Pipe *m_pINPipe, *m_pOUTPipe;
+
 		void WriteMetaData();
 		void MergeBigQToSortedFile();
 

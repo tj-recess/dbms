@@ -1,16 +1,19 @@
 #include "Sorted.h"
 
-Sorted::Sorted() : m_pSortInfo(NULL)
+Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL)
 {
 	m_pFile = new FileUtil();
-	// create IN pipe
-	// create OUT pipe
+	m_pINPipe = new Pipe(PIPE_SIZE);
+	m_pOUTPipe = new Pipe(PIPE_SIZE);
 }
 
 Sorted::~Sorted()
 {
 	delete m_pFile;
     m_pFile = NULL;
+
+	delete m_pBigQ;
+	m_pBigQ = NULL;
 }
 
 int Sorted::Create(char *f_path, void *sortInfo)
@@ -36,6 +39,7 @@ int Sorted::Open(char *fname)
 // returns 1 if successfully closed the file, 0 otherwise 
 int Sorted::Close()
 {
+	MergeBigQToSortedFile();
     return m_pFile->Close();
 }
 
@@ -67,7 +71,7 @@ void Sorted::Load (Schema &mySchema, char *loadMe)
 
     fclose(fileToLoad);	
 
-	// MergeBigQToSortedFile()
+	MergeBigQToSortedFile();
 }
 
 void Sorted::Add (Record &rec)
@@ -75,18 +79,51 @@ void Sorted::Add (Record &rec)
     m_pFile->Add(rec);
 
 	// if mode reading, change mode to writing
-	// push rec to IN-pipe: m_InPipe->Insert(&rec)
-	// if !BigQ, instantiate BigQ(IN-pipe, OUT-pipe, ordermaker, runlen)	
+	if (m_bReadingMode)
+		m_bReadingMode = false;
+
+	// push rec to IN-pipe
+	m_pINPipe->Insert(&rec);
+
+	// if !BigQ, instantiate BigQ(IN-pipe, OUT-pipe, ordermaker, runlen)
+	if (!m_pBigQ)
+		m_pBigQ = new BigQ(*m_pINPipe, *m_pOUTPipe, *(m_pSortInfo->myOrder), m_pSortInfo->runLength);
 }
 
-void MergeBigQToSortedFile()
+void Sorted::MergeBigQToSortedFile()
 {
 	// shutdown IN pipe
-	// while( OUT pipe->remove(rec) )
+	m_pINPipe->ShutDown();
+
+	// fetch sorted records from BigQ
+	// and 2-way merge with old sorted file
+	Record rec;
+	bool bMergeHappened = false;
+	FileUtil tmpFile;
+	tmpFile.Create("tmpFile");
+	tmpFile.Open("tmpFile");
+	while (m_pOUTPipe->Remove(&rec))
+	{
+		bMergeHappened = true;
 		// merge rec + sorted-file
-	// write to new file
-	// delete old file
-	// bigQ = NULL;
+		// write to new file
+	}
+	tmpFile.Close();
+
+	if (bMergeHappened)
+	{
+		// delete old file
+		//string command = "rm \"" + m_pFile->GetFileName() + "\"";
+		//system(command.c_str());
+
+		// rename tmp file to original old name
+		//command = "mv tmpFile \"" + m_pFile->GetFileName() + "\"";
+		//system(command.c_str());
+	}
+
+	// delete BigQ
+	delete m_pBigQ;
+	m_pBigQ = NULL;
 }
 
 void Sorted::MoveFirst ()
@@ -98,9 +135,15 @@ void Sorted::MoveFirst ()
 // Returns 0 on failure
 int Sorted::GetNext (Record &fetchme)
 {
-	// if mode = writing
-		// mergeBigQToSortedFile()
-		// change mode to "reading"
+	// If mode is not reading i.e. it is writing mode currently
+	// merge differential data to already sorted file
+	if (!m_bReadingMode)
+	{
+		m_bReadingMode = true;
+		MergeBigQToSortedFile();
+	}
+
+	// Now we can start reading
 	return m_pFile->GetNext(fetchme);
 }
 
