@@ -20,6 +20,7 @@ int DBFile::Create (char *name, fType myType, void *startup)
         m_pGenDBFile = new Sorted();
     else
         return RET_UNSUPPORTED_FILE_TYPE;
+
     if(!m_pGenDBFile)
     {
         cout<<"Not enough memory. EXIT."<<endl;
