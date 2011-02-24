@@ -32,12 +32,41 @@ int DBFile::Create (char *name, fType myType, void *startup)
 // and has previously been created and then closed.
 int DBFile::Open (char *name)
 {
-    if(m_pGenDBFile)
-        return m_pGenDBFile->Open(name);
-    else
+    //read metadata and create appropriate object
+    if(!m_pGenDBFile)
     {
-        //read metadata and create appropriate object
+		// check if file exists
+	    struct stat fileStat;
+    	int iStatus;
+		string metadataFileName = name;
+		metadataFileName = metadataFileName + ".meta.data";
+
+	    iStatus = stat(metadataFileName.c_str(), &fileStat);
+    	if (iStatus != 0)   // file doesn't exists
+	    {
+			cout << "DBFile::Open: File " << metadataFileName << "does not exist.\n";
+        	return RET_FILE_NOT_FOUND;
+	    }
+
+		ifstream ifile;
+		ifile.open(metadataFileName.c_str());
+		string line;
+		bool bHeapFile = false;
+		while (!ifile.eof())
+		{
+			getline(ifile, line);
+			if (line.compare("heap") == 0)
+			{
+				bHeapFile = true;
+				break;
+			}
+		}
+		if (bHeapFile = true)
+			m_pGenDBFile = new Heap();
+		else
+			m_pGenDBFile = new Sorted();
     }
+    return m_pGenDBFile->Open(name);
 }
 
 // Closes the file.
