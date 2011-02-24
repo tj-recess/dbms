@@ -11,8 +11,8 @@ endif
 test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o
 	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o FileUtil.o Heap.o Sorted.o -lfl -lpthread
 
-test1.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o
-	$(CC) -o test1.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o -lfl
+test1.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o EventLogger.o y.tab.o lex.yy.o test1.o
+	$(CC) -o test1.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o EventLogger.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o -lfl -lpthread
 
 test.o: test.cc
 	$(CC) -g -c test.cc

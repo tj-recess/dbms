@@ -59,9 +59,9 @@ void Heap::Load (Schema &mySchema, char *loadMe)
 	fclose(fileToLoad);
 }
 
-void Heap::Add (Record &rec, bool startFromNewPage)
+void Heap::Add (Record &rec)
 {
-    m_pFile->Add(rec, startFromNewPage);
+    m_pFile->Add(rec);
 }
 
 void Heap::MoveFirst ()

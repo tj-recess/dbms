@@ -3,6 +3,8 @@
 Sorted::Sorted() : m_pSortInfo(NULL)
 {
 	m_pFile = new FileUtil();
+	// create IN pipe
+	// create OUT pipe
 }
 
 Sorted::~Sorted()
@@ -43,11 +45,48 @@ int Sorted::Close()
  */
 void Sorted::Load (Schema &mySchema, char *loadMe)
 {
+    EventLogger *el = EventLogger::getEventLogger();
+
+    FILE *fileToLoad = fopen(loadMe, "r");
+    if (!fileToLoad)
+    {
+            el->writeLog("Can't open file name :" + string(loadMe));
+    }
+
+    //open the dbfile instance
+    Open(const_cast<char*>(m_pFile->GetBinFilePath().c_str()));
+
+    /* Logic :
+     * first read the record from the file using suckNextRecord()
+     * then add this record to page using Add() function
+     */
+
+    Record aRecord;
+    while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
+        Add(aRecord);
+
+    fclose(fileToLoad);	
+
+	// MergeBigQToSortedFile()
 }
 
-void Sorted::Add (Record &rec, bool startFromNewPage)
+void Sorted::Add (Record &rec)
 {
-    m_pFile->Add(rec, startFromNewPage);
+    m_pFile->Add(rec);
+
+	// if mode reading, change mode to writing
+	// push rec to IN-pipe: m_InPipe->Insert(&rec)
+	// if !BigQ, instantiate BigQ(IN-pipe, OUT-pipe, ordermaker, runlen)	
+}
+
+void MergeBigQToSortedFile()
+{
+	// shutdown IN pipe
+	// while( OUT pipe->remove(rec) )
+		// merge rec + sorted-file
+	// write to new file
+	// delete old file
+	// bigQ = NULL;
 }
 
 void Sorted::MoveFirst ()
@@ -59,6 +98,9 @@ void Sorted::MoveFirst ()
 // Returns 0 on failure
 int Sorted::GetNext (Record &fetchme)
 {
+	// if mode = writing
+		// mergeBigQToSortedFile()
+		// change mode to "reading"
 	return m_pFile->GetNext(fetchme);
 }
 

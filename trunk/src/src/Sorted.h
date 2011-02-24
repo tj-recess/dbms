@@ -15,6 +15,7 @@ class Sorted : public GenericDBFile
 		SortInfo *m_pSortInfo;
 		FileUtil *m_pFile;
 		void WriteMetaData();
+		void MergeBigQToSortedFile();
 
 	public:
 		Sorted();
@@ -42,7 +43,7 @@ class Sorted : public GenericDBFile
 
 		// Add new record to the end of the file
 		// Note: addMe is consumed by this function and cannot be used again
-		void Add (Record &addMe, bool startFromNewPage = false);
+		void Add (Record &addMe);
 
 		// Fetch next record (relative to p_currPtr) into fetchMe
 		int GetNext (Record &fetchMe);

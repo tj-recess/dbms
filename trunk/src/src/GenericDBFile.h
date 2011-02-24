@@ -31,7 +31,7 @@ class GenericDBFile
 
         // Add new record to the end of the file
         // Note: addMe is consumed by this function and cannot be used again
-        virtual void Add (Record &addMe, bool startFromNewPage = false)=0;
+        virtual void Add (Record &addMe)=0;
 
         // Bulk loads the DBFile instance from a text file,
         // appending new data to it using the SuckNextRecord function from Record.h
