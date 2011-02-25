@@ -95,30 +95,69 @@ void Sorted::MergeBigQToSortedFile()
 	// shutdown IN pipe
 	m_pINPipe->ShutDown();
 
-	// fetch sorted records from BigQ
-	// and 2-way merge with old sorted file
-	Record rec;
-	bool bMergeHappened = false;
+	// fetch sorted records from BigQ and old-sorted-file
+	// and do a 2-way merge and write into new-file (tmpFile)
+	Record * pRecFromPipe = NULL, *pRecFromFile = NULL;
+	ComparisonEngine ce;
 	FileUtil tmpFile;
 	tmpFile.Create("tmpFile");
 	tmpFile.Open("tmpFile");
+
+	m_pFile->MoveFirst();
+	int fetched1 = 1, fetched2 = 1;
+	while (fetched1 && fetched2)
+	{
+		if (pRecFromPipe == NULL)
+		{
+			pRecFromPipe = new Record;
+			fetched1 = m_pOUTPipe->Remove(pRecFromPipe);
+		}
+		if (pRecFromFile == NULL)
+		{
+			pRecFromFile = new Record;
+			fetched2 = m_pFile->GetNext(*pRecFromFile);
+		}
+
+		if (fetched1 && fetched2)
+		{
+			if (ce.Compare(pRecFromPipe, pRecFromFile, m_pSortInfo->myOrder) < 0)
+			{
+				tmpFile.Add(*pRecFromPipe);
+				delete pRecFromPipe;
+				pRecFromPipe = NULL;
+			}
+			else
+			{
+				tmpFile.Add(*pRecFromFile);
+				delete pRecFromFile;
+				pRecFromFile = NULL;
+			}
+		}
+	}
+
+	Record rec;
 	while (m_pOUTPipe->Remove(&rec))
 	{
-		bMergeHappened = true;
-		// merge rec + sorted-file
-		// write to new file
+		tmpFile.Add(rec);
 	}
+	while (m_pFile->GetNext(rec))
+	{
+		tmpFile.Add(rec);
+    }
+
 	tmpFile.Close();
 
-	if (bMergeHappened)
+	// if tmpFile is not empty, then delete old file
+	// and rename tmpFile to old file's name
+	if (tmpFile.GetFileLength() != 0)
 	{
 		// delete old file
-		//string command = "rm \"" + m_pFile->GetFileName() + "\"";
-		//system(command.c_str());
+		string command = "rm \"" + m_pFile->GetBinFilePath() + "\"";
+		system(command.c_str());
 
 		// rename tmp file to original old name
-		//command = "mv tmpFile \"" + m_pFile->GetFileName() + "\"";
-		//system(command.c_str());
+		command = "mv tmpFile \"" + m_pFile->GetBinFilePath() + "\"";
+		system(command.c_str());
 	}
 
 	// delete BigQ
