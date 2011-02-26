@@ -54,7 +54,8 @@ void Sorted::Load (Schema &mySchema, char *loadMe)
     FILE *fileToLoad = fopen(loadMe, "r");
     if (!fileToLoad)
     {
-            el->writeLog("Can't open file name :" + string(loadMe));
+		el->writeLog("Can't open file name :" + string(loadMe));
+		return;	
     }
 
     /* Logic :
@@ -89,6 +90,10 @@ void Sorted::Add (Record &rec)
 
 void Sorted::MergeBigQToSortedFile()
 {
+	// Check if there's anything to merge
+	if (!m_pBigQ)
+		return;
+
 	// shutdown IN pipe
 	m_pINPipe->ShutDown();
 

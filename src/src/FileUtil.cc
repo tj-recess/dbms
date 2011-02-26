@@ -34,6 +34,9 @@ int FileUtil::Create(char *f_path)
 	if (m_pFile)
 		m_pFile->Open(TRUNCATE, f_path);
 
+    m_pPage = new Page();
+    m_nTotalPages = 0;
+
 	m_bFileIsOpen = true;
 }
 
@@ -107,13 +110,6 @@ void FileUtil::Add (Record &rec, bool bstartFromNewPage)
      * if adding fails, write page to file and create new page
 	 * mark m_bDirtyPageExists = true after adding record to page
      */
-
-    // Writing data in the file for the first time
-    if (m_pPage == NULL)
-    {
-        m_pPage = new Page();
-        m_nTotalPages = 0;
-    }
 
     if (bstartFromNewPage)
 	{
