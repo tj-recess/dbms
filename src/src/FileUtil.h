@@ -18,6 +18,7 @@ class FileUtil
         int m_nTotalPages;
         bool m_bDirtyPageExists;
         int  m_nCurrPage;
+		bool m_bFileIsOpen;
 
         // Private member functions
         void WritePageToFile();

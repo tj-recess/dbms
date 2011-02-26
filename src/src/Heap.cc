@@ -44,9 +44,6 @@ void Heap::Load (Schema &mySchema, char *loadMe)
             el->writeLog("Can't open file name :" + string(loadMe));
     }
 
-    //open the dbfile instance
-    Open(const_cast<char*>(m_pFile->GetBinFilePath().c_str()));
-
     /* Logic :
      * first read the record from the file using suckNextRecord()
      * then add this record to page using Add() function

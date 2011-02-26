@@ -1,7 +1,8 @@
 #include "FileUtil.h"
 
 FileUtil::FileUtil(): m_sFilePath(), m_pPage(NULL), m_nTotalPages(0),
-				  m_bDirtyPageExists(false), m_nCurrPage(0) 
+   				      m_bDirtyPageExists(false), m_nCurrPage(0),
+					  m_bFileIsOpen(false)
 {
 	m_pFile = new File();
 }
@@ -33,7 +34,7 @@ int FileUtil::Create(char *f_path)
 	if (m_pFile)
 		m_pFile->Open(TRUNCATE, f_path);
 
-	return Close();
+	m_bFileIsOpen = true;
 }
 
 int FileUtil::Open(char *fname)
@@ -70,6 +71,8 @@ int FileUtil::Open(char *fname)
         	m_pFile->GetPage(m_pPage, m_nTotalPages);   //fetch last page from file on disk
         else
         	m_nTotalPages = 0;
+
+		m_bFileIsOpen = true;
 	}
 	
 	return RET_SUCCESS;
@@ -82,13 +85,18 @@ int FileUtil::Close()
     //if yes, flush it to disk and close the file.
     WritePageToFile();  //takes care of everything
     m_pFile->Close();
-
+	m_bFileIsOpen = false;
     return RET_SUCCESS; // If control came here, return success
 }
 
 void FileUtil::Add (Record &rec, bool startFromNewPage)
 {
     EventLogger *el = EventLogger::getEventLogger();
+	if (!m_bFileIsOpen)
+	{
+		el->writeLog("FileUtil::Add --> File is not open for adding records\n");
+		exit(0);
+	}
 
     // Consume the record
     Record aRecord;
