@@ -89,7 +89,7 @@ int FileUtil::Close()
     return RET_SUCCESS; // If control came here, return success
 }
 
-void FileUtil::Add (Record &rec, bool startFromNewPage)
+void FileUtil::Add (Record &rec, bool bstartFromNewPage)
 {
     EventLogger *el = EventLogger::getEventLogger();
 	if (!m_bFileIsOpen)
@@ -115,8 +115,12 @@ void FileUtil::Add (Record &rec, bool startFromNewPage)
         m_nTotalPages = 0;
     }
 
-    if(startFromNewPage)
+    if (bstartFromNewPage)
+	{
         WritePageToFile();  //this will write only if dirty page exists
+		m_pPage->EmptyItOut();
+        m_nTotalPages++;	// we need one extra page
+	}
 
     if (!m_pPage->Append(&aRecord)) // current page does not have enough space
     {
@@ -128,11 +132,11 @@ void FileUtil::Add (Record &rec, bool startFromNewPage)
         	el->writeLog("FileUtil::Add --> Adding record to page failed.\n");
                 return;
         }
-        else
-        	m_bDirtyPageExists = true;
+		else 
+			m_bDirtyPageExists = true;
 	}
-    else
-    	m_bDirtyPageExists = true;
+	else
+	   	m_bDirtyPageExists = true;
 }
 
 void FileUtil::MoveFirst ()
