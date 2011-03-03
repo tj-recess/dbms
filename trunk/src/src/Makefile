@@ -1,5 +1,6 @@
-all: test.out 
-#test1.out
+all: test.out
+	#test21.out test1.out
+
 CC = g++ -O0 -Wno-deprecated
 
 tag = -i
@@ -8,11 +9,23 @@ ifdef linux
 tag = -n
 endif
 
-test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o
+test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o test.o
 	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o FileUtil.o Heap.o Sorted.o -lfl -lpthread
+
+test21.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test21.o EventLogger.o
+	$(CC) -o test21.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test21.o EventLogger.o FileUtil.o Heap.o Sorted.o -lfl -lpthread
+
+test1.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o EventLogger.o y.tab.o lex.yy.o test1.o
+	$(CC) -o test1.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o EventLogger.o DBFile.o Pipe.o y.tab.o lex.yy.o test1.o -lfl -lpthread
 
 test.o: test.cc
 	$(CC) -g -c test.cc
+
+test21.o: test21.cc
+	$(CC) -g -c test21.cc
+
+test1.o: test1.cc
+	$(CC) -g -c test1.cc
 
 Heap.o: Heap.cc
 	$(CC) -g -c Heap.cc
