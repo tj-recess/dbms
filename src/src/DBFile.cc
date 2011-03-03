@@ -52,20 +52,20 @@ int DBFile::Open (char *name)
 		ifstream ifile;
 		ifile.open(metadataFileName.c_str());
 		string line;
-		bool bHeapFile = false;
 		while (!ifile.eof())
 		{
 			getline(ifile, line);
 			if (line.compare("heap") == 0)
 			{
-				bHeapFile = true;
+				m_pGenDBFile = new Heap();
 				break;
 			}
+                        else if(line.compare("sorted") == 0)
+                        {
+                            m_pGenDBFile = new Sorted();
+                            break;
+                        }
 		}
-		if (bHeapFile = true)
-			m_pGenDBFile = new Heap();
-		else
-			m_pGenDBFile = new Sorted();
     }
     return m_pGenDBFile->Open(name);
 }

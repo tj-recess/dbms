@@ -60,6 +60,8 @@ int FileUtil::Open(char *fname)
 	// 		ans - coz we should not access an already open file
 	// 		eg - currently open by another thread (?)
 
+        //set file name to current file
+        m_sFilePath = fname;
 	// open file in append mode, preserving all prev content
 	if (m_pFile)
 	{

@@ -1,6 +1,6 @@
 #include "Sorted.h"
 
-Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL)
+Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL), m_sMetaSuffix(".meta.data")
 {
 	m_pFile = new FileUtil();
 	m_pINPipe = new Pipe(PIPE_SIZE);
@@ -28,11 +28,33 @@ int Sorted::Create(char *f_path, void *sortInfo)
 	}
 	m_pSortInfo = (SortInfo*)sortInfo; 	// TODO: or make a deep copy?
 	WriteMetaData();
+        m_pSortInfo->myOrder->Print();
 	return RET_SUCCESS;
 }
 
 int Sorted::Open(char *fname)
 {
+    //read metadata here
+    ifstream meta_in;
+    cout<<fname;
+    meta_in.open((string(fname) + m_sMetaSuffix).c_str());
+    string fileType;
+    string type;
+    m_pSortInfo = new SortInfo();
+    m_pSortInfo->myOrder = new OrderMaker();
+    meta_in >> fileType;
+    meta_in >> m_pSortInfo->myOrder->numAtts;
+    for (int i = 0; i < m_pSortInfo->myOrder->numAtts; i++)
+    {
+        meta_in >> m_pSortInfo->myOrder->whichAtts[i];
+        meta_in >> type;
+        if(type.compare("Int") == 0)
+            m_pSortInfo->myOrder->whichTypes[i] = Int;
+        else if(type.compare("Double") == 0)
+            m_pSortInfo->myOrder->whichTypes[i] = Double;
+        else
+            m_pSortInfo->myOrder->whichTypes[i] = String;
+    }
     return m_pFile->Open(fname);
 }
 
@@ -74,8 +96,6 @@ void Sorted::Load (Schema &mySchema, char *loadMe)
 
 void Sorted::Add (Record &rec)
 {
-    m_pFile->Add(rec);
-
 	// if mode reading, change mode to writing
 	if (m_bReadingMode)
 		m_bReadingMode = false;
@@ -102,25 +122,32 @@ void Sorted::MergeBigQToSortedFile()
 	Record * pRecFromPipe = NULL, *pRecFromFile = NULL;
 	ComparisonEngine ce;
 	FileUtil tmpFile;
-	tmpFile.Create("tmpFile");
-	tmpFile.Open("tmpFile");
+
+        string tmpFileName = "tmpFile" + getusec();    //time(NULL) returns time_t in seconds since 1970
+	tmpFile.Create(const_cast<char*>(tmpFileName.c_str()));
+//	tmpFile.Open("tmpFile");    //not required now as we don't close file in create
 
 	m_pFile->MoveFirst();
-	int fetched1 = 1, fetched2 = 1;
-	while (fetched1 && fetched2)
+	int fetchedFromPipe = 1, fetchedFromFile = 1;
+
+        //if file on disk is empty (initially it will be) then don't fetch anything
+        if(m_pFile->GetFileLength() == 0)
+            fetchedFromFile = 0;
+
+	while (fetchedFromPipe && fetchedFromFile)
 	{
 		if (pRecFromPipe == NULL)
 		{
 			pRecFromPipe = new Record;
-			fetched1 = m_pOUTPipe->Remove(pRecFromPipe);
+			fetchedFromPipe = m_pOUTPipe->Remove(pRecFromPipe);
 		}
 		if (pRecFromFile == NULL)
 		{
 			pRecFromFile = new Record;
-			fetched2 = m_pFile->GetNext(*pRecFromFile);
+			fetchedFromFile = m_pFile->GetNext(*pRecFromFile);
 		}
 
-		if (fetched1 && fetched2)
+		if (fetchedFromPipe && fetchedFromFile)
 		{
 			if (ce.Compare(pRecFromPipe, pRecFromFile, m_pSortInfo->myOrder) < 0)
 			{
@@ -138,14 +165,14 @@ void Sorted::MergeBigQToSortedFile()
 	}
 
 	Record rec;
-	while (m_pOUTPipe->Remove(&rec))
+	while (fetchedFromPipe && m_pOUTPipe->Remove(&rec))
 	{
 		tmpFile.Add(rec);
 	}
-	while (m_pFile->GetNext(rec))
+	while (fetchedFromFile && m_pFile->GetNext(rec))
 	{
 		tmpFile.Add(rec);
-    }
+        }
 
 	tmpFile.Close();
 
@@ -153,13 +180,18 @@ void Sorted::MergeBigQToSortedFile()
 	// and rename tmpFile to old file's name
 	if (tmpFile.GetFileLength() != 0)
 	{
-		// delete old file
-		string command = "rm \"" + m_pFile->GetBinFilePath() + "\"";
-		system(command.c_str());
+            // delete old file
+            if(remove(m_pFile->GetBinFilePath().c_str()) != 0)
+                perror("error in removing old file");   //remove this as file might not exist initially
+            
+//		string command = "rm \"" + m_pFile->GetBinFilePath() + "\"";
+//		system(command.c_str());
 
-		// rename tmp file to original old name
-		command = "mv tmpFile \"" + m_pFile->GetBinFilePath() + "\"";
-		system(command.c_str());
+            // rename tmp file to original old name
+            if(rename(tmpFileName.c_str(), m_pFile->GetBinFilePath().c_str()) != 0)
+                perror("error in renaming temp file");
+//		command = "mv tmpFile \"" + m_pFile->GetBinFilePath() + "\"";
+//		system(command.c_str());
 	}
 
 	// delete BigQ
@@ -193,23 +225,40 @@ int Sorted::GetNext (Record &fetchme)
 // the given CNF, returns 0 on failure.
 int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 {
-	/* logic :
-	 * first read the record from the file in "fetchme,
-	 * pass it for comparison using given cnf and literal.
-	 * if compEngine.compare returns 1, it means fetched record
-	 * satisfies CNF expression so we simple return success (=1) here
-	 */
+    /*Logic:
+     *
+     * Logic:
+     * Prepare “query” OrderMaker from applyMe (CNF) -
+     * If the attribute used in Sorted file’s order maker is also present in CNF, append to “query” orderMaker
+     * else - stop making “query” orderMaker
+     * find the first matching record -
+     * If query OrderMaker is empty, first record (from current pointer or from the beginning) is the matching record.
+     * if query OrderMaker is not empty, perform binary search on file (from the current pointer) to find out a record -
+     * which is equal to the literal (Record) using “query” OrderMaker and CNF (probably using only “query” OrderMaker)
+     * returning apropriate value -
+     * if no matching record found, return 0
+     * if there is a possible matching record - start scanning the file matching every record found one by one.
+     * First evaluate the record on “query” OrderMaker, then evaluate the CNF instance.
+     * if the query OrderMaker doesn’t accept the record, return 0
+     * if query OrderMaker does accept it, match it with CNF
+     * if CNF accepts, return the record.
+     * if CNF doesn’t accept, move on to next record.
+     * repeat 1-2 until EOF.
+     * if it’s EOF, return 0.
+     * Keep the value of “query” OrderMaker and current pointer safe until user performs “MoveFirst” or some write operation.
+     */
+    
+    OrderMaker query;
+    cnf.GetSortOrders(*(m_pSortInfo->myOrder), query);
+    
+#ifdef _DEBUG
+    query.Print();
+#endif
+    
+    
 
-	ComparisonEngine compEngine;
-
-	while (GetNext(fetchme))
-	{
-		if (compEngine.Compare(&fetchme, &literal, &cnf))
-			return RET_SUCCESS;
-	}
-
-	//if control is here then no matching record was found
-	return RET_FAILURE;
+    //if control is here then no matching record was found
+    return RET_FAILURE;
 }
 
 // Create <table_name>.meta.data file
@@ -221,8 +270,19 @@ void Sorted::WriteMetaData()
         ofstream meta_out;
         meta_out.open(string(m_pFile->GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
         meta_out << "sorted\n";
-		meta_out << "write m_pSortInfo here\n";
+        meta_out << m_pSortInfo->myOrder->ToString();
+//	meta_out << "write m_pSortInfo here\n";
         meta_out.close();
    }
 }
 
+string Sorted :: getusec()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    stringstream ss;
+    ss << tv.tv_sec;
+    ss << ".";
+    ss << tv.tv_usec;
+    return ss.str();
+}

@@ -1,6 +1,8 @@
 #ifndef SORTED_H
 #define SORTED_H
 
+#include <cstdio>
+#include <sys/time.h>
 #include "GenericDBFile.h"
 #include "Pipe.h"
 #include "BigQ.h"
@@ -20,9 +22,11 @@ class Sorted : public GenericDBFile
 		BigQ *m_pBigQ;
 		FileUtil *m_pFile;
 		Pipe *m_pINPipe, *m_pOUTPipe;
+                string m_sMetaSuffix;
 
 		void WriteMetaData();
 		void MergeBigQToSortedFile();
+                string getusec();
 
 	public:
 		Sorted();

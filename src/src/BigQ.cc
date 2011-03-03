@@ -36,8 +36,8 @@ BigQ::~BigQ ()
 		r = NULL;
 	}
 	// remove runFile
-	string command = "rm \"" + m_sFileName + "\"";
-	system(command.c_str());
+//	string command = "rm \"" + m_sFileName + "\"";
+//	system(command.c_str());
 }
 
 void* BigQ::getRunsFromInputPipeHelper(void* context)
