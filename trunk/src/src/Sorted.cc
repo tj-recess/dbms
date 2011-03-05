@@ -40,21 +40,25 @@ int Sorted::Open(char *fname)
     meta_in.open((string(fname) + m_sMetaSuffix).c_str());
     string fileType;
     string type;
-    m_pSortInfo = new SortInfo();
-    m_pSortInfo->myOrder = new OrderMaker();
-    meta_in >> fileType;
-    meta_in >> m_pSortInfo->myOrder->numAtts;
-    for (int i = 0; i < m_pSortInfo->myOrder->numAtts; i++)
-    {
-        meta_in >> m_pSortInfo->myOrder->whichAtts[i];
-        meta_in >> type;
-        if(type.compare("Int") == 0)
-            m_pSortInfo->myOrder->whichTypes[i] = Int;
-        else if(type.compare("Double") == 0)
-            m_pSortInfo->myOrder->whichTypes[i] = Double;
-        else
-            m_pSortInfo->myOrder->whichTypes[i] = String;
-    }
+	if (!m_pSortInfo)
+	{
+	    m_pSortInfo = new SortInfo();
+    	m_pSortInfo->myOrder = new OrderMaker();
+	    meta_in >> fileType;
+    	meta_in >> m_pSortInfo->runLength;
+	    meta_in >> m_pSortInfo->myOrder->numAtts;
+    	for (int i = 0; i < m_pSortInfo->myOrder->numAtts; i++)
+	    {
+    	    meta_in >> m_pSortInfo->myOrder->whichAtts[i];
+        	meta_in >> type;
+	        if (type.compare("Int") == 0)
+    	        m_pSortInfo->myOrder->whichTypes[i] = Int;
+        	else if (type.compare("Double") == 0)
+            	m_pSortInfo->myOrder->whichTypes[i] = Double;
+	        else
+    	        m_pSortInfo->myOrder->whichTypes[i] = String;
+	    }
+	}
     return m_pFile->Open(fname);
 }
 
@@ -123,16 +127,15 @@ void Sorted::MergeBigQToSortedFile()
 	ComparisonEngine ce;
 	FileUtil tmpFile;
 
-        string tmpFileName = "tmpFile" + getusec();    //time(NULL) returns time_t in seconds since 1970
+    string tmpFileName = "tmpFile" + getusec();    //time(NULL) returns time_t in seconds since 1970
 	tmpFile.Create(const_cast<char*>(tmpFileName.c_str()));
-//	tmpFile.Open("tmpFile");    //not required now as we don't close file in create
 
 	m_pFile->MoveFirst();
 	int fetchedFromPipe = 1, fetchedFromFile = 1;
 
-        //if file on disk is empty (initially it will be) then don't fetch anything
-        if(m_pFile->GetFileLength() == 0)
-            fetchedFromFile = 0;
+    //if file on disk is empty (initially it will be) then don't fetch anything
+    if(m_pFile->GetFileLength() == 0)
+		fetchedFromFile = 0;
 
 	while (fetchedFromPipe && fetchedFromFile)
 	{
@@ -172,7 +175,7 @@ void Sorted::MergeBigQToSortedFile()
 	while (fetchedFromFile && m_pFile->GetNext(rec))
 	{
 		tmpFile.Add(rec);
-        }
+    }
 
 	tmpFile.Close();
 
@@ -180,18 +183,13 @@ void Sorted::MergeBigQToSortedFile()
 	// and rename tmpFile to old file's name
 	if (tmpFile.GetFileLength() != 0)
 	{
-            // delete old file
-            if(remove(m_pFile->GetBinFilePath().c_str()) != 0)
-                perror("error in removing old file");   //remove this as file might not exist initially
+		// delete old file
+        if(remove(m_pFile->GetBinFilePath().c_str()) != 0)
+        	perror("error in removing old file");   //remove this as file might not exist initially
             
-//		string command = "rm \"" + m_pFile->GetBinFilePath() + "\"";
-//		system(command.c_str());
-
-            // rename tmp file to original old name
-            if(rename(tmpFileName.c_str(), m_pFile->GetBinFilePath().c_str()) != 0)
-                perror("error in renaming temp file");
-//		command = "mv tmpFile \"" + m_pFile->GetBinFilePath() + "\"";
-//		system(command.c_str());
+		// rename tmp file to original old name
+        if(rename(tmpFileName.c_str(), m_pFile->GetBinFilePath().c_str()) != 0)
+        	perror("error in renaming temp file");
 	}
 
 	// delete BigQ
@@ -269,9 +267,18 @@ void Sorted::WriteMetaData()
    {
         ofstream meta_out;
         meta_out.open(string(m_pFile->GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
+	
+		//---- <tbl_name>.meta.data file looks like this ----
+		//sorted
+		//<runLength>
+		//<number of attributes in orderMaker>
+		//<attribute index><type>
+		//<attribute index><type>
+		//....
+		
         meta_out << "sorted\n";
+		meta_out << m_pSortInfo->runLength << "\n";
         meta_out << m_pSortInfo->myOrder->ToString();
-//	meta_out << "write m_pSortInfo here\n";
         meta_out.close();
    }
 }
