@@ -14,6 +14,7 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
     m_sFileName = "runFile" + getTime();
 
     m_runFile.Create(const_cast<char*>(m_sFileName.c_str()));
+	m_runFile.Close();
 
 #ifdef _DEBUG
     m_pSortOrder->Print();
@@ -35,9 +36,10 @@ BigQ::~BigQ ()
 		delete r;
 		r = NULL;
 	}
+
 	// remove runFile
-//	string command = "rm \"" + m_sFileName + "\"";
-//	system(command.c_str());
+	if(remove(m_sFileName.c_str()) != 0)
+    	perror("error in removing old file");
 }
 
 void* BigQ::getRunsFromInputPipeHelper(void* context)
@@ -143,14 +145,13 @@ void* BigQ::getRunsFromInputPipe()
 void BigQ::appendRunToFile(vector<Record*>& aRun)
 {
     static int appendCount = 0;
-
-	#ifdef _DEBUG
-	//  cout<<"Append Run to File count : "<< ++appendCount<<endl;
-//	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
-	#endif
-
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
+
+	#ifdef _DEBUG
+	cout<<"Append Run to File count : "<< ++appendCount<<endl;
+	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
+	#endif
 
 	int nPagesBefore = m_runFile.GetFileLength();
 
@@ -168,6 +169,12 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 	int nPagesAfter = m_runFile.GetFileLength();
     m_runFile.Close();
 	appendCount++;
+
+	#ifdef _DEBUG
+	cout << "\n***\nm_vRunLengths.size() = " <<  m_vRunLengths.size();
+	cout << "\nPages before: " << nPagesBefore;
+	cout << "\nPages after: " << nPagesAfter << endl;
+	#endif
 
 	// first run has one extra page count, as 0th page is blank
 	if ( m_vRunLengths.size() == 0)

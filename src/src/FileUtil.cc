@@ -117,7 +117,9 @@ void FileUtil::Add (Record &rec, bool bstartFromNewPage)
 	{
         WritePageToFile();  //this will write only if dirty page exists
 		m_pPage->EmptyItOut();
-        m_nTotalPages++;	// we need one extra page
+		// we need one extra page, unless we are at the start of file
+		if (m_nTotalPages != 0)
+	        m_nTotalPages++;	
 	}
 
     if (!m_pPage->Append(&aRecord)) // current page does not have enough space
