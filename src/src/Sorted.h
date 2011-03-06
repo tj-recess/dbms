@@ -22,11 +22,16 @@ class Sorted : public GenericDBFile
 		BigQ *m_pBigQ;
 		FileUtil *m_pFile;
 		Pipe *m_pINPipe, *m_pOUTPipe;
-                string m_sMetaSuffix;
+        string m_sMetaSuffix;
 
 		void WriteMetaData();
 		void MergeBigQToSortedFile();
-                string getusec();
+        string getusec();
+
+		int BinarySearch(int low, int high, Record&, OrderMaker*, int oldPagenum);	
+		void GetFileState(Page *pOldPage, int nOldPageNumber);
+		void PutFileState(Page *pOldPage, int nOldPageNumber);
+		void setPagePtr(int foundPage);
 
 	public:
 		Sorted();
