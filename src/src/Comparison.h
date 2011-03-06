@@ -62,6 +62,7 @@ public:
 	// print to the screen
 	void Print ();
 
+        //returns the string representation of OrderMaker
         std::string ToString();
 };
 
@@ -101,7 +102,10 @@ public:
         // a relational selection over a single relation so only one schema is used
         void GrowFromParseTree (struct AndList *parseTree, Schema *mySchema, 
 		Record &literal);
-
+        
+        //returns common attributes of 2 OrderMakers in a 3rd OrderMaker
+        //if no attributes match, it returns null
+        OrderMaker* GetMatchingOrder(OrderMaker& file_order);
 };
 
 #endif

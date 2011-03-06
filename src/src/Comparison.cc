@@ -123,7 +123,7 @@ string OrderMaker :: ToString()
     ss << numAtts <<endl;
     for (int i = 0; i < numAtts; i++)
     {
-            ss << whichAtts[i];
+            ss << whichAtts[i] << " ";
             if (whichTypes[i] == Int)
                     ss << "Int\n";
             else if (whichTypes[i] == Double)
@@ -633,3 +633,36 @@ void CNF :: GrowFromParseTree (struct AndList *parseTree, Schema *mySchema,
 }
 
 
+OrderMaker* CNF :: GetMatchingOrder(OrderMaker& file_order)
+{
+    OrderMaker cnf_order;
+    OrderMaker fileOrderCopy = file_order;
+    GetSortOrders(cnf_order, fileOrderCopy);
+    
+    OrderMaker *query = new OrderMaker();
+    bool matched = false;
+
+    for (int i = 0; i < file_order.numAtts; i++)
+    {
+        for(int j = 0; j < cnf_order.numAtts; j++)
+        {
+            if((file_order.whichAtts[i] == cnf_order.whichAtts[j]) && (file_order.whichAtts[i] == cnf_order.whichAtts[j]))
+            {
+                matched = true;
+                query->whichAtts[query->numAtts] = file_order.whichAtts[i];
+                query->whichTypes[query->numAtts] = file_order.whichTypes[i];
+                query->numAtts++;
+            }
+        }
+        if(!matched)
+            break;
+    }
+    if(query->numAtts > 0)
+        return query;
+    else
+    {
+        delete query;
+        return NULL;
+    }
+
+}
