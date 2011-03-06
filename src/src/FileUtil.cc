@@ -215,3 +215,28 @@ void FileUtil::WritePageToFile()
     m_bDirtyPageExists = false;
 }
 
+void FileUtil::SaveFileState(Page& oldPage, int& nOldPageNumber)
+{
+        char * pageBytes = new char[PAGE_SIZE];
+	m_pPage->ToBinary(pageBytes);
+	oldPage.FromBinary(pageBytes);
+	nOldPageNumber = m_nCurrPage;
+	delete pageBytes;
+	pageBytes = NULL;
+}
+
+void FileUtil::RestoreFileState(Page& oldPage, int nOldPageNumber)
+{
+	char* pageBytes = new char[PAGE_SIZE];
+	oldPage.ToBinary(pageBytes);
+	m_pPage->FromBinary(pageBytes);
+	m_nCurrPage = nOldPageNumber;
+	delete pageBytes;
+	pageBytes = NULL;
+}
+
+void FileUtil::SetCurrentPage(int pageNum)
+{
+	m_pFile->GetPage(m_pPage, pageNum);
+	m_nCurrPage = pageNum;
+}

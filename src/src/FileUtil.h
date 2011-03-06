@@ -61,10 +61,16 @@ class FileUtil
             return m_pFile->GetLength();
         }
 		
-		inline string GetBinFilePath()
-		{
-			return m_sFilePath;
-		}
+        inline string GetBinFilePath()
+        {
+                return m_sFilePath;
+        }
+
+        void SaveFileState(Page& oldPage, int& nOldPageNum);
+
+        void RestoreFileState(Page& oldPage, int nOldPageNumber);
+
+        void SetCurrentPage(int pageNum);
 };
 
 
