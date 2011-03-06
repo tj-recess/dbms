@@ -29,9 +29,9 @@ class Sorted : public GenericDBFile
         string getusec();
 
 		int BinarySearch(int low, int high, Record&, OrderMaker*, int oldPagenum);	
-		void GetFileState(Page *pOldPage, int nOldPageNumber);
-		void PutFileState(Page *pOldPage, int nOldPageNumber);
-		void setPagePtr(int foundPage);
+		void SaveFileState(Page& pOldPage, int& nOldPageNumber);
+		void RestoreFileState(Page& oldPage, int nOldPageNumber);
+		void SetCurrentPage(int foundPage);
 
 	public:
 		Sorted();

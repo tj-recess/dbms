@@ -229,7 +229,16 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
      * If the attribute used in Sorted file's order maker is also present in CNF, append to "query" OrderMaker
      * else - stop making "query" OrderMaker */
 	
-	OrderMaker *pQueryOM = NULL;
+    m_pSortInfo->myOrder->Print();
+    OrderMaker* pQueryOM = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
+
+#ifdef _DEBUG
+    if(pQueryOM!= NULL)
+        pQueryOM->Print();
+    else
+        cout<<"NULL query order maker"<<endl;
+#endif
+
 
     /* find the first matching record -
      * If query OrderMaker is empty, first record (from current pointer or from the beginning) is the matching record.
@@ -264,9 +273,9 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	{
 		// copy the position of current pointer in the file
 		// m_nCurrPage and m_pPage should be saved
-		Page * pOldPage = new Page();	// who deletes this and when?
+		Page pOldPage;
 		int nOldPageNumber;
-		GetFileState(pOldPage, nOldPageNumber);
+		SaveFileState(pOldPage, nOldPageNumber);
 
 		int low = nOldPageNumber;;
 		int high = m_pFile->GetFileLength();
@@ -275,7 +284,7 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 		if (foundPage == -1)	// nothing found
 		{
 			// put file in old state, as binary search might have changed it
-			PutFileState(pOldPage, nOldPageNumber);	
+			RestoreFileState(pOldPage, nOldPageNumber);
 			return RET_FAILURE;
 		}
 		else
@@ -283,7 +292,7 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 			// if foundPage = m_pFile->currPage, do normal GetNext to fetch record
 			// otherwise, get "foundPage" page into memory and then fetch record
 			if (foundPage != nOldPageNumber) 
-				setPagePtr(foundPage);
+				SetCurrentPage(foundPage);
 
 			bool bFetchNextRec = true;
 			do
@@ -307,16 +316,6 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 			return RET_FAILURE;
 		}
 	}
-			
-    
-    OrderMaker query;
-    cnf.GetSortOrders(*(m_pSortInfo->myOrder), query);
-    
-#ifdef _DEBUG
-    query.Print();
-#endif
-    
-    
 
     //if control is here then no matching record was found
     return RET_FAILURE;
@@ -334,7 +333,7 @@ int Sorted::BinarySearch(int low, int high, Record &literal,
 	if (low == mid && low == oldCurPageNum)
 		;	// do nothing, just fetch next record from current page
 	else
-		setPagePtr(mid); // fetch whole page in memory
+		SetCurrentPage(mid); // fetch whole page in memory
 
 	if (GetNext(rec))
 	{
@@ -383,14 +382,17 @@ string Sorted :: getusec()
     return ss.str();
 }
 
-void Sorted::GetFileState(Page *pOldPage, int nOldPageNumber)
+void Sorted::SaveFileState(Page& oldPage, int& nOldPageNumber)
 {
+    m_pFile->SaveFileState(oldPage,nOldPageNumber);
 }
 
-void Sorted::PutFileState(Page *pOldPage, int nOldPageNumber)
+void Sorted::RestoreFileState(Page& oldPage, int nOldPageNumber)
 {
+    m_pFile->RestoreFileState(oldPage, nOldPageNumber);
 }
 
-void Sorted::setPagePtr(int foundPage)
+void Sorted::SetCurrentPage(int foundPage)
 {
+    m_pFile->SetCurrentPage(foundPage);
 }
