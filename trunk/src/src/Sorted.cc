@@ -223,28 +223,91 @@ int Sorted::GetNext (Record &fetchme)
 // the given CNF, returns 0 on failure.
 int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 {
-    /*Logic:
+    /* Logic:
      *
-     * Logic:
-     * Prepare “query” OrderMaker from applyMe (CNF) -
-     * If the attribute used in Sorted file’s order maker is also present in CNF, append to “query” orderMaker
-     * else - stop making “query” orderMaker
-     * find the first matching record -
+     * Prepare "query" OrderMaker from applyMe (CNF) -
+     * If the attribute used in Sorted file's order maker is also present in CNF, append to "query" OrderMaker
+     * else - stop making "query" OrderMaker */
+	
+	OrderMaker *pQueryOM = NULL;
+
+    /* find the first matching record -
      * If query OrderMaker is empty, first record (from current pointer or from the beginning) is the matching record.
      * if query OrderMaker is not empty, perform binary search on file (from the current pointer) to find out a record -
-     * which is equal to the literal (Record) using “query” OrderMaker and CNF (probably using only “query” OrderMaker)
+     * which is equal to the literal (Record) using "query" OrderMaker and CNF (probably using only "query" OrderMaker) 
+	
      * returning apropriate value -
      * if no matching record found, return 0
      * if there is a possible matching record - start scanning the file matching every record found one by one.
-     * First evaluate the record on “query” OrderMaker, then evaluate the CNF instance.
-     * if the query OrderMaker doesn’t accept the record, return 0
+     * First evaluate the record on "query" OrderMaker, then evaluate the CNF instance.
+     * if the query OrderMaker doesn't accept the record, return 0
      * if query OrderMaker does accept it, match it with CNF
      * if CNF accepts, return the record.
-     * if CNF doesn’t accept, move on to next record.
+     * if CNF doesn't accept, move on to next record.
      * repeat 1-2 until EOF.
-     * if it’s EOF, return 0.
-     * Keep the value of “query” OrderMaker and current pointer safe until user performs “MoveFirst” or some write operation.
+     * if it's EOF, return 0.
+     * Keep the value of "query" OrderMaker and current pointer safe until user performs "MoveFirst" or some write operation.
      */
+
+	if (!pQueryOM)
+	{
+	    ComparisonEngine compEngine;
+		while (GetNext(fetchme))
+	    {
+    	    if (compEngine.Compare(&fetchme, &literal, &cnf))
+        	    return RET_SUCCESS;
+		}
+		//if control is here then no matching record was found
+	    return RET_FAILURE;		
+	}
+	else
+	{
+		// copy the position of current pointer in the file
+		// m_nCurrPage and m_pPage should be saved
+		Page * pOldPage = new Page();	// who deletes this and when?
+		int nOldPageNumber;
+		GetFileState(pOldPage, nOldPageNumber);
+
+		int low = nOldPageNumber;;
+		int high = m_pFile->GetFileLength();
+		int foundPage = BinarySearch(low, high, literal, pQueryOM, nOldPageNumber);
+
+		if (foundPage == -1)	// nothing found
+		{
+			// put file in old state, as binary search might have changed it
+			PutFileState(pOldPage, nOldPageNumber);	
+			return RET_FAILURE;
+		}
+		else
+		{
+			// if foundPage = m_pFile->currPage, do normal GetNext to fetch record
+			// otherwise, get "foundPage" page into memory and then fetch record
+			if (foundPage != nOldPageNumber) 
+				setPagePtr(foundPage);
+
+			bool bFetchNextRec = true;
+			do
+			{
+				ComparisonEngine compEngine;
+				if (GetNext(fetchme))
+			    {
+					// match with queryOM, if matches, compare with CNF
+					if (compEngine.Compare(&fetchme, &literal, pQueryOM) == 0)
+					{
+	        			if (compEngine.Compare(&fetchme, &literal, &cnf))
+		        	    	return RET_SUCCESS;
+						else
+							bFetchNextRec = true;
+					}
+			    }
+				else
+					bFetchNextRec = false;
+			} while(bFetchNextRec == true);
+
+			return RET_FAILURE;
+		}
+	}
+			
     
     OrderMaker query;
     cnf.GetSortOrders(*(m_pSortInfo->myOrder), query);
@@ -257,6 +320,32 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 
     //if control is here then no matching record was found
     return RET_FAILURE;
+}
+
+int Sorted::BinarySearch(int low, int high, Record &literal, 
+						 OrderMaker *pQueryOM, int oldCurPageNum)
+{
+	if (low > high)
+		return -1;
+
+	Record rec;
+	ComparisonEngine compEngine;
+	int mid = (low + high)/2;
+	if (low == mid && low == oldCurPageNum)
+		;	// do nothing, just fetch next record from current page
+	else
+		setPagePtr(mid); // fetch whole page in memory
+
+	if (GetNext(rec))
+	{
+		if (compEngine.Compare(&rec, &literal, pQueryOM) == 0)
+			return mid;
+		else if (compEngine.Compare(&rec, &literal, pQueryOM) < 0)
+			return BinarySearch(low, mid-1, literal, pQueryOM, oldCurPageNum);
+		else
+			return BinarySearch(mid, high, literal, pQueryOM, oldCurPageNum);	
+	}
+	return -1;	
 }
 
 // Create <table_name>.meta.data file
@@ -292,4 +381,16 @@ string Sorted :: getusec()
     ss << ".";
     ss << tv.tv_usec;
     return ss.str();
+}
+
+void Sorted::GetFileState(Page *pOldPage, int nOldPageNumber)
+{
+}
+
+void Sorted::PutFileState(Page *pOldPage, int nOldPageNumber)
+{
+}
+
+void Sorted::setPagePtr(int foundPage)
+{
 }
