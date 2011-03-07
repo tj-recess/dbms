@@ -1,6 +1,7 @@
 #include "Sorted.h"
 
-Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL), m_sMetaSuffix(".meta.data")
+Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL), 
+				   m_sMetaSuffix(".meta.data"), m_bPageFetched(false)
 {
 	m_pFile = new FileUtil();
 	m_pINPipe = new Pipe(PIPE_SIZE);
@@ -215,6 +216,7 @@ int Sorted::GetNext (Record &fetchme)
 	}
 
 	// Now we can start reading
+	m_bPageFetched = true;
 	return m_pFile->GetNext(fetchme);
 }
 
@@ -228,12 +230,26 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
      * Prepare "query" OrderMaker from applyMe (CNF) -
      * If the attribute used in Sorted file's order maker is also present in CNF, append to "query" OrderMaker
      * else - stop making "query" OrderMaker */
+
+    // If mode is not reading i.e. it is writing mode currently
+    // merge differential data to already sorted file
+    if (!m_bReadingMode)
+    {
+        m_bReadingMode = true;
+        MergeBigQToSortedFile();
+    }
+
+	if (m_bPageFetched == false)
+	{
+		m_pFile->SetCurrentPage(0);
+		m_bPageFetched = true;
+	}
 	
     m_pSortInfo->myOrder->Print();
     OrderMaker* pQueryOM = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
 
 #ifdef _DEBUG
-    if(pQueryOM!= NULL)
+    if (pQueryOM != NULL)
         pQueryOM->Print();
     else
         cout<<"NULL query order maker"<<endl;
@@ -273,18 +289,18 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	{
 		// copy the position of current pointer in the file
 		// m_nCurrPage and m_pPage should be saved
-		Page pOldPage;
+		Page OldPage;
 		int nOldPageNumber;
-		SaveFileState(pOldPage, nOldPageNumber);
+		m_pFile->SaveFileState(OldPage, nOldPageNumber);
 
 		int low = nOldPageNumber;;
-		int high = m_pFile->GetFileLength();
+		int high = m_pFile->GetFileLength()-2;
 		int foundPage = BinarySearch(low, high, literal, pQueryOM, nOldPageNumber);
 
 		if (foundPage == -1)	// nothing found
 		{
 			// put file in old state, as binary search might have changed it
-			RestoreFileState(pOldPage, nOldPageNumber);
+			m_pFile->RestoreFileState(OldPage, nOldPageNumber);
 			return RET_FAILURE;
 		}
 		else
@@ -292,7 +308,7 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 			// if foundPage = m_pFile->currPage, do normal GetNext to fetch record
 			// otherwise, get "foundPage" page into memory and then fetch record
 			if (foundPage != nOldPageNumber) 
-				SetCurrentPage(foundPage);
+				m_pFile->SetCurrentPage(foundPage);
 
 			bool bFetchNextRec = true;
 			do
@@ -333,7 +349,7 @@ int Sorted::BinarySearch(int low, int high, Record &literal,
 	if (low == mid && low == oldCurPageNum)
 		;	// do nothing, just fetch next record from current page
 	else
-		SetCurrentPage(mid); // fetch whole page in memory
+		m_pFile->SetCurrentPage(mid); // fetch mid-page in memory
 
 	if (GetNext(rec))
 	{
@@ -382,17 +398,3 @@ string Sorted :: getusec()
     return ss.str();
 }
 
-void Sorted::SaveFileState(Page& oldPage, int& nOldPageNumber)
-{
-    m_pFile->SaveFileState(oldPage,nOldPageNumber);
-}
-
-void Sorted::RestoreFileState(Page& oldPage, int nOldPageNumber)
-{
-    m_pFile->RestoreFileState(oldPage, nOldPageNumber);
-}
-
-void Sorted::SetCurrentPage(int foundPage)
-{
-    m_pFile->SetCurrentPage(foundPage);
-}

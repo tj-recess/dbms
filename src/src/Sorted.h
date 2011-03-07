@@ -23,15 +23,13 @@ class Sorted : public GenericDBFile
 		FileUtil *m_pFile;
 		Pipe *m_pINPipe, *m_pOUTPipe;
         string m_sMetaSuffix;
+		bool m_bPageFetched;
 
 		void WriteMetaData();
 		void MergeBigQToSortedFile();
         string getusec();
 
 		int BinarySearch(int low, int high, Record&, OrderMaker*, int oldPagenum);	
-		void SaveFileState(Page& pOldPage, int& nOldPageNumber);
-		void RestoreFileState(Page& oldPage, int nOldPageNumber);
-		void SetCurrentPage(int foundPage);
 
 	public:
 		Sorted();
