@@ -27,7 +27,7 @@ int Sorted::Create(char *f_path, void *sortInfo)
 		cout << "\nSorted::Create --> sortInfo is NULL. ERROR!\n";
 		return RET_FAILURE;
 	}
-	m_pSortInfo = (SortInfo*)sortInfo; 	// TODO: or make a deep copy?
+	m_pSortInfo = (SortInfo*)sortInfo; 	
 	WriteMetaData();
         m_pSortInfo->myOrder->Print();
 	return RET_SUCCESS;
@@ -287,28 +287,15 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	}
 	else
 	{
-		// copy the position of current pointer in the file
-		// m_nCurrPage and m_pPage should be saved
-		Page OldPage;
-		int nOldPageNumber;
-		m_pFile->SaveFileState(OldPage, nOldPageNumber);
-
-		int low = nOldPageNumber;;
-		int high = m_pFile->GetFileLength()-2;
-		int foundPage = BinarySearch(low, high, literal, pQueryOM, nOldPageNumber);
+		int foundPage = FindMatchingPage(literal, pQueryOM);
 
 		if (foundPage == -1)	// nothing found
-		{
-			// put file in old state, as binary search might have changed it
-			m_pFile->RestoreFileState(OldPage, nOldPageNumber);
 			return RET_FAILURE;
-		}
 		else
 		{
-			// if foundPage = m_pFile->currPage, do normal GetNext to fetch record
-			// otherwise, get "foundPage" page into memory and then fetch record
-			if (foundPage != nOldPageNumber) 
-				m_pFile->SetCurrentPage(foundPage);
+
+			OrderMaker cnf_order;
+			cnf.GetSortOrders(cnf_order, *(m_pSortInfo->myOrder));
 
 			bool bFetchNextRec = true;
 			do
@@ -317,16 +304,19 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 				if (GetNext(fetchme))
 			    {
 					// match with queryOM, if matches, compare with CNF
-					if (compEngine.Compare(&fetchme, &literal, pQueryOM) == 0)
+					//if (compEngine.Compare(&literal, pQueryOM, &fetchme, &cnf_order) == 0)
+					if (compEngine.Compare(&literal, &cnf_order, &fetchme, pQueryOM) == 0)
 					{
 	        			if (compEngine.Compare(&fetchme, &literal, &cnf))
 		        	    	return RET_SUCCESS;
 						else
-							bFetchNextRec = true;
+							bFetchNextRec = true; // CNF didn't match, try next record
 					}
+					else
+						bFetchNextRec = false; // sort order does not match
 			    }
 				else
-					bFetchNextRec = false;
+					bFetchNextRec = false; // file over?
 			} while(bFetchNextRec == true);
 
 			return RET_FAILURE;
@@ -337,9 +327,49 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
     return RET_FAILURE;
 }
 
+int Sorted::FindMatchingPage(Record &literal, OrderMaker * pQueryOM)
+{
+	// copy the position of current pointer in the file
+    // m_nCurrPage and m_pPage should be saved
+    Page OldPage;
+    int nOldPageNumber;
+    m_pFile->SaveFileState(OldPage, nOldPageNumber);
+
+    int low = nOldPageNumber;;
+    int high = m_pFile->GetFileLength()-2;
+    int foundPage = BinarySearch(low, high, literal, pQueryOM, nOldPageNumber);
+
+    if (foundPage == -1)    // nothing found
+    {
+        // put file in old state, as binary search might have changed it
+        m_pFile->RestoreFileState(OldPage, nOldPageNumber);
+        return foundPage;
+    }
+	else
+	{
+		if (foundPage > 0)
+		{
+			// page before "foundPage" might also have a matching record
+			// and the one behind that...
+			// how to handle this?
+			foundPage = foundPage - 1;
+		}
+
+		// if foundPage != m_pFile->currPage,
+		// get "foundPage" page into memory and then fetch record
+		if (foundPage != nOldPageNumber) 
+			m_pFile->SetCurrentPage(foundPage);
+	
+		return foundPage;
+	}
+}
+
 int Sorted::BinarySearch(int low, int high, Record &literal, 
 						 OrderMaker *pQueryOM, int oldCurPageNum)
 {
+	if (low == high && low == 0)
+		return 0;
+
 	if (low > high)
 		return -1;
 
