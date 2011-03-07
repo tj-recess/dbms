@@ -29,6 +29,7 @@ class Sorted : public GenericDBFile
 		void MergeBigQToSortedFile();
         string getusec();
 
+		int FindMatchingPage(Record&, OrderMaker*);
 		int BinarySearch(int low, int high, Record&, OrderMaker*, int oldPagenum);	
 
 	public:
