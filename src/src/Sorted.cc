@@ -351,8 +351,25 @@ int Sorted::FindMatchingPage(Record &literal, OrderMaker * pQueryOM)
 		{
 			// page before "foundPage" might also have a matching record
 			// and the one behind that...
-			// how to handle this?
-			foundPage = foundPage - 1;
+			// So keep going back by one page, till the 1st rec doesn't match
+			// and set foundPage = the first page where rec doesn't match
+			Record rec;
+		    ComparisonEngine compEngine;
+
+			bool bRecMatched = true;
+			int pageNum = foundPage;
+
+			while (bRecMatched && pageNum > 0)
+			{
+				// reduce the page number
+				pageNum--;
+				// fetch that page
+				m_pFile->SetCurrentPage(pageNum);
+				// if record can't be fetched or it is not equal to literal
+				if (GetNext(rec) || compEngine.Compare(&rec, &literal, pQueryOM) != 0)
+					bRecMatched = false;
+			}
+			foundPage = pageNum;
 		}
 
 		// if foundPage != m_pFile->currPage,
