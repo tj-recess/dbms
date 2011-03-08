@@ -287,48 +287,49 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	}
 	else
 	{
-		int foundPage = FindMatchingPage(literal, pQueryOM);
+		LoadMatchingPage(literal, pQueryOM);
+                ComparisonEngine compEngine;
+                bool foundMatchingRec = false;
+                while(GetNext(fetchme, true))
+                {
+                    // match with queryOM, until we find a matching record
+                    if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
+                    {
+                        foundMatchingRec = true;
+                        break;
+                    }
+                }
+                if(!foundMatchingRec)
+                    return RET_FAILURE;
 
-		if (foundPage == -1)	// nothing found
-			return RET_FAILURE;
-		else
-		{
+                while(true)
+                {
+                    if(GetNext(fetchme))
+                    {
+                        // match with queryOM, if matches, compare with CNF
+                        if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
+                        {
 
-			OrderMaker cnf_order;
-			cnf.GetSortOrders(cnf_order, *(m_pSortInfo->myOrder));
-
-			bool bFetchNextRec = true;
-			do
-			{
-				ComparisonEngine compEngine;
-				if (GetNext(fetchme))
-			    {
-					// match with queryOM, if matches, compare with CNF
-					if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
-//					if (compEngine.Compare(&literal, &cnf_order, &fetchme, pQueryOM) == 0)
-//                                        if (compEngine.Compare(&literal, &fetchme, m_pSortInfo->myOrder) == 0)
-					{
-	        			if (compEngine.Compare(&fetchme, &literal, &cnf))
-		        	    	return RET_SUCCESS;
-						else
-							bFetchNextRec = true; // CNF didn't match, try next record
-					}
-					else
-						bFetchNextRec = false; // sort order does not match
-			    }
-				else
-					bFetchNextRec = false; // file over?
-			} while(bFetchNextRec == true);
-
-			return RET_FAILURE;
-		}
+                                if (compEngine.Compare(&fetchme, &literal, &cnf))
+                                    return RET_SUCCESS;
+                                // CNF didn't match, try next record
+                        }
+                        else
+                        {
+                            //if queryOM doesn't match, return false
+                            return RET_FAILURE;
+                        }
+                    }
+                    else
+                        return RET_FAILURE;
+                }
 	}
 
     //if control is here then no matching record was found
     return RET_FAILURE;
 }
 
-int Sorted::FindMatchingPage(Record &literal, OrderMaker * pQueryOM)
+int Sorted::LoadMatchingPage(Record &literal, OrderMaker * pQueryOM)
 {
 	// copy the position of current pointer in the file
     // m_nCurrPage and m_pPage should be saved
