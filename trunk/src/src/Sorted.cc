@@ -290,11 +290,13 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 		LoadMatchingPage(literal, pQueryOM);
                 ComparisonEngine compEngine;
                 bool foundMatchingRec = false;
-                while(GetNext(fetchme, true))
+                while(m_pFile->GetNext(fetchme, true))
                 {
                     // match with queryOM, until we find a matching record
                     if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
                     {
+                        if (compEngine.Compare(&fetchme, &literal, &cnf))
+                            return RET_SUCCESS;
                         foundMatchingRec = true;
                         break;
                     }
