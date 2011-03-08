@@ -1,7 +1,8 @@
 #include "Sorted.h"
 
 Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL),
-				   m_sMetaSuffix(".meta.data"), m_bPageFetched(false)
+				   m_sMetaSuffix(".meta.data"), m_bPageFetched(false),
+				   m_pQueryOrderMaker(NULL), m_bMatchingPageFound(false)
 {
 	m_pFile = new FileUtil();
 	m_pINPipe = new Pipe(PIPE_SIZE);
@@ -67,6 +68,8 @@ int Sorted::Open(char *fname)
 int Sorted::Close()
 {
 	MergeBigQToSortedFile();
+	m_pQueryOrderMaker = NULL;
+	m_bMatchingPageFound = false;
     return m_pFile->Close();
 }
 
@@ -201,6 +204,8 @@ void Sorted::MergeBigQToSortedFile()
 void Sorted::MoveFirst ()
 {
 	m_pFile->MoveFirst();
+	m_pQueryOrderMaker = NULL;
+	m_bMatchingPageFound = false;
 }
 
 // Function to fetch the next record in the file in "fetchme"
@@ -245,15 +250,19 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 		m_bPageFetched = true;
 	}
 
-    m_pSortInfo->myOrder->Print();
-    OrderMaker* pQueryOM = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
+	// Make query-order-maker only if it is not already made
+	if (m_pQueryOrderMaker == NULL)
+	{
+	    //m_pSortInfo->myOrder->Print();
+    	m_pQueryOrderMaker = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
 
-#ifdef _DEBUG
-    if (pQueryOM != NULL)
-        pQueryOM->Print();
-    else
-        cout<<"NULL query order maker"<<endl;
-#endif
+		#ifdef _DEBUG
+	    if (m_pQueryOrderMaker != NULL)
+    	    m_pQueryOrderMaker->Print();
+	    else
+    	    cout<<"NULL query order maker"<<endl;
+		#endif
+	}
 
 
     /* find the first matching record -
@@ -274,7 +283,7 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
      * Keep the value of "query" OrderMaker and current pointer safe until user performs "MoveFirst" or some write operation.
      */
 
-	if (!pQueryOM)
+	if (!m_pQueryOrderMaker)
 	{
 	    ComparisonEngine compEngine;
 		while (GetNext(fetchme))
@@ -287,51 +296,57 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	}
 	else
 	{
-		LoadMatchingPage(literal, pQueryOM);
-                ComparisonEngine compEngine;
-                bool foundMatchingRec = false;
-                while(m_pFile->GetNext(fetchme, true))
+        ComparisonEngine compEngine;
+
+		// Binary search must be done once per query-order-maker
+		if (m_bMatchingPageFound == false)
+		{
+			m_bMatchingPageFound = true;
+			LoadMatchingPage(literal);
+			// find the page where query-order-maker first matches (using binary search)
+            bool foundMatchingRec = false;
+            while(m_pFile->GetNext(fetchme, true))
+            {
+                // match with queryOM, until we find a matching record
+                if (compEngine.Compare(&literal, m_pQueryOrderMaker, &fetchme, m_pSortInfo->myOrder) == 0)
                 {
-                    // match with queryOM, until we find a matching record
-                    if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
-                    {
-                        if (compEngine.Compare(&fetchme, &literal, &cnf))
-                            return RET_SUCCESS;
-                        foundMatchingRec = true;
-                        break;
-                    }
+                    if (compEngine.Compare(&fetchme, &literal, &cnf))
+                        return RET_SUCCESS;
+                    foundMatchingRec = true;
+                    break;
                 }
-                if(!foundMatchingRec)
+            }
+            if(!foundMatchingRec)
+                return RET_FAILURE;
+		}
+
+		while(true)
+        {
+        	if(GetNext(fetchme))
+            {
+            	// match with queryOM, if matches, compare with CNF
+                if (compEngine.Compare(&literal, m_pQueryOrderMaker, &fetchme, m_pSortInfo->myOrder) == 0)
+                {
+                	if (compEngine.Compare(&fetchme, &literal, &cnf))
+                    	return RET_SUCCESS; 
+					// otherwise CNF didn't match, try next record
+                }
+                else
+                {
+                	//if queryOM doesn't match, stop searching, return false
                     return RET_FAILURE;
-
-                while(true)
-                {
-                    if(GetNext(fetchme))
-                    {
-                        // match with queryOM, if matches, compare with CNF
-                        if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
-                        {
-
-                                if (compEngine.Compare(&fetchme, &literal, &cnf))
-                                    return RET_SUCCESS;
-                                // CNF didn't match, try next record
-                        }
-                        else
-                        {
-                            //if queryOM doesn't match, return false
-                            return RET_FAILURE;
-                        }
-                    }
-                    else
-                        return RET_FAILURE;
                 }
+			}
+            else
+            	return RET_FAILURE;
+		}
 	}
 
     //if control is here then no matching record was found
     return RET_FAILURE;
 }
 
-int Sorted::LoadMatchingPage(Record &literal, OrderMaker * pQueryOM)
+int Sorted::LoadMatchingPage(Record &literal)
 {
 	// copy the position of current pointer in the file
     // m_nCurrPage and m_pPage should be saved
@@ -341,7 +356,7 @@ int Sorted::LoadMatchingPage(Record &literal, OrderMaker * pQueryOM)
 
     int low = nOldPageNumber;;
     int high = m_pFile->GetFileLength()-2;
-    int foundPage = BinarySearch(low, high, literal, pQueryOM, nOldPageNumber);
+    int foundPage = BinarySearch(low, high, literal, nOldPageNumber);
 
     if (foundPage == -1)    // nothing found
     {
@@ -370,7 +385,7 @@ int Sorted::LoadMatchingPage(Record &literal, OrderMaker * pQueryOM)
 				// fetch that page
 				m_pFile->SetCurrentPage(pageNum);
 				// if record can't be fetched or it is not equal to literal
-				if (!GetNext(rec) || compEngine.Compare(&rec, &literal, pQueryOM) != 0)
+				if (!GetNext(rec) || compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) != 0)
 					bRecMatched = false;
 			}
 			foundPage = pageNum;
@@ -385,8 +400,7 @@ int Sorted::LoadMatchingPage(Record &literal, OrderMaker * pQueryOM)
 	}
 }
 
-int Sorted::BinarySearch(int low, int high, Record &literal,
-						 OrderMaker *pQueryOM, int oldCurPageNum)
+int Sorted::BinarySearch(int low, int high, Record &literal, int oldCurPageNum)
 {
 	// if there is only one page, then return that page
 	if (low == high)
@@ -406,12 +420,12 @@ int Sorted::BinarySearch(int low, int high, Record &literal,
 
 	if (GetNext(rec))
 	{
-		if (compEngine.Compare(&rec, &literal, pQueryOM) == 0)
+		if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) == 0)
 			return mid;
-		else if (compEngine.Compare(&rec, &literal, pQueryOM) < 0)
-			return BinarySearch(low, mid-1, literal, pQueryOM, oldCurPageNum);
+		else if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) < 0)
+			return BinarySearch(low, mid-1, literal, oldCurPageNum);
 		else
-			return BinarySearch(mid+1, high, literal, pQueryOM, oldCurPageNum);	
+			return BinarySearch(mid+1, high, literal, oldCurPageNum);	
 	}
 	return -1;
 }
