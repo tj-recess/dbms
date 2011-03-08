@@ -354,9 +354,10 @@ int Sorted::LoadMatchingPage(Record &literal)
     int nOldPageNumber;
     m_pFile->SaveFileState(OldPage, nOldPageNumber);
 
-    int low = nOldPageNumber;;
+	// nOldPageNumber (FileIUtil::m_nCurrPage) points to the page after the one thats in memory
+    int low = nOldPageNumber - 1;	
     int high = m_pFile->GetFileLength()-2;
-    int foundPage = BinarySearch(low, high, literal, nOldPageNumber);
+    int foundPage = BinarySearch(low, high, literal, nOldPageNumber-1);
 
     if (foundPage == -1)    // nothing found
     {
@@ -393,7 +394,8 @@ int Sorted::LoadMatchingPage(Record &literal)
 
 		// if foundPage != m_pFile->currPage,
 		// get "foundPage" page into memory and then fetch record
-		if (foundPage != nOldPageNumber)
+		// otherwise no need to fetch, it is already in memory
+		if (foundPage != (nOldPageNumber-1))
 			m_pFile->SetCurrentPage(foundPage);
 
 		return foundPage;
@@ -422,9 +424,11 @@ int Sorted::BinarySearch(int low, int high, Record &literal, int oldCurPageNum)
 	{
 		if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) == 0)
 			return mid;
-		else if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) < 0)
+		// if record is greater than what we need, search in upper half
+		else if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) > 0)
 			return BinarySearch(low, mid-1, literal, oldCurPageNum);
-		else
+		
+		else // if record is smaller than what we need, search in lower half
 			return BinarySearch(mid+1, high, literal, oldCurPageNum);	
 	}
 	return -1;
