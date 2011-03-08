@@ -23,14 +23,19 @@ class Sorted : public GenericDBFile
 		FileUtil *m_pFile;
 		Pipe *m_pINPipe, *m_pOUTPipe;
         string m_sMetaSuffix;
+		// variables for GetNext(CNF)
 		bool m_bPageFetched;
+		OrderMaker *m_pQueryOrderMaker;
+		bool m_bMatchingPageFound;
 
+		// Private functions
 		void WriteMetaData();
 		void MergeBigQToSortedFile();
         string getusec();
 
-		int FindMatchingPage(Record&, OrderMaker*);
-		int BinarySearch(int low, int high, Record&, OrderMaker*, int oldPagenum);	
+		// Functions for GetNext(CNF)
+		int LoadMatchingPage(Record&);
+		int BinarySearch(int low, int high, Record&, int oldPagenum);	
 
 	public:
 		Sorted();
