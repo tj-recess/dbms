@@ -204,6 +204,33 @@ int FileUtil::GetNext (Record &fetchme)
 	return RET_SUCCESS;
 }
 
+// Function to fetch the next record in the file in "fetchme"
+// from the page m_pPage. If the page is exhausted, return failure
+int FileUtil::GetNext (Record &fetchme, bool searchInCurrentPage)
+{
+    // write dirty page to file
+    // as it might happen that the record we want to fetch now
+    // is still in the dirty page which has not been flushed to disk
+    WritePageToFile();
+
+    // coming for the first time
+    // Page starts with 0, but data is stored from 1st page onwards
+    // Refer to File :: GetPage (File.cc line 168)
+    if (m_nCurrPage == 0)
+    {
+        m_pFile->GetPage(m_pPage, m_nCurrPage++);
+    }
+
+    // Try to fetch the first record from current_page
+    // This function will delete this record from the page
+    int ret = m_pPage->GetFirst(&fetchme);
+    if (!ret)
+		return RET_FAILURE;
+	else
+		return RET_SUCCESS;
+
+}
+
 // Write dirty page to file
 void FileUtil::WritePageToFile()
 {
@@ -238,5 +265,5 @@ void FileUtil::RestoreFileState(Page& oldPage, int nOldPageNumber)
 void FileUtil::SetCurrentPage(int pageNum)
 {
 	m_pFile->GetPage(m_pPage, pageNum);
-	m_nCurrPage = pageNum;
+	m_nCurrPage = pageNum+1;
 }

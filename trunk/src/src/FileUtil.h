@@ -49,6 +49,10 @@ class FileUtil
         // Fetch next record (relative to p_currPtr) into fetchMe
         int GetNext (Record &fetchMe);
 
+		// Fetch next record only in the current page
+		// return failure when page exhausts
+		int GetNext (Record &fetchme, bool searchInCurrentPage);
+
         // Given a page number "whichPage", fetch that page
         inline void GetPage(Page *putItHere, off_t whichPage)
         {
