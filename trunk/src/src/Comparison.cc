@@ -625,6 +625,10 @@ void CNF :: GrowFromParseTree (struct AndList *parseTree, Schema *mySchema,
 	// and get the record
 	literal.SuckNextRecord (&outSchema, outRecFile);
 
+#ifdef _DEBUG
+        cout<<"***Printing literal***"<<endl;
+        literal.Print(&outSchema);
+#endif
 	// close the record file
 	fclose (outRecFile);
 
@@ -640,18 +644,19 @@ OrderMaker* CNF :: GetMatchingOrder(OrderMaker& file_order)
     GetSortOrders(cnf_order, fileOrderCopy);
     
     OrderMaker *query = new OrderMaker();
-    bool matched = false;
-
+    
     for (int i = 0; i < file_order.numAtts; i++)
     {
+        bool matched = false;
         for(int j = 0; j < cnf_order.numAtts; j++)
         {
-            if((file_order.whichAtts[i] == cnf_order.whichAtts[j]) && (file_order.whichAtts[i] == cnf_order.whichAtts[j]))
+            if((file_order.whichAtts[i] == cnf_order.whichAtts[j]) && (file_order.whichTypes[i] == cnf_order.whichTypes[j]))
             {
                 matched = true;
-                query->whichAtts[query->numAtts] = file_order.whichAtts[i];
+                query->whichAtts[query->numAtts] = query->numAtts;  //number your atts accordingly as we are appending
                 query->whichTypes[query->numAtts] = file_order.whichTypes[i];
                 query->numAtts++;
+                break;
             }
         }
         if(!matched)

@@ -1,6 +1,6 @@
 #include "Sorted.h"
 
-Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL), 
+Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL),
 				   m_sMetaSuffix(".meta.data"), m_bPageFetched(false)
 {
 	m_pFile = new FileUtil();
@@ -27,7 +27,7 @@ int Sorted::Create(char *f_path, void *sortInfo)
 		cout << "\nSorted::Create --> sortInfo is NULL. ERROR!\n";
 		return RET_FAILURE;
 	}
-	m_pSortInfo = (SortInfo*)sortInfo; 	
+	m_pSortInfo = (SortInfo*)sortInfo;
 	WriteMetaData();
         m_pSortInfo->myOrder->Print();
 	return RET_SUCCESS;
@@ -63,7 +63,7 @@ int Sorted::Open(char *fname)
     return m_pFile->Open(fname);
 }
 
-// returns 1 if successfully closed the file, 0 otherwise 
+// returns 1 if successfully closed the file, 0 otherwise
 int Sorted::Close()
 {
 	MergeBigQToSortedFile();
@@ -82,7 +82,7 @@ void Sorted::Load (Schema &mySchema, char *loadMe)
     if (!fileToLoad)
     {
 		el->writeLog("Can't open file name :" + string(loadMe));
-		return;	
+		return;
     }
 
     /* Logic :
@@ -94,7 +94,7 @@ void Sorted::Load (Schema &mySchema, char *loadMe)
     while(aRecord.SuckNextRecord(&mySchema, fileToLoad))
         Add(aRecord);
 
-    fclose(fileToLoad);	
+    fclose(fileToLoad);
 
 	MergeBigQToSortedFile();
 }
@@ -187,7 +187,7 @@ void Sorted::MergeBigQToSortedFile()
 		// delete old file
         if(remove(m_pFile->GetBinFilePath().c_str()) != 0)
         	perror("error in removing old file");   //remove this as file might not exist initially
-            
+
 		// rename tmp file to original old name
         if(rename(tmpFileName.c_str(), m_pFile->GetBinFilePath().c_str()) != 0)
         	perror("error in renaming temp file");
@@ -221,7 +221,7 @@ int Sorted::GetNext (Record &fetchme)
 }
 
 
-// Function to fetch the next record in "fetchme" that matches 
+// Function to fetch the next record in "fetchme" that matches
 // the given CNF, returns 0 on failure.
 int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 {
@@ -244,7 +244,7 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 		m_pFile->SetCurrentPage(0);
 		m_bPageFetched = true;
 	}
-	
+
     m_pSortInfo->myOrder->Print();
     OrderMaker* pQueryOM = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
 
@@ -259,8 +259,8 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
     /* find the first matching record -
      * If query OrderMaker is empty, first record (from current pointer or from the beginning) is the matching record.
      * if query OrderMaker is not empty, perform binary search on file (from the current pointer) to find out a record -
-     * which is equal to the literal (Record) using "query" OrderMaker and CNF (probably using only "query" OrderMaker) 
-	
+     * which is equal to the literal (Record) using "query" OrderMaker and CNF (probably using only "query" OrderMaker)
+
      * returning apropriate value -
      * if no matching record found, return 0
      * if there is a possible matching record - start scanning the file matching every record found one by one.
@@ -283,7 +283,7 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
         	    return RET_SUCCESS;
 		}
 		//if control is here then no matching record was found
-	    return RET_FAILURE;		
+	    return RET_FAILURE;
 	}
 	else
 	{
@@ -304,8 +304,9 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 				if (GetNext(fetchme))
 			    {
 					// match with queryOM, if matches, compare with CNF
-					//if (compEngine.Compare(&literal, pQueryOM, &fetchme, &cnf_order) == 0)
-					if (compEngine.Compare(&literal, &cnf_order, &fetchme, pQueryOM) == 0)
+					if (compEngine.Compare(&literal, pQueryOM, &fetchme, m_pSortInfo->myOrder) == 0)
+//					if (compEngine.Compare(&literal, &cnf_order, &fetchme, pQueryOM) == 0)
+//                                        if (compEngine.Compare(&literal, &fetchme, m_pSortInfo->myOrder) == 0)
 					{
 	        			if (compEngine.Compare(&fetchme, &literal, &cnf))
 		        	    	return RET_SUCCESS;
@@ -374,14 +375,14 @@ int Sorted::FindMatchingPage(Record &literal, OrderMaker * pQueryOM)
 
 		// if foundPage != m_pFile->currPage,
 		// get "foundPage" page into memory and then fetch record
-		if (foundPage != nOldPageNumber) 
+		if (foundPage != nOldPageNumber)
 			m_pFile->SetCurrentPage(foundPage);
-	
+
 		return foundPage;
 	}
 }
 
-int Sorted::BinarySearch(int low, int high, Record &literal, 
+int Sorted::BinarySearch(int low, int high, Record &literal,
 						 OrderMaker *pQueryOM, int oldCurPageNum)
 {
 	// if there is only one page, then return that page
@@ -409,7 +410,7 @@ int Sorted::BinarySearch(int low, int high, Record &literal,
 		else
 			return BinarySearch(mid+1, high, literal, pQueryOM, oldCurPageNum);	
 	}
-	return -1;	
+	return -1;
 }
 
 // Create <table_name>.meta.data file
@@ -420,7 +421,7 @@ void Sorted::WriteMetaData()
    {
         ofstream meta_out;
         meta_out.open(string(m_pFile->GetBinFilePath() + ".meta.data").c_str(), ios::trunc);
-	
+
 		//---- <tbl_name>.meta.data file looks like this ----
 		//sorted
 		//<runLength>
@@ -428,7 +429,7 @@ void Sorted::WriteMetaData()
 		//<attribute index><type>
 		//<attribute index><type>
 		//....
-		
+
         meta_out << "sorted\n";
 		meta_out << m_pSortInfo->runLength << "\n";
         meta_out << m_pSortInfo->myOrder->ToString();
@@ -446,4 +447,3 @@ string Sorted :: getusec()
     ss << tv.tv_usec;
     return ss.str();
 }
-
