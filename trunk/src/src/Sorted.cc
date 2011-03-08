@@ -369,10 +369,16 @@ int Sorted::LoadMatchingPage(Record &literal)
 	{
 		if (foundPage > 0)
 		{
+			// fetch that page
+			m_pFile->SetCurrentPage(foundPage);
+
 			// if foundPage is the same as oldPage in memory
 			// just return and continue with that page
 			if (foundPage == (nOldPageNumber-1))
+			{
+				m_pFile->RestoreFileState(OldPage, nOldPageNumber);
 				return foundPage;
+			}
 
 			// otherwise, pages before "foundPage" might also have a matching record
 			// So keep going back by one page, till the 1st rec doesn't match
@@ -383,14 +389,14 @@ int Sorted::LoadMatchingPage(Record &literal)
 			int pageNum = foundPage;
 			while (pageNum > 0)
 			{
-				// fetch that page
-				m_pFile->SetCurrentPage(pageNum);
-				// if record fetched but it is not equal to literal, stop going to prev page
-				if (GetNext(rec) && compEngine.Compare(&literal, m_pQueryOrderMaker, &rec, m_pSortInfo->myOrder) != 0)
+				// if record fetched but it is not less to literal, stop going to prev page
+				if (GetNext(rec) && compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) < 0)
 					break;
 
 				// if 1st rec matches, goto prev page and check with 1st rec again
                 pageNum--;
+				// fetch that page
+				m_pFile->SetCurrentPage(pageNum);
 			}
 			foundPage = pageNum;
 		}
@@ -412,10 +418,7 @@ int Sorted::BinarySearch(int low, int high, Record &literal, int oldCurPageNum)
 	Record rec;
 	ComparisonEngine compEngine;
 	int mid = (low + high)/2;
-	if (low == mid && low == oldCurPageNum)
-		;	// do nothing, just fetch next record from current page
-	else
-		m_pFile->SetCurrentPage(mid); // fetch mid-page in memory
+	m_pFile->SetCurrentPage(mid); // fetch mid-page in memory
 
 	if (GetNext(rec))
 	{
@@ -423,8 +426,12 @@ int Sorted::BinarySearch(int low, int high, Record &literal, int oldCurPageNum)
 			return mid;
 		// if record is greater than what we need, search in upper half
 		else if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) > 0)
-			return BinarySearch(low, mid-1, literal, oldCurPageNum);
-		
+		{
+			if (low == mid)
+		        return mid;
+			else
+				return BinarySearch(low, mid-1, literal, oldCurPageNum);
+		}		
 		else // if record is smaller than what we need, search in lower half
 			return BinarySearch(mid+1, high, literal, oldCurPageNum);	
 	}
