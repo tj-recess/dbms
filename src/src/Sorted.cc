@@ -366,7 +366,7 @@ int Sorted::FindMatchingPage(Record &literal, OrderMaker * pQueryOM)
 				// fetch that page
 				m_pFile->SetCurrentPage(pageNum);
 				// if record can't be fetched or it is not equal to literal
-				if (GetNext(rec) || compEngine.Compare(&rec, &literal, pQueryOM) != 0)
+				if (!GetNext(rec) || compEngine.Compare(&rec, &literal, pQueryOM) != 0)
 					bRecMatched = false;
 			}
 			foundPage = pageNum;
@@ -384,9 +384,11 @@ int Sorted::FindMatchingPage(Record &literal, OrderMaker * pQueryOM)
 int Sorted::BinarySearch(int low, int high, Record &literal, 
 						 OrderMaker *pQueryOM, int oldCurPageNum)
 {
-	if (low == high && low == 0)
-		return 0;
+	// if there is only one page, then return that page
+	if (low == high)
+		return low;
 
+	// error condition, should never reach here
 	if (low > high)
 		return -1;
 
@@ -405,7 +407,7 @@ int Sorted::BinarySearch(int low, int high, Record &literal,
 		else if (compEngine.Compare(&rec, &literal, pQueryOM) < 0)
 			return BinarySearch(low, mid-1, literal, pQueryOM, oldCurPageNum);
 		else
-			return BinarySearch(mid, high, literal, pQueryOM, oldCurPageNum);	
+			return BinarySearch(mid+1, high, literal, pQueryOM, oldCurPageNum);	
 	}
 	return -1;	
 }
