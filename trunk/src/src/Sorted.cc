@@ -369,34 +369,31 @@ int Sorted::LoadMatchingPage(Record &literal)
 	{
 		if (foundPage > 0)
 		{
-			// page before "foundPage" might also have a matching record
-			// and the one behind that...
+			// if foundPage is the same as oldPage in memory
+			// just return and continue with that page
+			if (foundPage == (nOldPageNumber-1))
+				return foundPage;
+
+			// otherwise, pages before "foundPage" might also have a matching record
 			// So keep going back by one page, till the 1st rec doesn't match
 			// and set foundPage = the first page where rec doesn't match
 			Record rec;
 		    ComparisonEngine compEngine;
 
-			bool bRecMatched = true;
 			int pageNum = foundPage;
-
-			while (bRecMatched && pageNum > 0)
+			while (pageNum > 0)
 			{
-				// reduce the page number
-				pageNum--;
 				// fetch that page
 				m_pFile->SetCurrentPage(pageNum);
-				// if record can't be fetched or it is not equal to literal
-				if (!GetNext(rec) || compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) != 0)
-					bRecMatched = false;
+				// if record fetched but it is not equal to literal, stop going to prev page
+				if (GetNext(rec) && compEngine.Compare(&literal, m_pQueryOrderMaker, &rec, m_pSortInfo->myOrder) != 0)
+					break;
+
+				// if 1st rec matches, goto prev page and check with 1st rec again
+                pageNum--;
 			}
 			foundPage = pageNum;
 		}
-
-		// if foundPage != m_pFile->currPage,
-		// get "foundPage" page into memory and then fetch record
-		// otherwise no need to fetch, it is already in memory
-		if (foundPage != (nOldPageNumber-1))
-			m_pFile->SetCurrentPage(foundPage);
 
 		return foundPage;
 	}
