@@ -68,8 +68,6 @@ int Sorted::Open(char *fname)
 int Sorted::Close()
 {
 	MergeBigQToSortedFile();
-	m_pQueryOrderMaker = NULL;
-	m_bMatchingPageFound = false;
     return m_pFile->Close();
 }
 
@@ -199,6 +197,10 @@ void Sorted::MergeBigQToSortedFile()
 	// delete BigQ
 	delete m_pBigQ;
 	m_pBigQ = NULL;
+
+	// invalidate the old query-order-maker
+	m_pQueryOrderMaker = NULL;
+	m_bMatchingPageFound = false;
 }
 
 void Sorted::MoveFirst ()
@@ -395,8 +397,10 @@ int Sorted::LoadMatchingPage(Record &literal)
 
 				// if 1st rec matches, goto prev page and check with 1st rec again
                 pageNum--;
-				// fetch that page
-				m_pFile->SetCurrentPage(pageNum);
+				if (pageNum == (nOldPageNumber-1))
+    	            m_pFile->RestoreFileState(OldPage, nOldPageNumber);
+				else // fetch that page
+					m_pFile->SetCurrentPage(pageNum);
 			}
 			foundPage = pageNum;
 		}
