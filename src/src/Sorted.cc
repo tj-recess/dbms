@@ -30,7 +30,9 @@ int Sorted::Create(char *f_path, void *sortInfo)
 	}
 	m_pSortInfo = (SortInfo*)sortInfo;
 	WriteMetaData();
-        m_pSortInfo->myOrder->Print();
+	#ifdef _DEBUG
+    m_pSortInfo->myOrder->Print();
+	#endif
 	return RET_SUCCESS;
 }
 
@@ -255,7 +257,10 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	// Make query-order-maker only if it is not already made
 	if (m_pQueryOrderMaker == NULL)
 	{
-	    //m_pSortInfo->myOrder->Print();
+		#ifdef _DEBUG
+	    m_pSortInfo->myOrder->Print();
+		#endif
+
     	m_pQueryOrderMaker = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
 
 		#ifdef _DEBUG
@@ -391,8 +396,8 @@ int Sorted::LoadMatchingPage(Record &literal)
 			int pageNum = foundPage;
 			while (pageNum > 0)
 			{
-				// if record fetched but it is not less to literal, stop going to prev page
-				if (GetNext(rec) && compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) < 0)
+				// if record fetched but it is not less than literal, stop going to prev page
+				if (GetNext(rec) && compEngine.Compare(&literal, m_pQueryOrderMaker, &rec, m_pSortInfo->myOrder) > 0)
 					break;
 
 				// if 1st rec matches, goto prev page and check with 1st rec again
@@ -426,17 +431,17 @@ int Sorted::BinarySearch(int low, int high, Record &literal, int oldCurPageNum)
 
 	if (GetNext(rec))
 	{
-		if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) == 0)
+		if (compEngine.Compare(&literal, m_pQueryOrderMaker, &rec, m_pSortInfo->myOrder) == 0)
 			return mid;
-		// if record is greater than what we need, search in upper half
-		else if (compEngine.Compare(&rec, &literal, m_pQueryOrderMaker) > 0)
+		// if record is greater than what we need, search in top half
+		else if (compEngine.Compare(&literal, m_pQueryOrderMaker, &rec, m_pSortInfo->myOrder) < 0)
 		{
 			if (low == mid)
 		        return mid;
 			else
 				return BinarySearch(low, mid-1, literal, oldCurPageNum);
 		}		
-		else // if record is smaller than what we need, search in lower half
+		else // if record is smaller than what we need, search in bottom half
 			return BinarySearch(mid+1, high, literal, oldCurPageNum);	
 	}
 	return -1;
