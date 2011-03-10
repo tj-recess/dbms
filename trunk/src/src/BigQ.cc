@@ -149,7 +149,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
     int length = aRun.size();
 
 	#ifdef _DEBUG
-	cout<<"Append Run to File count : "<< ++appendCount<<endl;
+	cout<<"Append Run to File count : "<< appendCount + 1 <<endl;
 	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
 	#endif
 
