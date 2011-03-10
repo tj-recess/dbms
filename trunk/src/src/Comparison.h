@@ -89,6 +89,8 @@ public:
 	// for the given comparison
 	int GetSortOrders (OrderMaker &left, OrderMaker &right);
 
+        int GetCNFSortOrder (OrderMaker &left, OrderMaker &right);
+
 	// print the comparison structure to the screen
 	void Print ();
 

@@ -134,7 +134,66 @@ string OrderMaker :: ToString()
     return ss.str();
 }
 
+int CNF :: GetCNFSortOrder (OrderMaker &left, OrderMaker &right) {
 
+	// initialize the size of the OrderMakers
+	left.numAtts = 0;
+	right.numAtts = 0;
+
+	// loop through all of the disjunctions in the CNF and find those
+	// that are acceptable for use in a sort ordering
+	for (int i = 0; i < numAnds; i++) {
+
+		// if we don't have a disjunction of length one, then it
+		// can't be acceptable for use with a sort ordering
+		if (orLens[i] != 1) {
+			continue;
+		}
+
+		// made it this far, so first verify that it is an equality check
+		if (orList[i][0].op != Equals) {
+			continue;
+		}
+
+		// now verify that it operates over atts from both tables
+		if (!((orList[i][0].operand1 == Left && orList[i][0].operand2 == Right) ||
+		      (orList[i][0].operand2 == Left && orList[i][0].operand1 == Right))) {
+//			continue;
+		}
+
+		// since we are here, we have found a join attribute!!!
+		// so all we need to do is add the new comparison info into the
+		// relevant structures
+		if (orList[i][0].operand1 == Left) {
+			left.whichAtts[left.numAtts] = orList[i][0].whichAtt1;
+			left.whichTypes[left.numAtts] = orList[i][0].attType;
+                        right.whichAtts[right.numAtts] = orList[i][0].whichAtt2;
+                        right.whichTypes[right.numAtts] = orList[i][0].attType;
+		}
+
+		if (orList[i][0].operand1 == Right) {
+                        right.whichAtts[right.numAtts] = orList[i][0].whichAtt1;
+                        right.whichTypes[right.numAtts] = orList[i][0].attType;
+                }
+
+		if (orList[i][0].operand2 == Left) {
+                        left.whichAtts[left.numAtts] = orList[i][0].whichAtt2;
+                        left.whichTypes[left.numAtts] = orList[i][0].attType;
+                }
+
+		if (orList[i][0].operand2 == Right) {
+                        right.whichAtts[right.numAtts] = orList[i][0].whichAtt2;
+                        right.whichTypes[right.numAtts] = orList[i][0].attType;
+                }
+
+		// note that we have found two new attributes
+		left.numAtts++;
+		right.numAtts++;
+	}
+
+	return left.numAtts;
+
+}
 
 int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 
@@ -641,7 +700,7 @@ OrderMaker* CNF :: GetMatchingOrder(OrderMaker& file_order)
 {
     OrderMaker cnf_order;
     OrderMaker fileOrderCopy = file_order;
-    GetSortOrders(cnf_order, fileOrderCopy);
+    GetCNFSortOrder(cnf_order, fileOrderCopy);
     
     OrderMaker *query = new OrderMaker();
     
@@ -653,8 +712,8 @@ OrderMaker* CNF :: GetMatchingOrder(OrderMaker& file_order)
             if((file_order.whichAtts[i] == cnf_order.whichAtts[j]) && (file_order.whichTypes[i] == cnf_order.whichTypes[j]))
             {
                 matched = true;
-                query->whichAtts[query->numAtts] = query->numAtts;  //number your atts accordingly as we are appending
-                query->whichTypes[query->numAtts] = file_order.whichTypes[i];
+                query->whichAtts[query->numAtts] = fileOrderCopy.whichAtts[j];  //number your atts accordingly as we are appending
+                query->whichTypes[query->numAtts] = fileOrderCopy.whichTypes[j];
                 query->numAtts++;
                 break;
             }
