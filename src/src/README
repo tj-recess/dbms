@@ -1,0 +1,21 @@
+Project Members
+----------------
+NAME				UFID
+
+Arpit Tripathi		61350118
+Malvika Agrawal		45163914
+
+
+Additional Information
+----------------------
+* Changed one line in test.cc
+ 15 //  while ((res = temp.SuckNextRecord (rel->schema (), src)) && ++proc < numrecs) {
+ 16     while( proc < numrecs && (res = temp.SuckNextRecord (rel->schema (), src)) ){
+ 17         proc++;
+
+* We have written our own EventLogger.
+  The files for it are: EventLogger.cc and EventLogger.h
+  They have been added in Makefile
+
+* There are some memory leaks in Schema.cc, because of which valgrind run failed.
+  As you said, we except not to get our marks deducted for memory leaks :) 
