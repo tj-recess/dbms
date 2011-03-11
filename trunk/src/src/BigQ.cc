@@ -158,7 +158,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 	//insert first record into new page so that a clear demarcation can be established
     //start this demarcation from 2nd run (don't do it for first run )
     int i = 0;
-    if(appendCount > 0)
+    //if(appendCount > 0)
     {
         m_runFile.Add(*aRun[0], true);
         i = 1;
