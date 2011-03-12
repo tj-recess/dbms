@@ -135,20 +135,20 @@ void Sorted::MergeBigQToSortedFile()
 	tmpFile.Create(const_cast<char*>(tmpFileName.c_str()));
 
 	m_pFile->MoveFirst();
-	int fetchedFromPipe = 1, fetchedFromFile = 1;
+	int fetchedFromPipe = 0, fetchedFromFile = 0;
 
-    //if file on disk is empty (initially it will be) then don't fetch anything
-    if(m_pFile->GetFileLength() == 0)
+        //if file on disk is empty (initially it will be) then don't fetch anything
+        if(m_pFile->GetFileLength() == 0)
 		fetchedFromFile = 0;
 
-	while (fetchedFromPipe && fetchedFromFile)
+        do
 	{
 		if (pRecFromPipe == NULL)
 		{
 			pRecFromPipe = new Record;
 			fetchedFromPipe = m_pOUTPipe->Remove(pRecFromPipe);
 		}
-		if (pRecFromFile == NULL)
+		if (pRecFromFile == NULL && m_pFile->GetFileLength() != 0)
 		{
 			pRecFromFile = new Record;
 			fetchedFromFile = m_pFile->GetNext(*pRecFromFile);
@@ -170,16 +170,23 @@ void Sorted::MergeBigQToSortedFile()
 			}
 		}
 	}
+        while (fetchedFromPipe && fetchedFromFile);
+
+        if(fetchedFromFile != 0)
+            tmpFile.Add(*pRecFromFile);
+        if(fetchedFromPipe != 0)
+            tmpFile.Add(*pRecFromPipe);
+
 
 	Record rec;
-	while (fetchedFromPipe && m_pOUTPipe->Remove(&rec))
+	while (m_pOUTPipe->Remove(&rec))
 	{
 		tmpFile.Add(rec);
 	}
-	while (fetchedFromFile && m_pFile->GetNext(rec))
+	while (m_pFile->GetFileLength() != 0 && m_pFile->GetNext(rec))
 	{
 		tmpFile.Add(rec);
-    }
+        }
 
 	tmpFile.Close();
 
