@@ -5,7 +5,7 @@
 using namespace std;
 
 BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
-	: m_runFile(), m_nRunLen(runlen), m_sFileName()
+	: m_runFile(), m_nRunLen(runlen), m_sFileName(), m_nAppendCount(0)
 {
     //init data structures
     m_pInPipe = &in;
@@ -144,12 +144,12 @@ void* BigQ::getRunsFromInputPipe()
 
 void BigQ::appendRunToFile(vector<Record*>& aRun)
 {
-    static int appendCount = 0;
     m_runFile.Open(const_cast<char*>(m_sFileName.c_str()));     //open with the same name
     int length = aRun.size();
 
 	#ifdef _DEBUG
-	cout<<"Append Run to File count : "<< appendCount + 1 <<endl;
+	cout << "\n\nFileName : " << m_sFileName.c_str() << endl;
+	cout<<"Append Run to File count : "<< m_nAppendCount + 1 <<endl;
 	cout << "\n\n---- BigQ::appendRunToFile aRun.size() = " << length;
 	#endif
 
@@ -158,7 +158,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 	//insert first record into new page so that a clear demarcation can be established
     //start this demarcation from 2nd run (don't do it for first run )
     int i = 0;
-    //if(appendCount > 0)
+    if(m_nAppendCount > 0)
     {
         m_runFile.Add(*aRun[0], true);
         i = 1;
@@ -166,9 +166,9 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
     for(; i < length; i++)
         m_runFile.Add(*aRun[i]);
 
-	int nPagesAfter = m_runFile.GetFileLength();
     m_runFile.Close();
-	appendCount++;
+	int nPagesAfter = m_runFile.GetFileLength();
+	m_nAppendCount++;
 
 	#ifdef _DEBUG
 	cout << "\n***\nm_vRunLengths.size() = " <<  m_vRunLengths.size();
@@ -178,9 +178,15 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 
 	// first run has one extra page count, as 0th page is blank
 	if ( m_vRunLengths.size() == 0)
-		m_vRunLengths.push_back(nPagesAfter - nPagesBefore);
+	{
+		m_vRunLengths.push_back(nPagesAfter - nPagesBefore - 1) ;
+		cout << "\n\nPush-0 : " << nPagesAfter - nPagesBefore -1<< endl;
+	}
 	else
-		m_vRunLengths.push_back((nPagesAfter - nPagesBefore)+1);
+	{
+		m_vRunLengths.push_back(nPagesAfter - nPagesBefore);
+		cout << "\n\nPush-0 : " << nPagesAfter - nPagesBefore << endl;
+	}
 }
 
 

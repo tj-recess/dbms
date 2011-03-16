@@ -125,6 +125,7 @@ private:
 	string m_sFileName;
 	ComparisonEngine ce;
 	vector<int> m_vRunLengths;
+	int m_nAppendCount;
 
 private:
 	// -------- phase - 1 --------------
