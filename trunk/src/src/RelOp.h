@@ -36,11 +36,20 @@ class SelectPipe : public RelationalOp {
 	void WaitUntilDone () { }
 	void Use_n_Pages (int n) { }
 };
-class Project : public RelationalOp { 
+
+class Project : public RelationalOp 
+{
+	private:
+		pthread_t m_thread;
+		Pipe *m_pInPipe, *m_pOutPipe;
+		int m_nNumAttsToKeep, m_nNumAttsOriginal;
+		int * m_pAttsToKeep;
+		static void * ProjectHelper(void * context);
+		void ProjectOperation(); 
 	public:
-	void Run (Pipe &inPipe, Pipe &outPipe, int *keepMe, int numAttsInput, int numAttsOutput) { }
-	void WaitUntilDone () { }
-	void Use_n_Pages (int n) { }
+		void Run (Pipe &inPipe, Pipe &outPipe, int *keepMe, int numAttsInput, int numAttsOutput);
+		void WaitUntilDone ();
+		void Use_n_Pages (int n) { }
 };
 class Join : public RelationalOp { 
 	public:
