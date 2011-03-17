@@ -180,12 +180,16 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 	if ( m_vRunLengths.size() == 0)
 	{
 		m_vRunLengths.push_back(nPagesAfter - nPagesBefore - 1) ;
+#ifdef _DEBUG
 		cout << "\n\nPush-0 : " << nPagesAfter - nPagesBefore -1<< endl;
+#endif
 	}
 	else
 	{
 		m_vRunLengths.push_back(nPagesAfter - nPagesBefore);
+#ifdef _DEBUG
 		cout << "\n\nPush-0 : " << nPagesAfter - nPagesBefore << endl;
+#endif
 	}
 }
 
