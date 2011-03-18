@@ -20,7 +20,7 @@ class RelationalOp {
 class SelectFile : public RelationalOp { 
 
 	private:
-	 pthread_t thread;
+	 pthread_t m_thread;
 	// Record *buffer;
             struct Params
             {
@@ -37,7 +37,7 @@ class SelectFile : public RelationalOp {
                     literalRec = literal;
                 }
             };
-            static void* Start(void*);
+            static void* DoOperation(void*);
 
 	public:
 
@@ -58,11 +58,24 @@ class Project : public RelationalOp
 {
 	private:
 		pthread_t m_thread;
-		Pipe *m_pInPipe, *m_pOutPipe;
-		int m_nNumAttsToKeep, m_nNumAttsOriginal;
-		int * m_pAttsToKeep;
-		static void * ProjectHelper(void * context);
-		void ProjectOperation(); 
+        struct Params
+        {
+            Pipe *inputPipe, *outputPipe;
+			int numAttsToKeep, numAttsOriginal;
+	        int * pAttsToKeep;
+
+            Params(Pipe *inPipe, Pipe *outPipe, int *keepMe,
+				   int numAttsInput, int numAttsOutput)
+            {
+				inputPipe = inPipe;
+                outputPipe = outPipe;
+				numAttsToKeep = numAttsOutput;
+				numAttsOriginal = numAttsInput;
+				pAttsToKeep = keepMe;
+            }
+        };
+        static void* DoOperation(void*);
+
 	public:
 		void Run (Pipe &inPipe, Pipe &outPipe, int *keepMe, int numAttsInput, int numAttsOutput);
 		void WaitUntilDone ();
@@ -80,12 +93,31 @@ class DuplicateRemoval : public RelationalOp {
 	void WaitUntilDone () { }
 	void Use_n_Pages (int n) { }
 };
-class Sum : public RelationalOp {
+
+class Sum : public RelationalOp 
+{
+	private:
+		pthread_t m_thread;
+        struct Params
+        {
+            Pipe *inputPipe, *outputPipe;
+			Function *computeFunc;
+
+            Params(Pipe *inPipe, Pipe *outPipe, Function *computeMe)
+            {
+                inputPipe = inPipe;
+                outputPipe = outPipe;
+				computeFunc = computeMe;
+            }
+        };
+        static void* DoOperation(void*);
+
 	public:
-	void Run (Pipe &inPipe, Pipe &outPipe, Function &computeMe) { }
-	void WaitUntilDone () { }
+	void Run (Pipe &inPipe, Pipe &outPipe, Function &computeMe);
+	void WaitUntilDone ();
 	void Use_n_Pages (int n) { }
 };
+
 class GroupBy : public RelationalOp {
 	public:
 	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe) { }
@@ -97,11 +129,21 @@ class WriteOut : public RelationalOp
 {
 	private:
         pthread_t m_thread;
-        Pipe *m_pInPipe;
-		Schema *m_pSchema;
-		FILE *m_pFILE;
-        static void * WriteOutHelper(void * context);
-        void WriteOutOperation();
+        struct Params
+        {
+            Pipe *inputPipe;
+			Schema *pSchema;
+			FILE *pFILE;
+
+            Params(Pipe *inPipe, Schema *pMySchema, FILE *outFile)
+            {
+                inputPipe = inPipe;
+				pSchema = pMySchema;
+				pFILE = outFile;
+            }
+        };
+        static void* DoOperation(void*);
+
 	public:
 	void Run (Pipe &inPipe, FILE *outFile, Schema &mySchema);
 	void WaitUntilDone ();
