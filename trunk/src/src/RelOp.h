@@ -1,6 +1,7 @@
 #ifndef REL_OP_H
 #define REL_OP_H
 
+#include <pthread.h>
 #include "Pipe.h"
 #include "DBFile.h"
 #include "Record.h"
@@ -19,8 +20,24 @@ class RelationalOp {
 class SelectFile : public RelationalOp { 
 
 	private:
-	// pthread_t thread;
+	 pthread_t thread;
 	// Record *buffer;
+            struct Params
+            {
+                DBFile *inputFile;
+                Pipe *outputPipe;
+                CNF *selectOp;
+                Record *literalRec;
+
+                Params(DBFile *inFile, Pipe *outPipe, CNF *selOp, Record *literal)
+                {
+                    inputFile = inFile;
+                    outputPipe = outPipe;
+                    selectOp = selOp;
+                    literalRec = literal;
+                }
+            };
+            static void* Start(void*);
 
 	public:
 
