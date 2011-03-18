@@ -2,15 +2,16 @@
 
 void SelectFile::Run (DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal)
 {
-    pthread_create(&thread, NULL, Start, (void*)new Params(&inFile, &outPipe, &selOp, &literal));
+    pthread_create(&m_thread, NULL, DoOperation, 
+				   (void*)new Params(&inFile, &outPipe, &selOp, &literal));
 }
 
 /*Logic:
- *Keep scanning the file using GetNext(..) and apply CNF (within GetNext(..),
+ * Keep scanning the file using GetNext(..) and apply CNF (within GetNext(..),
  * insert into output pipe whichever record matches.
  * Shutdown the output Pipe
  */
-void* SelectFile::Start(void* p)
+void* SelectFile::DoOperation(void* p)
 {
     Params* param = (Params*)p;
     param->inputFile->MoveFirst();
@@ -20,10 +21,12 @@ void* SelectFile::Start(void* p)
         param->outputPipe->Insert(&rec);
     }
     param->outputPipe->ShutDown();
+	delete param;
+	param = NULL;
 }
 
 void SelectFile::WaitUntilDone () {
-	 pthread_join (thread, NULL);
+	 pthread_join (m_thread, NULL);
 }
 
 void SelectFile::Use_n_Pages (int runlen)
@@ -44,40 +47,32 @@ void SelectFile::Use_n_Pages (int runlen)
 void Project::Run (Pipe &inPipe, Pipe &outPipe, int *keepMe, 
 				   int numAttsInput, int numAttsOutput)
 {
-	// Initialize member variables
-	m_pInPipe = &inPipe;
-	m_pOutPipe = &outPipe;
-	m_pAttsToKeep = keepMe;
-	m_nNumAttsToKeep = numAttsOutput;
-	m_nNumAttsOriginal = numAttsInput;
-	
 	// Create thread to do the project operation
-	pthread_create(&m_thread, NULL, &ProjectHelper, (void*)this);
+	pthread_create(&m_thread, NULL, &DoOperation, 
+				   (void*) new Params(&inPipe, &outPipe, keepMe, numAttsInput, numAttsOutput));
 	
 	return;
 }
 
-void * Project::ProjectHelper(void * context)
+void * Project::DoOperation(void * p)
 {
-	((Project*)context)->ProjectOperation();
-}
-
-void Project::ProjectOperation()
-{
+	Params* param = (Params*)p;
 	Record rec;	
 	// While records are coming from inPipe, 
 	// modify records and keep only desired attributes
 	// and push the modified records into outPipe
-	while(m_pInPipe->Remove(&rec))
+	while(param->inputPipe->Remove(&rec))
 	{
 		// Porject function will modify "rec" itself
-		rec.Project(m_pAttsToKeep, m_nNumAttsToKeep, m_nNumAttsOriginal);
+		rec.Project(param->pAttsToKeep, param->numAttsToKeep, param->numAttsOriginal);
 		// Push this modified rec in outPipe
-		m_pOutPipe->Insert(&rec);
+		param->outputPipe->Insert(&rec);
 	}
 	
 	//Shut down the outpipe
-	m_pOutPipe->ShutDown();
+	param->outputPipe->ShutDown();
+	delete param;
+	param = NULL;
 }
 
 void Project::WaitUntilDone()
@@ -95,40 +90,31 @@ void Project::WaitUntilDone()
  */
 void WriteOut::Run (Pipe &inPipe, FILE *outFile, Schema &mySchema)
 {
-	// Initialize member variables
-	m_pInPipe = &inPipe;
-	m_pSchema = &mySchema;
-	m_pFILE = outFile;
-	
 	// Create thread to do the project operation
-	pthread_create(&m_thread, NULL, &WriteOutHelper, (void*)this);
+	pthread_create(&m_thread, NULL, &DoOperation, 
+				   (void*) new Params(&inPipe, &mySchema, outFile));
 	
 	return;
 }
 
-void * WriteOut::WriteOutHelper(void * context)
+void * WriteOut::DoOperation(void * p)
 {
-	((WriteOut*)context)->WriteOutOperation();
-}
-
-void WriteOut::WriteOutOperation()
-{
+	Params* param = (Params*)p;
 	Record rec;	
 	// While records are coming from inPipe, 
-	// modify records and keep only desired attributes
-	// and push the modified records into outPipe
-	while(m_pInPipe->Remove(&rec))
+	// Write out the attributes in text form in outFile
+	while(param->inputPipe->Remove(&rec))
 	{
 		// Basically copy the code from Record.cc (Record::Print function)
-	    int n = m_pSchema->GetNumAtts();
-	    Attribute *atts = m_pSchema->GetAtts();
+	    int n = param->pSchema->GetNumAtts();
+	    Attribute *atts = param->pSchema->GetAtts();
 
 	    // loop through all of the attributes
     	for (int i = 0; i < n; i++) 
 		{
 
 	        // print the attribute name
-			fprintf(m_pFILE, "%s: ", atts[i].name);
+			fprintf(param->pFILE, "%s: ", atts[i].name);
     	    //cout << atts[i].name << ": ";
 
 	        // use the i^th slot at the head of the record to get the
@@ -137,21 +123,21 @@ void WriteOut::WriteOutOperation()
 
 	        // here we determine the type, which given in the schema;
     	    // depending on the type we then print out the contents
-			fprintf(m_pFILE, "[");
+			fprintf(param->pFILE, "[");
         	//cout << "[";
 
 	        // first is integer
     	    if (atts[i].myType == Int) 
 			{
         	    int *myInt = (int *) &(rec.bits[pointer]);
-				fprintf(m_pFILE, "%d", *myInt);
+				fprintf(param->pFILE, "%d", *myInt);
             	//cout << *myInt;
 		        // then is a double
         	} 
 			else if (atts[i].myType == Double) 
 			{
 	            double *myDouble = (double *) &(rec.bits[pointer]);
-				fprintf(m_pFILE, "%f", *myDouble);
+				fprintf(param->pFILE, "%f", *myDouble);
     	        //cout << *myDouble;
 
         		// then is a character string
@@ -159,22 +145,25 @@ void WriteOut::WriteOutOperation()
 			else if (atts[i].myType == String) 
 			{
             	char *myString = (char *) &(rec.bits[pointer]);
-				fprintf(m_pFILE, "%s", myString);
+				fprintf(param->pFILE, "%s", myString);
 	            //cout << myString;
 	        }
-			fprintf(m_pFILE, "]");
+			fprintf(param->pFILE, "]");
 	        //cout << "]";
 
     	    // print out a comma as needed to make things pretty
         	if (i != n - 1) 
 			{
-				fprintf(m_pFILE, ", ");
+				fprintf(param->pFILE, ", ");
             	//cout << ", ";
 	        }
     	}		// end of for loop
-		fprintf(m_pFILE, "\n");
+		fprintf(param->pFILE, "\n");
 	    //cout << "\n";
 	}			// no more records in the inPipe
+
+	delete param;
+	param = NULL;
 }
 
 void WriteOut::WaitUntilDone()
@@ -184,3 +173,44 @@ void WriteOut::WaitUntilDone()
 }
 
 
+/* Input: inPipe = fetch input records from here
+ *	      outPipe = push project output here
+ *		  computeMe = Function using which sum must be computed
+ */
+void Sum::Run (Pipe &inPipe, Pipe &outPipe, Function &computeMe)
+{
+	// Create thread to do the project operation
+	pthread_create(&m_thread, NULL, &DoOperation, 
+				   (void*) new Params(&inPipe, &outPipe, &computeMe));
+	
+	return;
+}
+
+void * Sum::DoOperation(void * p)
+{
+	Params* param = (Params*)p;
+	Record rec;	
+	double sum = 0;
+	// While records are coming from inPipe, 
+	// Use function on them and calculate sum
+	while(param->inputPipe->Remove(&rec))
+	{
+		int ival = 0; double dval = 0;
+		param->computeFunc->Apply(rec, ival, dval);
+		sum += (ival + dval);
+	}
+
+	// create temperory schema, with one attribute - sum
+	// push this record to outPipe
+
+    //Shut down the outpipe
+    param->outputPipe->ShutDown();
+    delete param;
+    param = NULL;
+}
+
+void Sum::WaitUntilDone()
+{
+    // Block until thread is done
+    pthread_join(m_thread, 0);
+}
