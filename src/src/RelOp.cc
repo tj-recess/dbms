@@ -1,14 +1,36 @@
 #include "RelOp.h"
 
-void SelectFile::Run (DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal) {
+void SelectFile::Run (DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal)
+{
+    pthread_create(&thread, NULL, Start, (void*)new Params(&inFile, &outPipe, &selOp, &literal));
+}
+
+/*Logic:
+ *Keep scanning the file using GetNext(..) and apply CNF (within GetNext(..),
+ * insert into output pipe whichever record matches.
+ * Shutdown the output Pipe
+ */
+void* SelectFile::Start(void* p)
+{
+    Params* param = (Params*)p;
+    param->inputFile->MoveFirst();
+    Record rec;
+    while(param->inputFile->GetNext(rec, *(param->selectOp), *(param->literalRec)))
+    {
+        param->outputPipe->Insert(&rec);
+    }
+    param->outputPipe->ShutDown();
 }
 
 void SelectFile::WaitUntilDone () {
-	// pthread_join (thread, NULL);
+	 pthread_join (thread, NULL);
 }
 
-void SelectFile::Use_n_Pages (int runlen) {
-
+void SelectFile::Use_n_Pages (int runlen)
+{
+    /*Arpit - This method has no impact in this class, probably.
+     we have it just because it's pure virtual in
+     */
 }
 
 
