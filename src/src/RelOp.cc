@@ -210,7 +210,6 @@ void * Sum::DoOperation(void * p)
 	// Make a file that contains this sum
 	FILE * sum_file = fopen("tmp_sum_data_file", "w");
 	fprintf(sum_file, "%f|", sum);
-	cout << "\n ---- sum is : " << sum << "\n";
 	fclose(sum_file);
 	sum_file = fopen("tmp_sum_data_file", "r");
 	// Make record using the above schema and data file
@@ -224,8 +223,8 @@ void * Sum::DoOperation(void * p)
     param->outputPipe->ShutDown();
 
 	// delete file "tmp_sum_data_file"
-//	if(remove("tmp_sum_data_file") != 0)
-//        perror("\nError in removing tmp_sum_data_file!");
+	if(remove("tmp_sum_data_file") != 0)
+        perror("\nError in removing tmp_sum_data_file!");
 
     delete param;
     param = NULL;
