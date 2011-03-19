@@ -201,10 +201,32 @@ void * Sum::DoOperation(void * p)
 	}
 
 	// create temperory schema, with one attribute - sum
-	// push this record to outPipe
+	Attribute att = {"sum", Double};
 
-    //Shut down the outpipe
+	Schema sum_schema("tmp_sum_schema_file", // filename, not used
+					   1, 					 // number of attributes	
+				       &att);				 // attribute pointer
+
+	// Make a file that contains this sum
+	FILE * sum_file = fopen("tmp_sum_data_file", "w");
+	fprintf(sum_file, "%f|", sum);
+	cout << "\n ---- sum is : " << sum << "\n";
+	fclose(sum_file);
+	sum_file = fopen("tmp_sum_data_file", "r");
+	// Make record using the above schema and data file
+	rec.SuckNextRecord(&sum_schema, sum_file);
+	fclose(sum_file);
+
+	// Push this record to outPipe
+	param->outputPipe->Insert(&rec);
+
+    // Shut down the outpipe
     param->outputPipe->ShutDown();
+
+	// delete file "tmp_sum_data_file"
+//	if(remove("tmp_sum_data_file") != 0)
+//        perror("\nError in removing tmp_sum_data_file!");
+
     delete param;
     param = NULL;
 }
