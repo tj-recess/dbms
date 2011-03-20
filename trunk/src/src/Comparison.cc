@@ -136,6 +136,61 @@ string OrderMaker :: ToString()
 
 int CNF :: GetCNFSortOrder (OrderMaker &left, OrderMaker &right) {
 
+    // initialize the size of the OrderMakers
+    left.numAtts = 0;
+    right.numAtts = 0;
+
+    // loop through all of the disjunctions in the CNF and find those
+    // that are acceptable for use in a sort ordering
+    for (int i = 0; i < numAnds; i++) 
+	{
+        // if we don't have a disjunction of length one, then it
+        // can't be acceptable for use with a sort ordering
+        if (orLens[i] != 1) {
+            continue;
+        }
+
+        // made it this far, so first verify that it is an equality check
+        if (orList[i][0].op != Equals) {
+            continue;
+        }
+
+        // check that operand1 is Left and operand2 is Literal
+        if (orList[i][0].operand1 == Left && orList[i][0].operand2 == Literal)
+        {
+            // get type and column-position-in-file for column
+            left.whichAtts[left.numAtts] = orList[i][0].whichAtt1;
+            left.whichTypes[left.numAtts] = orList[i][0].attType;
+            // get type and the position in CNF
+            right.whichAtts[right.numAtts] = orList[i][0].whichAtt2;
+            right.whichTypes[right.numAtts] = orList[i][0].attType;
+        }
+
+        // check that operand1 is Literal and operand2 is Right
+        else if (orList[i][0].operand1 == Literal && orList[i][0].operand2 == Right)
+        {
+            // get type and column-position-in-file for column
+            left.whichAtts[left.numAtts] = orList[i][0].whichAtt2;
+            left.whichTypes[left.numAtts] = orList[i][0].attType;
+            // get type and the position in CNF
+            right.whichAtts[right.numAtts] = orList[i][0].whichAtt1;
+            right.whichTypes[right.numAtts] = orList[i][0].attType;
+        }
+        else
+            continue;
+
+        left.numAtts++;
+        right.numAtts++;
+    }
+
+    return left.numAtts;
+
+}
+
+
+/*
+int CNF :: GetCNFSortOrder (OrderMaker &left, OrderMaker &right) {
+
 	// initialize the size of the OrderMakers
 	left.numAtts = 0;
 	right.numAtts = 0;
@@ -193,7 +248,7 @@ int CNF :: GetCNFSortOrder (OrderMaker &left, OrderMaker &right) {
 
 	return left.numAtts;
 
-}
+}*/
 
 int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 
