@@ -11,13 +11,15 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen)
     m_pInPipe = &in;
     m_pOutPipe = &out;
     m_pSortOrder = &sortorder;
-    m_sFileName = "runFile" + getTime();
+//    m_sFileName = "runFile" + getTime();
+    m_sFileName = "runFile" + System::getusec();
 
     m_runFile.Create(const_cast<char*>(m_sFileName.c_str()));
 	m_runFile.Close();
 
 #ifdef _DEBUG
-    m_pSortOrder->Print();
+        cout<<"BigQ : temp runFile name : " << m_sFileName << endl;
+//    m_pSortOrder->Print();
 #endif
 
     // read data from in pipe sort them into runlen pages
@@ -44,11 +46,20 @@ BigQ::~BigQ ()
 
 void* BigQ::getRunsFromInputPipeHelper(void* context)
 {
+#ifdef _DEBUG
+    cout<<"calling from Helper"<<endl;
+#endif
     ((BigQ *)context)->getRunsFromInputPipe();
+#ifdef _DEBUG
+    cout<<"called from Helper"<<endl;
+#endif
 }
 
 void* BigQ::getRunsFromInputPipe()
 {
+#ifdef _DEBUG
+    cout<<"\n\n "<< m_sFileName << " :inside getRunsFrom Pipe"<<endl;
+#endif
     Record recFromPipe;
     vector<Record*> aRunVector;		
     Page currentPage;
@@ -103,6 +114,9 @@ void* BigQ::getRunsFromInputPipe()
             overflowRec = false;
         }
     }
+#ifdef _DEBUG
+    cout<<"\n\n "<< m_sFileName << " : "<< recs << "recs removed from inPipe"<<endl;
+#endif
 
     //done with all records in pipe, if there is anything in vector
     //it should be sorted and written out to file
@@ -131,9 +145,9 @@ void* BigQ::getRunsFromInputPipe()
     }
 
 	#ifdef _DEBUG
-	for (int i = 0; i < m_vRunLengths.size(); i++)
+	for (int l = 0; l < m_vRunLengths.size(); l++)
 	{
-		cout << "\nRun " << i << " length " << m_vRunLengths.at(i);
+		cout << "\nRun " << l << " length " << m_vRunLengths.at(l);
 	}
 	#endif
 
@@ -171,7 +185,7 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 	m_nAppendCount++;
 
 	#ifdef _DEBUG
-	cout << "\n***\nm_vRunLengths.size() = " <<  m_vRunLengths.size();
+	cout <<"\n\n "<< m_sFileName << " :\n***\nm_vRunLengths.size() = " <<  m_vRunLengths.size();
 	cout << "\nPages before: " << nPagesBefore;
 	cout << "\nPages after: " << nPagesAfter << endl;
 	#endif
@@ -181,14 +195,14 @@ void BigQ::appendRunToFile(vector<Record*>& aRun)
 	{
 		m_vRunLengths.push_back(nPagesAfter - nPagesBefore - 1) ;
 #ifdef _DEBUG
-		cout << "\n\nPush-0 : " << nPagesAfter - nPagesBefore -1<< endl;
+		cout << "\n\n "<< m_sFileName << " :\n\nPush-0 : " << nPagesAfter - nPagesBefore -1<< endl;
 #endif
 	}
 	else
 	{
 		m_vRunLengths.push_back(nPagesAfter - nPagesBefore);
 #ifdef _DEBUG
-		cout << "\n\nPush-0 : " << nPagesAfter - nPagesBefore << endl;
+		cout << "\n\n "<< m_sFileName << " :\n\nPush-0 : " << nPagesAfter - nPagesBefore << endl;
 #endif
 	}
 }
@@ -229,6 +243,10 @@ int BigQ::MergeRuns()
     Run * pRun = NULL;
     Record * pRec = NULL;
 
+#ifdef _DEBUG
+    cout<< m_sFileName <<" : nMWayRun = "<<nMWayRun<<endl;
+#endif
+
     for (int i = 0; i < nMWayRun; i++)
     {
 		// Run length of 0th run is 1 extra, as 0th page doesn't contain data
@@ -239,7 +257,7 @@ int BigQ::MergeRuns()
 		nRunsAlive++;
 
 		#ifdef _DEBUG
-		cout << "\n\n runHeadPage = " << runHeadPage
+		cout <<"\n\n "<< m_sFileName << " :\n\n runHeadPage = " << runHeadPage
 			 << "\n nPagesFetched = "<< nPagesFetched
 			 << "\n nRunsAlive = "<< nRunsAlive;
 		#endif
@@ -272,7 +290,7 @@ int BigQ::MergeRuns()
     }
 
 	#ifdef _DEBUG
-	cout << "\n\n m_vRuns.size() = " << m_vRuns.size()
+	cout <<"\n\n "<< m_sFileName << " : m_vRuns.size() = " << m_vRuns.size()
 		 << "\n pqRecords.size() = " << pqRecords.size() << endl;
 	#endif
 

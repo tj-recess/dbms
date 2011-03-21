@@ -27,6 +27,7 @@ enum FileOpenMode { TRUNCATE = 0, APPEND = 1};
 unsigned int Random_Generate();
 
 //#define _DEBUG 0
+//#define _Sorted_DEBUG 1
 
 #endif
 

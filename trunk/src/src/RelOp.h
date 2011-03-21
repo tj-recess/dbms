@@ -17,7 +17,7 @@ class RelationalOp {
 	virtual void Use_n_Pages (int n) = 0;
 };
 
-class SelectFile : public RelationalOp { 
+class SelectFile : public RelationalOp {
 
 	private:
 	 pthread_t m_thread;
@@ -81,11 +81,33 @@ class Project : public RelationalOp
 		void WaitUntilDone ();
 		void Use_n_Pages (int n) { }
 };
-class Join : public RelationalOp { 
-	public:
-	void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal) { }
-	void WaitUntilDone () { }
-	void Use_n_Pages (int n) { }
+class Join : public RelationalOp {
+    private:
+        pthread_t thread;
+        int runLen;
+        struct Params
+        {
+            Pipe *outputPipe, *inputPipeL, *inputPipeR;
+            CNF *selectOp;
+            Record *literalRec;
+            int runLen;
+
+            Params(Pipe *inPipeL, Pipe *inPipeR, Pipe *outPipe, CNF *selOp, Record *literal, int runlen)
+            {
+                inputPipeL = inPipeL;
+                inputPipeR = inPipeR;
+                outputPipe = outPipe;
+                selectOp = selOp;
+                literalRec = literal;
+                runLen = runlen;
+            }
+        };
+        static void* DoOperation(void*);
+
+    public:
+	void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal);
+	void WaitUntilDone ();
+	void Use_n_Pages (int n);
 };
 
 class DuplicateRemoval : public RelationalOp 
@@ -138,7 +160,26 @@ class Sum : public RelationalOp
 };
 
 class GroupBy : public RelationalOp {
-	public:
+    private:
+        pthread_t thread;
+	// Record *buffer;
+        struct Params
+        {
+            Pipe *outputPipe, *inputPipe;
+            OrderMaker *groupAttributes;
+            Function *computeMeFunction;
+
+            Params(Pipe *inPipe, Pipe *outPipe, OrderMaker *groupAtts, Function *computeMe)
+            {
+                inputPipe = inPipe;
+                outputPipe = outPipe;
+                groupAttributes = groupAtts;
+                computeMeFunction = computeMe;
+            }
+        };
+        static void* Start(void*);
+
+    public:
 	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe) { }
 	void WaitUntilDone () { }
 	void Use_n_Pages (int n) { }

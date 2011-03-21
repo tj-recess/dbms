@@ -210,6 +210,9 @@ int CNF :: GetCNFSortOrder (OrderMaker &left, OrderMaker &right) {
 			continue;
 		}
 
+                if(orList[i][0].operand2 != Literal)
+                    continue;
+
 		// now verify that it operates over atts from both tables
 		if (!((orList[i][0].operand1 == Left && orList[i][0].operand2 == Right) ||
 		      (orList[i][0].operand2 == Left && orList[i][0].operand1 == Right))) {

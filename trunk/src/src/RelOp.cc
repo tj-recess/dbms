@@ -16,10 +16,19 @@ void* SelectFile::DoOperation(void* p)
     Params* param = (Params*)p;
     param->inputFile->MoveFirst();
     Record rec;
+#ifdef _DEBUG
+    int cnt = 0;
+#endif
     while(param->inputFile->GetNext(rec, *(param->selectOp), *(param->literalRec)))
     {
+#ifdef _DEBUG
+        cnt++;
+#endif
         param->outputPipe->Insert(&rec);
     }
+#ifdef _DEBUG
+    cout<<"SelectFile : inserted " << cnt << " recs in output Pipe"<<endl;
+#endif
     param->outputPipe->ShutDown();
 	delete param;
 	param = NULL;
@@ -36,6 +45,71 @@ void SelectFile::Use_n_Pages (int runlen)
      */
 }
 
+void Join::Run(Pipe& inPipeL, Pipe& inPipeR, Pipe& outPipe, CNF& selOp, Record& literal)
+{
+    pthread_create(&thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal, runLen));
+}
+
+void* Join::DoOperation(void* p)
+{
+    Params* param = (Params*)p;
+    /*actual logic goes here
+     * 1. we have to create BigQL for inPipeL and BigQR for inPipeR
+     * 2. Try to Create OrderMakers (omL and omR) for both BigQL and BigQR using CNF (use the GetSortOrder method)
+     * 3. If (omL != null && omR != null) then go ahead and merge these 2 BigQs.(after constructing them of course)
+     * 4. else - join these bigQs using “block-nested loops join” -- what the heck is that ?
+     * 5. Put the results into outPipe and shut it down once done.
+     */
+    OrderMaker omL, omR;
+    param->selectOp->GetSortOrders(omL, omR);
+    if(omL.numAtts > 0 && omR.numAtts > 0)
+    {
+#ifdef _DEBUG
+        cout<<"RelOp omL: ";
+        omL.Print();
+        cout<<"RelOp omR: ";
+        omR.Print();
+#endif
+        const int pipeSize = 100;
+        Pipe outL(pipeSize), outR(pipeSize);
+        BigQ bigqL(*(param->inputPipeL), outL, omL, param->runLen);
+        BigQ bigR(*(param->inputPipeR), outR, omR, param->runLen);
+        Record *recL = new Record();
+        Record *recR = new Record();
+
+        while(outL.Remove(recL) && outR.Remove(recR))
+        {
+#ifdef _DEBUG
+            cout<<"got record from both BigQL and BigQR"<<endl;
+            cout<<"recL = "<< recL->bits <<endl;
+            cout<<"recR = "<< recR->bits <<endl;
+#endif
+            int numAttsToKeep = omL.numAtts + omR.numAtts;
+            int attsToKeep[numAttsToKeep];
+            for(int i = 0; i < omL.numAtts; i++)
+                attsToKeep[i] = omL.whichAtts[i];
+            for(int i = omL.numAtts; i < numAttsToKeep; i++)
+                attsToKeep[i] = omR.whichAtts[i];
+
+            Record joinResult;
+            joinResult.MergeRecords(recL, recR, omL.numAtts, omR.numAtts, attsToKeep, numAttsToKeep, omL.numAtts);
+            param->outputPipe->Insert(&joinResult);
+        }
+
+    }
+    param->outputPipe->ShutDown();
+}
+
+void Join::WaitUntilDone () {
+	 pthread_join (thread, NULL);
+}
+
+void Join::Use_n_Pages (int runlen)
+{
+    //not sure if this runLen should be halved as
+    //2 BigQs will be constructed
+    runLen = runlen;
+}
 
 /* Input: inPipe = fetch input records from here
  *	      outPipe = push project output here

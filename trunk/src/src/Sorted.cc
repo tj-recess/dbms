@@ -265,17 +265,19 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	if (m_pQueryOrderMaker == NULL)
 	{
 		#ifdef _DEBUG
-	    m_pSortInfo->myOrder->Print();
+//	    m_pSortInfo->myOrder->Print();
 		#endif
 
-    	m_pQueryOrderMaker = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
+            m_pQueryOrderMaker = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
 
-		#ifdef _DEBUG
-	    if (m_pQueryOrderMaker != NULL)
-    	    m_pQueryOrderMaker->Print();
-	    else
-    	    cout<<"NULL query order maker"<<endl;
-		#endif
+
+
+#ifdef _Sorted_DEBUG
+            if (m_pQueryOrderMaker != NULL)
+                m_pQueryOrderMaker->Print();
+            else
+                cout<<"NULL query order maker"<<endl;
+#endif
 	}
 
 
