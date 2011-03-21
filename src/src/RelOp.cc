@@ -47,7 +47,7 @@ void SelectFile::Use_n_Pages (int runlen)
 
 void Join::Run(Pipe& inPipeL, Pipe& inPipeR, Pipe& outPipe, CNF& selOp, Record& literal)
 {
-    pthread_create(&thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal, runLen));
+    pthread_create(&thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal, m_nRunLen));
 }
 
 void* Join::DoOperation(void* p)
@@ -57,11 +57,64 @@ void* Join::DoOperation(void* p)
      * 1. we have to create BigQL for inPipeL and BigQR for inPipeR
      * 2. Try to Create OrderMakers (omL and omR) for both BigQL and BigQR using CNF (use the GetSortOrder method)
      * 3. If (omL != null && omR != null) then go ahead and merge these 2 BigQs.(after constructing them of course)
-     * 4. else - join these bigQs using “block-nested loops join” -- what the heck is that ?
+     * 4. else - join these bigQs using "block-nested loops join" - block-size?
      * 5. Put the results into outPipe and shut it down once done.
      */
     OrderMaker omL, omR;
     param->selectOp->GetSortOrders(omL, omR);
+	
+	// Malvika: 
+/*
+	param->runLen = 10;
+	if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
+	{
+		// fetch leftRec
+		// fetch righRec
+
+		// Logic:
+		// <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
+		// num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
+		int left_tot = ((int *) leftRec.bits)[1]/sizeof(int) - 1;
+		int right_tot = ((int *) rightRec.bits)[1]/sizeof(int) - 1;;
+		int numAttsToKeep = left_tot + right_tot - omR.numAtts;
+		int attsToKeep[numAttsToKeep];
+		// keep all of left
+        for(int i = 0; i < omL.numAtts; i++)
+            attsToKeep[i] = omL.whichAtts[i];
+		// keep only non-join ones from right
+		// loop over all attributes of right-rec
+		for (int j = 0; j < right_tot; j++)
+		{
+			// loop over join attributes of right-rec
+			bool found = false;
+			for (int k = 0; k < omR.numAtts; k++)
+			{
+				// if attribute not in join, add to attsToKeep
+				if (j == omR.whichAtts[k])
+				{
+					found = true;
+					break;
+				}
+			}
+			if (!found)
+				attsToKeep[i++] = j;
+		} 
+		if (i != numAttsToKeep)
+		{
+			cerr << "\nOh No!\n";
+			exit(1);
+		}
+
+        Record joinResult;
+        joinResult.MergeRecords(recL, recR, omL.numAtts, omR.numAtts, attsToKeep, numAttsToKeep, omL.numAtts);
+        param->outputPipe->Insert(&joinResult);
+	}
+	else
+	{
+		// block-nested-loop-join
+	}
+*/
+
     if(omL.numAtts > 0 && omR.numAtts > 0)
     {
 #ifdef _DEBUG
@@ -108,7 +161,7 @@ void Join::Use_n_Pages (int runlen)
 {
     //not sure if this runLen should be halved as
     //2 BigQs will be constructed
-    runLen = runlen;
+    m_nRunLen = runlen;
 }
 
 /* Input: inPipe = fetch input records from here
@@ -314,10 +367,17 @@ void Sum::WaitUntilDone()
  *        outPipe = push project output here
  *        mySchema = Schema of the records coming in inPipe 
  */
+//int DuplicateRemoval::m_nRunLen = -1;
 int DuplicateRemoval::m_nRunLen = 10;
 
 void DuplicateRemoval::Run(Pipe &inPipe, Pipe &outPipe, Schema &mySchema)
 {
+	if (m_nRunLen == -1)
+	{
+		cerr << "\nError! Use_n_Page() must be called and "
+			 << "pages of memory allowed for operations must be set!\n";
+		exit(1);
+	}
     // Create thread to do the project operation
     pthread_create(&m_thread, NULL, &DoOperation,
                    (void*) new Params(&inPipe, &outPipe, &mySchema));
