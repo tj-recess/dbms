@@ -201,9 +201,9 @@ void * Sum::DoOperation(void * p)
 	}
 
 	// create temperory schema, with one attribute - sum
-	Attribute att = {"sum", Double};
+	Attribute att = {(char*)"sum", Double};
 
-	Schema sum_schema("tmp_sum_schema_file", // filename, not used
+	Schema sum_schema((char*)"tmp_sum_schema_file", // filename, not used
 					   1, 					 // number of attributes	
 				       &att);				 // attribute pointer
 
@@ -235,3 +235,82 @@ void Sum::WaitUntilDone()
     // Block until thread is done
     pthread_join(m_thread, 0);
 }
+
+/* Input: inPipe = fetch input records from here
+ *        outPipe = push project output here
+ *        mySchema = Schema of the records coming in inPipe 
+ */
+int DuplicateRemoval::m_nRunLen = 10;
+
+void DuplicateRemoval::Run(Pipe &inPipe, Pipe &outPipe, Schema &mySchema)
+{
+    // Create thread to do the project operation
+    pthread_create(&m_thread, NULL, &DoOperation,
+                   (void*) new Params(&inPipe, &outPipe, &mySchema));
+    return;
+}
+
+void * DuplicateRemoval::DoOperation(void * p)
+{
+    Params* param = (Params*)p;
+    Record lastSeenRec, currentRec;
+	OrderMaker sortOrder;
+	int pipeSize = 100;
+
+	// make sort order maker for bigQ
+    int n = param->pSchema->GetNumAtts();
+    Attribute *atts = param->pSchema->GetAtts();
+	// loop through all of the attributes, and list as it is
+	sortOrder.numAtts = n;
+    for (int i = 0; i < n; i++)
+    {
+		sortOrder.whichAtts[i] = i;
+		sortOrder.whichTypes[i] = atts[i].myType;
+	}
+
+	// create local outPipe
+	Pipe localOutPipe(pipeSize);
+	// start bigQ
+   	BigQ B(*(param->inputPipe), localOutPipe, sortOrder, m_nRunLen);
+
+	bool bLastSeenRecSet = false;
+	ComparisonEngine ce;
+	while (localOutPipe.Remove(&currentRec))
+	{
+		if (bLastSeenRecSet == false)
+		{
+			lastSeenRec = currentRec;
+			bLastSeenRecSet = true;
+		}
+
+		// compare currentRec with lastSeenRec
+		// if same, do nothing
+		// if different, send currentRec to param->outputPipe
+		//				 and update lastSeenRec
+		if (ce.Compare(&lastSeenRec, &currentRec, &sortOrder) != 0)
+		{
+			lastSeenRec = currentRec;
+			param->outputPipe->Insert(&currentRec);
+		}
+	}
+
+    //Shut down the outpipe
+	localOutPipe.ShutDown();
+    param->outputPipe->ShutDown();
+	
+    delete param;
+    param = NULL;
+}
+
+void DuplicateRemoval::Use_n_Pages(int n)
+{
+	// set runLen for bigQ as the number of pages allowed for internal use
+	m_nRunLen = n;
+}
+
+void DuplicateRemoval::WaitUntilDone()
+{
+    // Block until thread is done
+    pthread_join(m_thread, 0);
+}
+

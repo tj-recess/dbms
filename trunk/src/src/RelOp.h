@@ -87,11 +87,30 @@ class Join : public RelationalOp {
 	void WaitUntilDone () { }
 	void Use_n_Pages (int n) { }
 };
-class DuplicateRemoval : public RelationalOp {
+
+class DuplicateRemoval : public RelationalOp 
+{
+    private:
+        pthread_t m_thread;
+		static int m_nRunLen;		// needed by BigQ, set using Use_n_Pages(n)
+        struct Params
+        {
+            Pipe *inputPipe, *outputPipe;
+			Schema *pSchema;
+
+            Params(Pipe *inPipe, Pipe *outPipe, Schema *mySchema)
+            {
+                inputPipe = inPipe;
+                outputPipe = outPipe;
+				pSchema = mySchema;
+            }
+        };
+        static void* DoOperation(void*);
+
 	public:
-	void Run (Pipe &inPipe, Pipe &outPipe, Schema &mySchema) { }
-	void WaitUntilDone () { }
-	void Use_n_Pages (int n) { }
+	void Run (Pipe &inPipe, Pipe &outPipe, Schema &mySchema);
+	void WaitUntilDone ();
+	void Use_n_Pages (int n);
 };
 
 class Sum : public RelationalOp 
