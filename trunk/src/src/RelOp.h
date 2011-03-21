@@ -84,7 +84,7 @@ class Project : public RelationalOp
 class Join : public RelationalOp {
     private:
         pthread_t thread;
-        int runLen;
+        int m_nRunLen;
         struct Params
         {
             Pipe *outputPipe, *inputPipeL, *inputPipeR;
