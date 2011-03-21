@@ -64,23 +64,31 @@ void* Join::DoOperation(void* p)
     param->selectOp->GetSortOrders(omL, omR);
 	
 	// Malvika: 
-/*
+
 	param->runLen = 10;
 	if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
 	{
+            const int pipeSize = 100;
+            Pipe outL(pipeSize), outR(pipeSize);
+            BigQ bigqL(*(param->inputPipeL), outL, omL, param->runLen);
+            BigQ bigR(*(param->inputPipeR), outR, omR, param->runLen);
+            Record recL, recR;
 		// fetch leftRec
+            while(outL.Remove(&recL) && outR.Remove(&recR))
+            {
 		// fetch righRec
 
 		// Logic:
 		// <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
 		// num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
-		int left_tot = ((int *) leftRec.bits)[1]/sizeof(int) - 1;
-		int right_tot = ((int *) rightRec.bits)[1]/sizeof(int) - 1;;
+		int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
+		int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;;
 		int numAttsToKeep = left_tot + right_tot - omR.numAtts;
 		int attsToKeep[numAttsToKeep];
 		// keep all of left
-        for(int i = 0; i < omL.numAtts; i++)
-            attsToKeep[i] = omL.whichAtts[i];
+                int i;
+                for(i = 0; i < left_tot; i++)
+                    attsToKeep[i] = i;
 		// keep only non-join ones from right
 		// loop over all attributes of right-rec
 		for (int j = 0; j < right_tot; j++)
@@ -105,15 +113,19 @@ void* Join::DoOperation(void* p)
 			exit(1);
 		}
 
-        Record joinResult;
-        joinResult.MergeRecords(recL, recR, omL.numAtts, omR.numAtts, attsToKeep, numAttsToKeep, omL.numAtts);
-        param->outputPipe->Insert(&joinResult);
+                Record joinResult;
+                joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+                param->outputPipe->Insert(&joinResult);
+            }
 	}
 	else
 	{
 		// block-nested-loop-join
 	}
-*/
+
+        param->outputPipe->ShutDown();
+}
+/*
 
     if(omL.numAtts > 0 && omR.numAtts > 0)
     {
@@ -150,8 +162,7 @@ void* Join::DoOperation(void* p)
         }
 
     }
-    param->outputPipe->ShutDown();
-}
+*/
 
 void Join::WaitUntilDone () {
 	 pthread_join (thread, NULL);
@@ -448,3 +459,88 @@ void DuplicateRemoval::WaitUntilDone()
     pthread_join(m_thread, 0);
 }
 
+void GroupBy::Use_n_Pages(int n)
+{
+    m_nRunLen = n;
+}
+
+void GroupBy::Run(Pipe& inPipe, Pipe& outPipe, OrderMaker& groupAtts, Function& computeMe)
+{
+    pthread_create(&m_thread, NULL, DoOperation, (void*)new Params(&inPipe, &outPipe, &groupAtts, &computeMe, m_nRunLen));
+}
+
+void GroupBy::WaitUntilDone()
+{
+    pthread_join(m_thread, 0);
+}
+
+void* GroupBy::DoOperation(void* p)
+{
+    Params* param = (Params*)p;
+    //create a local outputPipe and a BigQ and an feed it with current inputPipe
+    const int pipeSize = 100;
+    Pipe localOutPipe(pipeSize);
+    BigQ localBigQ(*(param->inputPipe), localOutPipe, *(param->groupAttributes), param->runLen);
+    Record rec;
+    Record *currentGroupRecord;
+    bool currentGroupActive = false;
+    ComparisonEngine ce;
+    double sum = 0.0;
+    while(localOutPipe.Remove(&rec))
+    {
+        Record copy;
+        copy.Copy(&rec);
+        copy.Project(param->groupAttributes->whichAtts, param->groupAttributes->numAtts, ((int*)rec.bits)[1]/sizeof(int) - 1);
+        if(!currentGroupActive)
+        {
+            currentGroupRecord = &copy;
+            currentGroupActive = true;
+        }
+        
+        if(ce.Compare(currentGroupRecord, &copy, param->groupAttributes) == 0)
+        {
+            int ival = 0; double dval = 0;
+		param->computeMeFunction->Apply(rec, ival, dval);
+		sum += (ival + dval);
+	}
+        else
+        {
+            //store old sum and group-by attribtues concatenated in outputPipe
+            //and also start new group from here
+
+            // create temperory schema, with one attribute - sum 
+            Attribute att = {(char*)"sum", Double};
+            Schema sum_schema((char*)"tmp_sum_schema_file", // filename, not used
+					   1, // number of attributes
+				       &att); // attribute pointer
+
+            // Make a file that contains this sum
+            string tempSumFileName = "tmp_sum_data_file" + System::getusec();
+            FILE * sum_file = fopen(tempSumFileName.c_str(), "w");
+            fprintf(sum_file, "%f|", sum);
+            fclose(sum_file);
+            sum_file = fopen(tempSumFileName.c_str(), "r");
+            // Make record using the above schema and data file
+            Record sumRec;
+            sumRec.SuckNextRecord(&sum_schema, sum_file);
+            fclose(sum_file);
+
+            //glue this record with the one we have from groupAttribute
+            int numAttsToKeep = param->groupAttributes->numAtts + 1;
+            int attsToKeep[numAttsToKeep];
+            attsToKeep[0] = 0;  //for sumRec
+            for(int i = 1; i < numAttsToKeep; i++)
+            {
+                attsToKeep[i] = param->groupAttributes->whichAtts[i-1];
+            }
+            Record tuple;
+            tuple.MergeRecords(&sumRec, &copy, 1, numAttsToKeep - 1, attsToKeep,  numAttsToKeep, 1);
+            // Push this record to outPipe
+            param->outputPipe->Insert(&tuple);
+
+            //start new group for this record
+            currentGroupRecord = &rec;
+            currentGroupActive = true;
+        }
+    }
+}
