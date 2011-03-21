@@ -161,28 +161,30 @@ class Sum : public RelationalOp
 
 class GroupBy : public RelationalOp {
     private:
-        pthread_t thread;
-	// Record *buffer;
+        pthread_t m_thread;
+        int m_nRunLen;
         struct Params
         {
             Pipe *outputPipe, *inputPipe;
             OrderMaker *groupAttributes;
             Function *computeMeFunction;
+            int runLen;
 
-            Params(Pipe *inPipe, Pipe *outPipe, OrderMaker *groupAtts, Function *computeMe)
+            Params(Pipe *inPipe, Pipe *outPipe, OrderMaker *groupAtts, Function *computeMe, int runlen)
             {
                 inputPipe = inPipe;
                 outputPipe = outPipe;
                 groupAttributes = groupAtts;
                 computeMeFunction = computeMe;
+                runLen = runlen;
             }
         };
-        static void* Start(void*);
+        static void* DoOperation(void*);
 
     public:
-	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe) { }
-	void WaitUntilDone () { }
-	void Use_n_Pages (int n) { }
+	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe);
+	void WaitUntilDone ();
+	void Use_n_Pages (int n);
 };
 
 class WriteOut : public RelationalOp 
