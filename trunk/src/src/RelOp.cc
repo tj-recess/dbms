@@ -68,62 +68,78 @@ void* Join::DoOperation(void* p)
 	param->runLen = 10;
 	if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
 	{
-            const int pipeSize = 100;
-            Pipe outL(pipeSize), outR(pipeSize);
-            BigQ bigqL(*(param->inputPipeL), outL, omL, param->runLen);
-            BigQ bigR(*(param->inputPipeR), outR, omR, param->runLen);
-            Record recL, recR;
-		// fetch leftRec
-            while(outL.Remove(&recL) && outR.Remove(&recR))
-            {
-		// fetch righRec
+        const int pipeSize = 100;
+        Pipe outL(pipeSize), outR(pipeSize);
+        BigQ bigqL(*(param->inputPipeL), outL, omL, param->runLen);
+        BigQ bigR(*(param->inputPipeR), outR, omR, param->runLen);
+        Record recL, recR;
+		// fetch one leftRec and one righRec
+		// find stuff for merging using them
+		// no while loop here *** TODO
+		bool left_fetched = false;
+		if (outL.Remove(&recL))
+			left_fetched = true;
 
-		// Logic:
-		// <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
-		// num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
-		int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
-		int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;;
-		int numAttsToKeep = left_tot + right_tot - omR.numAtts;
-		int attsToKeep[numAttsToKeep];
-		// keep all of left
-                int i;
-                for(i = 0; i < left_tot; i++)
-                    attsToKeep[i] = i;
-		// keep only non-join ones from right
-		// loop over all attributes of right-rec
-		for (int j = 0; j < right_tot; j++)
-		{
-			// loop over join attributes of right-rec
-			bool found = false;
-			for (int k = 0; k < omR.numAtts; k++)
+		bool right_fetched = false;
+		if (outR.Remove(&recR))
+			right_fetched = true;
+	
+		if (left_fetched && right_fetched)
+        {
+			// Logic:
+			// <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
+			// num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
+			int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
+			int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;;
+			int numAttsToKeep = left_tot + right_tot - omR.numAtts;
+			int attsToKeep[numAttsToKeep];
+			// keep all of left
+        	int i;
+	        for(i = 0; i < left_tot; i++)
+    	        attsToKeep[i] = i;
+			// keep only non-join ones from right
+			// loop over all attributes of right-rec
+			for (int j = 0; j < right_tot; j++)
 			{
-				// if attribute not in join, add to attsToKeep
-				if (j == omR.whichAtts[k])
+				// loop over join attributes of right-rec
+				bool found = false;
+				for (int k = 0; k < omR.numAtts; k++)
 				{
-					found = true;
-					break;
+					// if attribute not in join, add to attsToKeep
+					if (j == omR.whichAtts[k])
+					{
+						found = true;
+						break;
+					}
 				}
+				if (!found)
+					attsToKeep[i++] = j;
+			} 
+			if (i != numAttsToKeep)
+			{
+				cerr << "\nOh No!\n";
+				exit(1);
 			}
-			if (!found)
-				attsToKeep[i++] = j;
-		} 
-		if (i != numAttsToKeep)
-		{
-			cerr << "\nOh No!\n";
-			exit(1);
-		}
 
-                Record joinResult;
-                joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-                param->outputPipe->Insert(&joinResult);
-            }
+			// Use left and right records till they both come
+			// if one stops coming, we can't merge (as this is only a natural join)	
+	        Record joinResult;
+			do
+			{
+    		    joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+        		param->outputPipe->Insert(&joinResult);
+		    } while(outL.Remove(&recL) && outR.Remove(&recR));
+        }
+
+		outL.ShutDown();
+		outR.ShutDown();
 	}
 	else
 	{
 		// block-nested-loop-join
 	}
 
-        param->outputPipe->ShutDown();
+    param->outputPipe->ShutDown();
 }
 /*
 
