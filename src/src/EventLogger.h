@@ -10,6 +10,8 @@
 
 #include <fstream>
 #include<iostream>
+#include <sys/time.h>
+#include <sstream>
 
 using namespace std;
 
@@ -24,6 +26,22 @@ public:
 	virtual ~EventLogger();
 	void writeLog(const string& msg);
 	static EventLogger* getEventLogger();
+};
+
+class System
+{
+public:
+    static string getusec()
+    {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        stringstream ss;
+        ss << tv.tv_sec;
+        ss << ".";
+        ss << tv.tv_usec;
+        return ss.str();
+    }
+
 };
 
 #endif /* EVENTLOGGER_H_ */
