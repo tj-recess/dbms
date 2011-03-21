@@ -137,11 +137,11 @@ void Sorted::MergeBigQToSortedFile()
 	m_pFile->MoveFirst();
 	int fetchedFromPipe = 0, fetchedFromFile = 0;
 
-        //if file on disk is empty (initially it will be) then don't fetch anything
-        if(m_pFile->GetFileLength() == 0)
+    //if file on disk is empty (initially it will be) then don't fetch anything
+    if(m_pFile->GetFileLength() == 0)
 		fetchedFromFile = 0;
 
-        do
+    do
 	{
 		if (pRecFromPipe == NULL)
 		{
@@ -170,12 +170,12 @@ void Sorted::MergeBigQToSortedFile()
 			}
 		}
 	}
-        while (fetchedFromPipe && fetchedFromFile);
+    while (fetchedFromPipe && fetchedFromFile);
 
-        if(fetchedFromFile != 0)
-            tmpFile.Add(*pRecFromFile);
-        if(fetchedFromPipe != 0)
-            tmpFile.Add(*pRecFromPipe);
+    if(fetchedFromFile != 0)
+        tmpFile.Add(*pRecFromFile);
+    if(fetchedFromPipe != 0)
+        tmpFile.Add(*pRecFromPipe);
 
 
 	Record rec;
