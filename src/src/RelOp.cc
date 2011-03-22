@@ -561,7 +561,7 @@ void* GroupBy::DoOperation(void* p)
     Pipe localOutPipe(pipeSize);
     BigQ localBigQ(*(param->inputPipe), localOutPipe, *(param->groupAttributes), param->runLen);
     Record rec;
-    Record *currentGroupRecord;
+    Record *currentGroupRecord = new Record();
     bool currentGroupActive = false;
     ComparisonEngine ce;
     double sum = 0.0;
@@ -571,17 +571,9 @@ void* GroupBy::DoOperation(void* p)
     ofstream log_file("log_file");
     ofstream groupRecordLogFile("groupRecordLogFile");
 #endif
-    while(localOutPipe.Remove(&rec))
+    while(localOutPipe.Remove(&rec) || currentGroupActive)
     {
-        Record copy;
-        copy.Copy(&rec);
-        copy.Project(param->groupAttributes->whichAtts, param->groupAttributes->numAtts, ((int*)rec.bits)[1]/sizeof(int) - 1);
-
 #ifdef _RELOP_DEBUG
-        Attribute tempAtts[] = {"s_nationkey", Int};
-//        Schema tempSchema((char*)"dafdsa", 3, tempAtts);    //to print column 4 (s_nationkey) only
-//        copy.PrintToFile(&tempSchema, log_file);
-//        copy.Print(&tempSchema);
         Schema suppSchema("catalog", "supplier");
         if(!printed)
         {
@@ -589,13 +581,12 @@ void* GroupBy::DoOperation(void* p)
             for (int i = 0; i < param->groupAttributes->numAtts; i++)
                 cout<<"param->groupAttributes->whichAtts["<<i<<"] = "<<param->groupAttributes->whichAtts[i]<<endl;
             cout<<"columns in Record = "<<((int*)rec.bits)[1]/sizeof(int) - 1<<endl;
-            cout<<"columns in Copy (after project) = "<<((int*)copy.bits)[1]/sizeof(int) - 1<<endl;
             printed = true;
         }
 #endif
         if(!currentGroupActive)
         {
-            currentGroupRecord = &rec;
+            currentGroupRecord->Copy(&rec);
             currentGroupActive = true;
 #ifdef _RELOP_DEBUG
             rec.PrintToFile(&suppSchema, log_file);
@@ -603,11 +594,14 @@ void* GroupBy::DoOperation(void* p)
 #endif
         }
         
-        if(ce.Compare(currentGroupRecord, &rec, param->groupAttributes) == 0)
+        //either no new record fetched (end of pipe) or new group started so just go to else part and finish the last group
+        if(rec.bits != NULL && ce.Compare(currentGroupRecord, &rec, param->groupAttributes) == 0)
         {
             int ival = 0; double dval = 0;
             param->computeMeFunction->Apply(rec, ival, dval);
             sum += (ival + dval);
+            delete rec.bits;
+            rec.bits = NULL;
 #ifdef _RELOP_DEBUG
             recordsInAGroup++;
 #endif
@@ -638,7 +632,11 @@ void* GroupBy::DoOperation(void* p)
             sumRec.SuckNextRecord(&sum_schema, sum_file);
             fclose(sum_file);
 
-            //glue this record with the one we have from groupAttribute
+#ifdef _RELOP_DEBUG
+//            cout<<"Sum Record : ";
+//            sumRec.Print(&sum_schema);
+#endif
+            //glue this record with the one we have from groupAttribute - not needed in q6
             int numAttsToKeep = param->groupAttributes->numAtts + 1;
             int attsToKeep[numAttsToKeep];
             attsToKeep[0] = 0;  //for sumRec
@@ -647,18 +645,12 @@ void* GroupBy::DoOperation(void* p)
                 attsToKeep[i] = param->groupAttributes->whichAtts[i-1];
             }
             Record tuple;
-            tuple.MergeRecords(&sumRec, &copy, 1, numAttsToKeep - 1, attsToKeep,  numAttsToKeep, 1);
+            tuple.MergeRecords(&sumRec, currentGroupRecord, 1, numAttsToKeep - 1, attsToKeep,  numAttsToKeep, 1);
             // Push this record to outPipe
-            param->outputPipe->Insert(&tuple);
-
-#ifdef _RELOP_DEBUG
-            rec.PrintToFile(&suppSchema, log_file);
-            currentGroupRecord->PrintToFile(&suppSchema, groupRecordLogFile);
-#endif
-
+            
+            param->outputPipe->Insert(&tuple);            
             //start new group for this record
-            currentGroupRecord = &rec;
-            currentGroupActive = true;
+            currentGroupActive = false;
             // delete file "tmp_sum_data_file"
             if(remove(tempSumFileName.c_str()) != 0)
             perror("\nError in removing tmp_sum_data_file!");
