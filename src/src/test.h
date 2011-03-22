@@ -149,6 +149,20 @@ void get_cnf (char *input, Schema *left, Function &fn_pred) {
 		close_lexical_parser_func ();
 }
 
+void get_sort_order(char *input, Schema *l, OrderMaker &sortorder) 
+{
+    init_lexical_parser(input);
+    if (yyparse() != 0) {
+        cout << " Error: can't parse your CNF \n";
+        exit(1);
+    }
+    Record literal;
+    CNF sort_pred;
+    sort_pred.GrowFromParseTree(final, l, literal); // constructs CNF predicate
+    OrderMaker dummy;
+    sort_pred.GetSortOrders(sortorder, dummy);
+}
+
 relation *rel;
 
 char *supplier = "supplier"; 
