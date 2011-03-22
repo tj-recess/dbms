@@ -16,17 +16,17 @@ void* SelectFile::DoOperation(void* p)
     Params* param = (Params*)p;
     param->inputFile->MoveFirst();
     Record rec;
-#ifdef _DEBUG
+#ifdef _OPS_DEBUG
     int cnt = 0;
 #endif
     while(param->inputFile->GetNext(rec, *(param->selectOp), *(param->literalRec)))
     {
-#ifdef _DEBUG
+#ifdef _OPS_DEBUG
         cnt++;
 #endif
         param->outputPipe->Insert(&rec);
     }
-#ifdef _DEBUG
+#ifdef _OPS_DEBUG
     cout<<"SelectFile : inserted " << cnt << " recs in output Pipe"<<endl;
 #endif
     param->outputPipe->ShutDown();
@@ -75,7 +75,6 @@ void* Join::DoOperation(void* p)
         Record recL, recR;
 		// fetch one leftRec and one righRec
 		// find stuff for merging using them
-		// no while loop here *** TODO
 		bool left_fetched = false;
 		if (outL.Remove(&recL))
 			left_fetched = true;
@@ -92,10 +91,20 @@ void* Join::DoOperation(void* p)
 			int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
 			int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;;
 			int numAttsToKeep = left_tot + right_tot - omR.numAtts;
-			int attsToKeep[numAttsToKeep];
+			int attsToKeep[numAttsToKeep], attsToKeepLeft[omL.numAtts], attsToKeepRight[omR.numAtts];
+		
+			// make attsToKeepLeft
+			for (int i = 0; i < omL.numAtts; i++)
+				attsToKeepLeft[i] = omL.whichAtts[i];
+
+			// make attsToKeepRight
+			for (int i = 0; i < omR.numAtts; i++)
+				attsToKeepRight[i] = omR.whichAtts[i];
+
+			// make attsToKeep - for final merged/joined record
 			// keep all of left
         	int i;
-	        for(i = 0; i < left_tot; i++)
+	        for (i = 0; i < left_tot; i++)
     	        attsToKeep[i] = i;
 			// keep only non-join ones from right
 			// loop over all attributes of right-rec
@@ -121,16 +130,70 @@ void* Join::DoOperation(void* p)
 				exit(1);
 			}
 
-			// Use left and right records till they both come
-			// if one stops coming, we can't merge (as this is only a natural join)	
-	        Record joinResult;
+			// Make orderMaker for comparing records on the join-attributes
+			OrderMaker JoinAttsOM;	
+			JoinAttsOM.numAtts = omR.numAtts;
+			for (int j = 0; j < omR.numAtts; j++)
+			{
+				JoinAttsOM.whichAtts[j] = j;
+				JoinAttsOM.whichTypes[j] = omR.whichTypes[j];
+			}
+
+			// Porject grp-atts of left and right record
+			// Compare them (make order maker)
+			// if equal, join ... fetch next left and right
+			// if left < right, fetch next left
+			// if left > right, fetch next right
+			// TODO: make make-order-maker
+	        Record joinResult, copy_left, copy_right;
+			ComparisonEngine ce;
+			bool bError = false;
+			int cnt = 1;
 			do
 			{
-    		    joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-        		param->outputPipe->Insert(&joinResult);
-		    } while(outL.Remove(&recL) && outR.Remove(&recR));
+		        copy_left.Copy(&recL);
+		        copy_right.Copy(&recR);
+				copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
+				copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
+				// join attributes match, fetch both
+				int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
+				if (ret == 0)
+				{
+	    		    joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+					#ifdef _OPS_DEBUG
+					cout << "\n" << cnt++ <<" Result col:  " << ((int *) joinResult.bits)[1]/sizeof(int) - 1;
+					#endif
+        			param->outputPipe->Insert(&joinResult);
+					// fetch new records
+					if (!outL.Remove(&recL))
+						bError = true;
+
+					if (!outR.Remove(&recR))
+						bError = true;
+				}
+				// left is smaller than right, fetch new left
+				else if (ret < 0)
+				{
+					if (!outL.Remove(&recL))
+                        bError = true;
+				}
+				else	// left is greater than right, fetch right
+				{
+					if (!outR.Remove(&recR))
+                        bError = true;
+				}
+		    } while(!bError);
         }
 
+		// clear out pipes
+		while (outR.Remove(&recR))
+		{
+			// do nothing
+		}
+		while (outL.Remove(&recL))
+		{
+			// do nothing
+		}
 		outL.ShutDown();
 		outR.ShutDown();
 	}
@@ -145,7 +208,7 @@ void* Join::DoOperation(void* p)
 
     if(omL.numAtts > 0 && omR.numAtts > 0)
     {
-#ifdef _DEBUG
+#ifdef _OPS_DEBUG
         cout<<"RelOp omL: ";
         omL.Print();
         cout<<"RelOp omR: ";
@@ -160,7 +223,7 @@ void* Join::DoOperation(void* p)
 
         while(outL.Remove(recL) && outR.Remove(recR))
         {
-#ifdef _DEBUG
+#ifdef _OPS_DEBUG
             cout<<"got record from both BigQL and BigQR"<<endl;
             cout<<"recL = "<< recL->bits <<endl;
             cout<<"recR = "<< recR->bits <<endl;
@@ -352,6 +415,9 @@ void * Sum::DoOperation(void * p)
 		int ival = 0; double dval = 0;
 		param->computeFunc->Apply(rec, ival, dval);
 		sum += (ival + dval);
+		#ifdef _OPS_DEBUG
+			cout << "\nsum = "<< sum;
+		#endif
 	}
 
 	// create temperory schema, with one attribute - sum
