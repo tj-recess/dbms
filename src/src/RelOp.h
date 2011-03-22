@@ -21,23 +21,22 @@ class SelectFile : public RelationalOp {
 
 	private:
 	 pthread_t m_thread;
-	// Record *buffer;
-            struct Params
-            {
-                DBFile *inputFile;
-                Pipe *outputPipe;
-                CNF *selectOp;
-                Record *literalRec;
+     struct Params
+     {
+		DBFile *inputFile;
+        Pipe *outputPipe;
+        CNF *selectOp;
+        Record *literalRec;
 
-                Params(DBFile *inFile, Pipe *outPipe, CNF *selOp, Record *literal)
-                {
-                    inputFile = inFile;
-                    outputPipe = outPipe;
-                    selectOp = selOp;
-                    literalRec = literal;
-                }
-            };
-            static void* DoOperation(void*);
+        Params(DBFile *inFile, Pipe *outPipe, CNF *selOp, Record *literal)
+        {
+            inputFile = inFile;
+            outputPipe = outPipe;
+            selectOp = selOp;
+            literalRec = literal;
+        }
+	};
+    static void* DoOperation(void*);
 
 	public:
 
@@ -47,10 +46,30 @@ class SelectFile : public RelationalOp {
 
 };
 
-class SelectPipe : public RelationalOp {
+class SelectPipe : public RelationalOp 
+{
+    private:
+     pthread_t m_thread;
+     struct Params
+     {
+        Pipe *inputPipe;
+        Pipe *outputPipe;
+        CNF *selectOp;
+        Record *literalRec;
+
+        Params(Pipe *inPipe, Pipe *outPipe, CNF *selOp, Record *literal)
+        {
+			inputPipe = inPipe;
+            outputPipe = outPipe;
+            selectOp = selOp;
+            literalRec = literal;
+        }
+    };
+    static void* DoOperation(void*);
+
 	public:
-	void Run (Pipe &inPipe, Pipe &outPipe, CNF &selOp, Record &literal) { }
-	void WaitUntilDone () { }
+	void Run (Pipe &inPipe, Pipe &outPipe, CNF &selOp, Record &literal);
+	void WaitUntilDone ();
 	void Use_n_Pages (int n) { }
 };
 
