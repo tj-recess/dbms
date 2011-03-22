@@ -45,6 +45,51 @@ void SelectFile::Use_n_Pages (int runlen)
      */
 }
 
+//--------------- SelectPipe ------------
+void SelectPipe::Run (Pipe &inPipe, Pipe &outPipe, CNF &selOp, Record &literal)
+{
+    pthread_create(&m_thread, NULL, DoOperation, 
+				   (void*)new Params(&inPipe, &outPipe, &selOp, &literal));
+}
+
+/*Logic:
+ * Keep scanning the inPipe using GetNext(..) and apply CNF (within GetNext(..),
+ * insert into output pipe whichever record matches.
+ * Shutdown the output Pipe
+ */
+void* SelectPipe::DoOperation(void* p)
+{
+    Params* param = (Params*)p;
+    Record rec;
+	#ifdef _OPS_DEBUG
+    int cnt = 0;
+	#endif
+
+	ComparisonEngine compEngine;
+    while(param->inputPipe->Remove(&rec))
+    {
+	#ifdef _OPS_DEBUG
+        cnt++;
+	#endif
+		if (compEngine.Compare(&rec, (param->literalRec), (param->selectOp)) )
+	        param->outputPipe->Insert(&rec);
+    }
+
+	#ifdef _OPS_DEBUG
+    cout<<"SelectPipe : inserted " << cnt << " recs in output Pipe"<<endl;
+	#endif
+
+    param->outputPipe->ShutDown();
+	delete param;
+	param = NULL;
+}
+
+void SelectPipe::WaitUntilDone () {
+	 pthread_join (m_thread, NULL);
+}
+
+//--------------- Join ------------------
+
 //int Join::m_nRunLen = -1;
 int Join::m_nRunLen = 10;
 
@@ -199,6 +244,7 @@ void Join::Use_n_Pages (int runlen)
     m_nRunLen = runlen;
 }
 
+//--------------- Project ------------------
 /* Input: inPipe = fetch input records from here
  *	      outPipe = push project output here
  *        keepMe = array containing the attributes to project eg [3,5,2,7]
@@ -244,6 +290,7 @@ void Project::WaitUntilDone()
 }
 
 
+//--------------- WriteOut ------------------
 /* Input: inPipe = fetch input records from here
  * 		  outFile = File where text version should be written
  *					Its has been opened already
@@ -335,6 +382,7 @@ void WriteOut::WaitUntilDone()
 }
 
 
+//--------------- Sum ------------------
 /* Input: inPipe = fetch input records from here
  *	      outPipe = push project output here
  *		  computeMe = Function using which sum must be computed
@@ -401,6 +449,8 @@ void Sum::WaitUntilDone()
     pthread_join(m_thread, 0);
 }
 
+
+//--------------- DuplicateRemoval ------------------
 /* Input: inPipe = fetch input records from here
  *        outPipe = push project output here
  *        mySchema = Schema of the records coming in inPipe 
@@ -485,6 +535,8 @@ void DuplicateRemoval::WaitUntilDone()
     // Block until thread is done
     pthread_join(m_thread, 0);
 }
+
+//--------------- GroupBy ------------------
 
 void GroupBy::Use_n_Pages(int n)
 {
