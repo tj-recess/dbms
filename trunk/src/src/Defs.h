@@ -29,6 +29,7 @@ unsigned int Random_Generate();
 //#define _DEBUG 0
 //#define _Sorted_DEBUG 1
 //#define _OPS_DEBUG
+#define _RELOP_DEBUG 0
 
 #endif
 

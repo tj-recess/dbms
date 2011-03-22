@@ -6,6 +6,7 @@
 #include "DBFile.h"
 #include "Record.h"
 #include "Function.h"
+#include <fstream>
 
 class RelationalOp {
 	public:
