@@ -118,98 +118,98 @@ void* Join::DoOperation(void* p)
     OrderMaker omL, omR;
     param->selectOp->GetSortOrders(omL, omR);
 	
-	if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
-	{
+    if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
+    {
         const int pipeSize = 100;
         Pipe outL(pipeSize), outR(pipeSize);
         BigQ bigqL(*(param->inputPipeL), outL, omL, m_nRunLen);
         BigQ bigR(*(param->inputPipeR), outR, omR, m_nRunLen);
         Record recL, recR;
-		// fetch one leftRec and one righRec
-		// find stuff for merging using them
-		bool left_fetched = false;
-		if (outL.Remove(&recL))
-			left_fetched = true;
+        // fetch one leftRec and one righRec
+        // find stuff for merging using them
+        bool left_fetched = false;
+        if (outL.Remove(&recL))
+                left_fetched = true;
 
-		bool right_fetched = false;
-		if (outR.Remove(&recR))
-			right_fetched = true;
-	
-		if (left_fetched && right_fetched)
+        bool right_fetched = false;
+        if (outR.Remove(&recR))
+                right_fetched = true;
+
+        if (left_fetched && right_fetched)
         {
-			// Logic:
-			// <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
-			// num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
-			int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
-			int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;
-			int numAttsToKeep = left_tot + right_tot;
-			int attsToKeep[numAttsToKeep], attsToKeepLeft[omL.numAtts], attsToKeepRight[omR.numAtts];
-		
-			// make attsToKeepLeft
-			for (int i = 0; i < omL.numAtts; i++)
-				attsToKeepLeft[i] = omL.whichAtts[i];
+                // Logic:
+                // <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
+                // num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
+                int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
+                int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;
+                int numAttsToKeep = left_tot + right_tot;
+                int attsToKeep[numAttsToKeep], attsToKeepLeft[omL.numAtts], attsToKeepRight[omR.numAtts];
 
-			// make attsToKeepRight
-			for (int i = 0; i < omR.numAtts; i++)
-				attsToKeepRight[i] = omR.whichAtts[i];
+                // make attsToKeepLeft
+                for (int i = 0; i < omL.numAtts; i++)
+                        attsToKeepLeft[i] = omL.whichAtts[i];
 
-			// make attsToKeep - for final merged/joined record
-			// <all from left> + <all from right> 
+                // make attsToKeepRight
+                for (int i = 0; i < omR.numAtts; i++)
+                        attsToKeepRight[i] = omR.whichAtts[i];
+
+                // make attsToKeep - for final merged/joined record
+                // <all from left> + <all from right>
         	int i;
 	        for (i = 0; i < left_tot; i++)
     	        attsToKeep[i] = i;
-			for (int j = 0; j < right_tot; j++)
-				attsToKeep[i++] = j;
+                for (int j = 0; j < right_tot; j++)
+                        attsToKeep[i++] = j;
 
-			// Make orderMaker for comparing records on the join-attributes
-			OrderMaker JoinAttsOM;	
-			JoinAttsOM.numAtts = omR.numAtts;
-			for (int j = 0; j < omR.numAtts; j++)
-			{
-				JoinAttsOM.whichAtts[j] = j;
-				JoinAttsOM.whichTypes[j] = omR.whichTypes[j];
-			}
+                // Make orderMaker for comparing records on the join-attributes
+                OrderMaker JoinAttsOM;
+                JoinAttsOM.numAtts = omR.numAtts;
+                for (int j = 0; j < omR.numAtts; j++)
+                {
+                        JoinAttsOM.whichAtts[j] = j;
+                        JoinAttsOM.whichTypes[j] = omR.whichTypes[j];
+                }
 
-			// Porject grp-atts of left and right record
-			// Compare them (make order maker)
-			// if equal, join ... fetch only right (fetch from FK table)
-			// if left < right, fetch next left
-			// if left > right, fetch next right
+                // Porject grp-atts of left and right record
+                // Compare them (make order maker)
+                // if equal, join ... fetch only right (fetch from FK table)
+                // if left < right, fetch next left
+                // if left > right, fetch next right
 	        Record joinResult, copy_left, copy_right;
-			ComparisonEngine ce;
-			bool bError = false;
-			int cnt = 1;
-			do
-			{
-		        copy_left.Copy(&recL);
-		        copy_right.Copy(&recR);
-				copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
-				copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
-				// join attributes match, fetch from FK table (assume its right)
-				int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
-				if (ret == 0)
-				{
-	    		    joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-					#ifdef _OPS_DEBUG
-					cout << "\n" << cnt++ <<" Result col:  " << ((int *) joinResult.bits)[1]/sizeof(int) - 1;
-					#endif
-        			param->outputPipe->Insert(&joinResult);
+                ComparisonEngine ce;
+                bool bError = false;
+                int cnt = 1;
+                do
+                {
+                    copy_left.Copy(&recL);
+                    copy_right.Copy(&recR);
+                    copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
+                    copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
+                    // join attributes match, fetch from FK table (assume its right)
+                    int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
+                    if (ret == 0)
+                    {
+                        joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+                        #ifdef _OPS_DEBUG
+                        cout << "\n" << cnt++ <<" Result col:  " << ((int *) joinResult.bits)[1]/sizeof(int) - 1;
+                        #endif
+                        param->outputPipe->Insert(&joinResult);
 
-					if (!outR.Remove(&recR))
-						bError = true;
-				}
-				// left is smaller than right, fetch new left
-				else if (ret < 0)
-				{
-					if (!outL.Remove(&recL))
-                        bError = true;
-				}
-				else	// left is greater than right, fetch right
-				{
-					if (!outR.Remove(&recR))
-                        bError = true;
-				}
-		    } while(!bError);
+                        if (!outR.Remove(&recR))
+                                bError = true;
+                    }
+                    // left is smaller than right, fetch new left
+                    else if (ret < 0)
+                    {
+                            if (!outL.Remove(&recL))
+                                bError = true;
+                    }
+                    else	// left is greater than right, fetch right
+                    {
+                            if (!outR.Remove(&recR))
+                            bError = true;
+                    }
+            } while(!bError);
         }
 
 		// clear out pipes
@@ -565,25 +565,59 @@ void* GroupBy::DoOperation(void* p)
     bool currentGroupActive = false;
     ComparisonEngine ce;
     double sum = 0.0;
+#ifdef _RELOP_DEBUG
+    bool printed = false;
+    int recordsInAGroup = 0;
+    ofstream log_file("log_file");
+    ofstream groupRecordLogFile("groupRecordLogFile");
+#endif
     while(localOutPipe.Remove(&rec))
     {
         Record copy;
         copy.Copy(&rec);
         copy.Project(param->groupAttributes->whichAtts, param->groupAttributes->numAtts, ((int*)rec.bits)[1]/sizeof(int) - 1);
+
+#ifdef _RELOP_DEBUG
+        Attribute tempAtts[] = {"s_nationkey", Int};
+//        Schema tempSchema((char*)"dafdsa", 3, tempAtts);    //to print column 4 (s_nationkey) only
+//        copy.PrintToFile(&tempSchema, log_file);
+//        copy.Print(&tempSchema);
+        Schema suppSchema("catalog", "supplier");
+        if(!printed)
+        {
+            cout<< "param->groupAttributes->numAtts" << param->groupAttributes->numAtts << endl;
+            for (int i = 0; i < param->groupAttributes->numAtts; i++)
+                cout<<"param->groupAttributes->whichAtts["<<i<<"] = "<<param->groupAttributes->whichAtts[i]<<endl;
+            cout<<"columns in Record = "<<((int*)rec.bits)[1]/sizeof(int) - 1<<endl;
+            cout<<"columns in Copy (after project) = "<<((int*)copy.bits)[1]/sizeof(int) - 1<<endl;
+            printed = true;
+        }
+#endif
         if(!currentGroupActive)
         {
-            currentGroupRecord = &copy;
+            currentGroupRecord = &rec;
             currentGroupActive = true;
+#ifdef _RELOP_DEBUG
+            rec.PrintToFile(&suppSchema, log_file);
+            currentGroupRecord->PrintToFile(&suppSchema, groupRecordLogFile);
+#endif
         }
         
-        if(ce.Compare(currentGroupRecord, &copy, param->groupAttributes) == 0)
+        if(ce.Compare(currentGroupRecord, &rec, param->groupAttributes) == 0)
         {
             int ival = 0; double dval = 0;
-		param->computeMeFunction->Apply(rec, ival, dval);
-		sum += (ival + dval);
+            param->computeMeFunction->Apply(rec, ival, dval);
+            sum += (ival + dval);
+#ifdef _RELOP_DEBUG
+            recordsInAGroup++;
+#endif
 	}
         else
         {
+#ifdef _RELOP_DEBUG
+            cout<<"Records in a Group = "<<recordsInAGroup<<", and sum = "<<sum<<endl;
+            recordsInAGroup = 0;
+#endif
             //store old sum and group-by attribtues concatenated in outputPipe
             //and also start new group from here
 
@@ -617,9 +651,29 @@ void* GroupBy::DoOperation(void* p)
             // Push this record to outPipe
             param->outputPipe->Insert(&tuple);
 
+#ifdef _RELOP_DEBUG
+            rec.PrintToFile(&suppSchema, log_file);
+            currentGroupRecord->PrintToFile(&suppSchema, groupRecordLogFile);
+#endif
+
             //start new group for this record
             currentGroupRecord = &rec;
             currentGroupActive = true;
+            // delete file "tmp_sum_data_file"
+            if(remove(tempSumFileName.c_str()) != 0)
+            perror("\nError in removing tmp_sum_data_file!");
         }
     }
+#ifdef _RELOP_DEBUG
+    log_file.flush();
+    log_file.close();
+    groupRecordLogFile.flush();
+    groupRecordLogFile.close();
+    cout<<"sum in last group (after finish) = "<< sum<<endl;
+    cout<<"recs in last group (after finish) = "<< recordsInAGroup<<endl;
+#endif
+    // Shut down the outpipe
+    param->outputPipe->ShutDown();
+    delete param;
+    param = NULL;
 }

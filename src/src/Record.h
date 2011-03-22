@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <fstream>
 
 #include "Defs.h"
 #include "ParseTree.h"
@@ -68,6 +69,8 @@ public:
 	// prints the contents of the record; this requires
 	// that the schema also be given so that the record can be interpreted
 	void Print (Schema *mySchema);
+
+        void PrintToFile(Schema*, std::ofstream&);
 };
 
 #endif
