@@ -16,17 +16,17 @@ void* SelectFile::DoOperation(void* p)
     Params* param = (Params*)p;
     param->inputFile->MoveFirst();
     Record rec;
-#ifdef _OPS_DEBUG
+#ifdef _RELOP_DEBUG
     int cnt = 0;
 #endif
     while(param->inputFile->GetNext(rec, *(param->selectOp), *(param->literalRec)))
     {
-#ifdef _OPS_DEBUG
+#ifdef _RELOP_DEBUG
         cnt++;
 #endif
         param->outputPipe->Insert(&rec);
     }
-#ifdef _OPS_DEBUG
+#ifdef _RELOP_DEBUG
     cout<<"SelectFile : inserted " << cnt << " recs in output Pipe"<<endl;
 #endif
     param->outputPipe->ShutDown();
@@ -61,21 +61,21 @@ void* SelectPipe::DoOperation(void* p)
 {
     Params* param = (Params*)p;
     Record rec;
-	#ifdef _OPS_DEBUG
+	#ifdef _RELOP_DEBUG
     int cnt = 0;
 	#endif
 
 	ComparisonEngine compEngine;
     while(param->inputPipe->Remove(&rec))
     {
-	#ifdef _OPS_DEBUG
+	#ifdef _RELOP_DEBUG
         cnt++;
 	#endif
 		if (compEngine.Compare(&rec, (param->literalRec), (param->selectOp)) )
 	        param->outputPipe->Insert(&rec);
     }
 
-	#ifdef _OPS_DEBUG
+	#ifdef _RELOP_DEBUG
     cout<<"SelectPipe : inserted " << cnt << " recs in output Pipe"<<endl;
 	#endif
 
@@ -190,7 +190,7 @@ void* Join::DoOperation(void* p)
                     if (ret == 0)
                     {
                         joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-                        #ifdef _OPS_DEBUG
+                        #ifdef _RELOP_DEBUG
                         cout << "\n" << cnt++ <<" Result col:  " << ((int *) joinResult.bits)[1]/sizeof(int) - 1;
                         #endif
                         param->outputPipe->Insert(&joinResult);
@@ -408,7 +408,7 @@ void * Sum::DoOperation(void * p)
 		int ival = 0; double dval = 0;
 		param->computeFunc->Apply(rec, ival, dval);
 		sum += (ival + dval);
-		#ifdef _OPS_DEBUG
+		#ifdef _RELOP_DEBUG
 			cout << "\nsum = "<< sum;
 		#endif
 	}
