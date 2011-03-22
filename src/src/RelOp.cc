@@ -45,9 +45,19 @@ void SelectFile::Use_n_Pages (int runlen)
      */
 }
 
+//int Join::m_nRunLen = -1;
+int Join::m_nRunLen = 10;
+
 void Join::Run(Pipe& inPipeL, Pipe& inPipeR, Pipe& outPipe, CNF& selOp, Record& literal)
 {
-    pthread_create(&thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal, m_nRunLen));
+    if (m_nRunLen == -1)
+    {
+        cerr << "\nError! Use_n_Page() must be called and "
+             << "pages of memory allowed for operations must be set!\n";
+        exit(1);
+    }
+
+    pthread_create(&thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal));
 }
 
 void* Join::DoOperation(void* p)
@@ -63,15 +73,12 @@ void* Join::DoOperation(void* p)
     OrderMaker omL, omR;
     param->selectOp->GetSortOrders(omL, omR);
 	
-	// Malvika: 
-
-	param->runLen = 10;
 	if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
 	{
         const int pipeSize = 100;
         Pipe outL(pipeSize), outR(pipeSize);
-        BigQ bigqL(*(param->inputPipeL), outL, omL, param->runLen);
-        BigQ bigR(*(param->inputPipeR), outR, omR, param->runLen);
+        BigQ bigqL(*(param->inputPipeL), outL, omL, m_nRunLen);
+        BigQ bigR(*(param->inputPipeR), outR, omR, m_nRunLen);
         Record recL, recR;
 		// fetch one leftRec and one righRec
 		// find stuff for merging using them
@@ -89,8 +96,8 @@ void* Join::DoOperation(void* p)
 			// <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
 			// num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
 			int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
-			int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;;
-			int numAttsToKeep = left_tot + right_tot - omR.numAtts;
+			int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;
+			int numAttsToKeep = left_tot + right_tot;
 			int attsToKeep[numAttsToKeep], attsToKeepLeft[omL.numAtts], attsToKeepRight[omR.numAtts];
 		
 			// make attsToKeepLeft
@@ -102,33 +109,12 @@ void* Join::DoOperation(void* p)
 				attsToKeepRight[i] = omR.whichAtts[i];
 
 			// make attsToKeep - for final merged/joined record
-			// keep all of left
+			// <all from left> + <all from right> 
         	int i;
 	        for (i = 0; i < left_tot; i++)
     	        attsToKeep[i] = i;
-			// keep only non-join ones from right
-			// loop over all attributes of right-rec
 			for (int j = 0; j < right_tot; j++)
-			{
-				// loop over join attributes of right-rec
-				bool found = false;
-				for (int k = 0; k < omR.numAtts; k++)
-				{
-					// if attribute not in join, add to attsToKeep
-					if (j == omR.whichAtts[k])
-					{
-						found = true;
-						break;
-					}
-				}
-				if (!found)
-					attsToKeep[i++] = j;
-			} 
-			if (i != numAttsToKeep)
-			{
-				cerr << "\nOh No!\n";
-				exit(1);
-			}
+				attsToKeep[i++] = j;
 
 			// Make orderMaker for comparing records on the join-attributes
 			OrderMaker JoinAttsOM;	
@@ -141,10 +127,9 @@ void* Join::DoOperation(void* p)
 
 			// Porject grp-atts of left and right record
 			// Compare them (make order maker)
-			// if equal, join ... fetch next left and right
+			// if equal, join ... fetch only right (fetch from FK table)
 			// if left < right, fetch next left
 			// if left > right, fetch next right
-			// TODO: make make-order-maker
 	        Record joinResult, copy_left, copy_right;
 			ComparisonEngine ce;
 			bool bError = false;
@@ -155,7 +140,7 @@ void* Join::DoOperation(void* p)
 		        copy_right.Copy(&recR);
 				copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
 				copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
-				// join attributes match, fetch both
+				// join attributes match, fetch from FK table (assume its right)
 				int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
 				if (ret == 0)
 				{
@@ -164,9 +149,6 @@ void* Join::DoOperation(void* p)
 					cout << "\n" << cnt++ <<" Result col:  " << ((int *) joinResult.bits)[1]/sizeof(int) - 1;
 					#endif
         			param->outputPipe->Insert(&joinResult);
-					// fetch new records
-					if (!outL.Remove(&recL))
-						bError = true;
 
 					if (!outR.Remove(&recR))
 						bError = true;
@@ -204,46 +186,9 @@ void* Join::DoOperation(void* p)
 
     param->outputPipe->ShutDown();
 }
-/*
 
-    if(omL.numAtts > 0 && omR.numAtts > 0)
-    {
-#ifdef _OPS_DEBUG
-        cout<<"RelOp omL: ";
-        omL.Print();
-        cout<<"RelOp omR: ";
-        omR.Print();
-#endif
-        const int pipeSize = 100;
-        Pipe outL(pipeSize), outR(pipeSize);
-        BigQ bigqL(*(param->inputPipeL), outL, omL, param->runLen);
-        BigQ bigR(*(param->inputPipeR), outR, omR, param->runLen);
-        Record *recL = new Record();
-        Record *recR = new Record();
-
-        while(outL.Remove(recL) && outR.Remove(recR))
-        {
-#ifdef _OPS_DEBUG
-            cout<<"got record from both BigQL and BigQR"<<endl;
-            cout<<"recL = "<< recL->bits <<endl;
-            cout<<"recR = "<< recR->bits <<endl;
-#endif
-            int numAttsToKeep = omL.numAtts + omR.numAtts;
-            int attsToKeep[numAttsToKeep];
-            for(int i = 0; i < omL.numAtts; i++)
-                attsToKeep[i] = omL.whichAtts[i];
-            for(int i = omL.numAtts; i < numAttsToKeep; i++)
-                attsToKeep[i] = omR.whichAtts[i];
-
-            Record joinResult;
-            joinResult.MergeRecords(recL, recR, omL.numAtts, omR.numAtts, attsToKeep, numAttsToKeep, omL.numAtts);
-            param->outputPipe->Insert(&joinResult);
-        }
-
-    }
-*/
-
-void Join::WaitUntilDone () {
+void Join::WaitUntilDone () 
+{
 	 pthread_join (thread, NULL);
 }
 
@@ -424,8 +369,8 @@ void * Sum::DoOperation(void * p)
 	Attribute att = {(char*)"sum", Double};
 
 	Schema sum_schema((char*)"tmp_sum_schema_file", // filename, not used
-					   1, 					 // number of attributes	
-				       &att);				 // attribute pointer
+					   1, 					 		// number of attributes	
+				       &att);				 		// attribute pointer
 
 	// Make a file that contains this sum
 	FILE * sum_file = fopen("tmp_sum_data_file", "w");

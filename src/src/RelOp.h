@@ -84,22 +84,20 @@ class Project : public RelationalOp
 class Join : public RelationalOp {
     private:
         pthread_t thread;
-        int m_nRunLen;
+        static int m_nRunLen;
         struct Params
         {
             Pipe *outputPipe, *inputPipeL, *inputPipeR;
             CNF *selectOp;
             Record *literalRec;
-            int runLen;
 
-            Params(Pipe *inPipeL, Pipe *inPipeR, Pipe *outPipe, CNF *selOp, Record *literal, int runlen)
+            Params(Pipe *inPipeL, Pipe *inPipeR, Pipe *outPipe, CNF *selOp, Record *literal)
             {
                 inputPipeL = inPipeL;
                 inputPipeR = inPipeR;
                 outputPipe = outPipe;
                 selectOp = selOp;
                 literalRec = literal;
-                runLen = runlen;
             }
         };
         static void* DoOperation(void*);
