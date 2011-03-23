@@ -40,7 +40,7 @@ void SelectFile::WaitUntilDone () {
 
 void SelectFile::Use_n_Pages (int runlen)
 {
-    /*Arpit - This method has no impact in this class, probably.
+    /*This method has no impact in this class, probably.
      we have it just because it's pure virtual in
      */
 }
@@ -227,9 +227,95 @@ void* Join::DoOperation(void* p)
 	else
 	{
 		// block-nested-loop-join
+
+		vector<Record*> left_vec;
+		vector<Record*> right_vec;
+		Record rec;
+
+		// push the whole left table in left_vec	
+		while (param->inputPipeL->Remove(&rec))
+		{
+			Record *copy_rec = new Record;
+			copy_rec->Copy(&rec);
+			left_vec.push_back(copy_rec);
+		}
+
+		bool bJoinSchCreated = false;
+		int left_tot, right_tot, numAttsToKeep;
+		int *attsToKeep;
+		// push whatever possible (depending on how much memory is left)
+		// from right table into right_vec
+		bool bRightFileOver = false;
+		do
+		{
+			int right_recs_fetched = 0;
+    	    while (right_recs_fetched++ < 20000 &&  param->inputPipeR->Remove(&rec))
+        	{
+	            Record *copy_rec = new Record;
+    	        copy_rec->Copy(&rec);
+        	    right_vec.push_back(copy_rec);
+	        }
+		
+			if (right_recs_fetched == 20000)
+				right_recs_fetched = 0;
+			else
+				bRightFileOver = true;
+
+			// make join-schema for joint record
+			if (!bJoinSchCreated && left_vec.size() > 0 && right_vec.size() > 0)
+			{
+				bJoinSchCreated = true;
+				left_tot = ((int *) left_vec.at(0)->bits)[1]/sizeof(int) - 1;
+                right_tot = ((int *) right_vec.at(0)->bits)[1]/sizeof(int) - 1;
+                numAttsToKeep = left_tot + right_tot;
+
+				attsToKeep = new int(numAttsToKeep);
+				int i;
+		        for (i = 0; i < left_tot; i++)
+        	        attsToKeep[i] = i;
+                for (int j = 0; j < right_tot; j++)
+                    attsToKeep[i++] = j;
+			}
+
+			Record joinResult;
+			ComparisonEngine ce;
+			// nested for loop, first left, then right
+			for (int i = 0; i < left_vec.size(); i++)
+			{
+				for (int j = 0; j < right_vec.size(); j++)
+				{
+					// merge left and right records
+					joinResult.MergeRecords(left_vec.at(i), right_vec.at(j), left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+					// check with CNF, if OK, push to outPipe
+					if (ce.Compare(&joinResult, param->literalRec, param->selectOp) == 0)
+						param->outputPipe->Insert(&joinResult);
+				}
+			}
+		
+			ClearAndDestroy(right_vec);	
+			
+		} while (bRightFileOver == false);
+		
+		delete [] attsToKeep;
+		attsToKeep = NULL;	
+		
+		ClearAndDestroy(left_vec);
+		ClearAndDestroy(right_vec);	
 	}
 
+	// shutdown the output pipe
     param->outputPipe->ShutDown();
+}
+
+void Join::ClearAndDestroy(vector<Record*> &v)
+{
+	Record *rec;
+	for (int i = 0; i < v.size(); i++)
+	{
+		rec = v.at(i);
+		delete rec;
+		rec = NULL;
+	}
 }
 
 void Join::WaitUntilDone () 
@@ -293,8 +379,7 @@ void Project::WaitUntilDone()
 //--------------- WriteOut ------------------
 /* Input: inPipe = fetch input records from here
  * 		  outFile = File where text version should be written
- *					Its has been opened already
- *					TODO: caller doesn't close it, should we?
+ *					It has been opened already
  *		  mySchema = the schema to use for writing records			
  */
 void WriteOut::Run (Pipe &inPipe, FILE *outFile, Schema &mySchema)
@@ -324,7 +409,6 @@ void * WriteOut::DoOperation(void * p)
 
 	        // print the attribute name
 			fprintf(param->pFILE, "%s: ", atts[i].name);
-    	    //cout << atts[i].name << ": ";
 
 	        // use the i^th slot at the head of the record to get the
     	    // offset to the correct attribute in the record
@@ -333,42 +417,34 @@ void * WriteOut::DoOperation(void * p)
 	        // here we determine the type, which given in the schema;
     	    // depending on the type we then print out the contents
 			fprintf(param->pFILE, "[");
-        	//cout << "[";
 
 	        // first is integer
     	    if (atts[i].myType == Int) 
 			{
         	    int *myInt = (int *) &(rec.bits[pointer]);
 				fprintf(param->pFILE, "%d", *myInt);
-            	//cout << *myInt;
 		        // then is a double
         	} 
 			else if (atts[i].myType == Double) 
 			{
 	            double *myDouble = (double *) &(rec.bits[pointer]);
 				fprintf(param->pFILE, "%f", *myDouble);
-    	        //cout << *myDouble;
-
         		// then is a character string
 	        } 
 			else if (atts[i].myType == String) 
 			{
             	char *myString = (char *) &(rec.bits[pointer]);
 				fprintf(param->pFILE, "%s", myString);
-	            //cout << myString;
 	        }
 			fprintf(param->pFILE, "]");
-	        //cout << "]";
 
     	    // print out a comma as needed to make things pretty
         	if (i != n - 1) 
 			{
 				fprintf(param->pFILE, ", ");
-            	//cout << ", ";
 	        }
     	}		// end of for loop
 		fprintf(param->pFILE, "\n");
-	    //cout << "\n";
 	}			// no more records in the inPipe
 
 	delete param;

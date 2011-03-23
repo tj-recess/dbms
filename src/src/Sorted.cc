@@ -2,7 +2,8 @@
 
 Sorted::Sorted() : m_pSortInfo(NULL), m_bReadingMode(true), m_pBigQ(NULL),
 				   m_sMetaSuffix(".meta.data"), m_bPageFetched(false),
-				   m_pQueryOrderMaker(NULL), m_bMatchingPageFound(false)
+				   m_pQueryOrderMaker(NULL), m_bMatchingPageFound(false),
+				   m_bQueryOMCreated(false)
 {
 	m_pFile = new FileUtil();
 	m_pINPipe = new Pipe(PIPE_SIZE);
@@ -16,6 +17,8 @@ Sorted::~Sorted()
 
 	delete m_pBigQ;
 	m_pBigQ = NULL;
+
+	m_bQueryOMCreated = false;
 }
 
 int Sorted::Create(char *f_path, void *sortInfo)
@@ -69,6 +72,7 @@ int Sorted::Open(char *fname)
 // returns 1 if successfully closed the file, 0 otherwise
 int Sorted::Close()
 {
+	m_bQueryOMCreated = false;
 	MergeBigQToSortedFile();
     return m_pFile->Close();
 }
@@ -80,6 +84,7 @@ int Sorted::Close()
 void Sorted::Load (Schema &mySchema, char *loadMe)
 {
     EventLogger *el = EventLogger::getEventLogger();
+	m_bQueryOMCreated = false;
 
     FILE *fileToLoad = fopen(loadMe, "r");
     if (!fileToLoad)
@@ -104,6 +109,8 @@ void Sorted::Load (Schema &mySchema, char *loadMe)
 
 void Sorted::Add (Record &rec)
 {
+	m_bQueryOMCreated = false;
+
 	// if mode reading, change mode to writing
 	if (m_bReadingMode)
 		m_bReadingMode = false;
@@ -118,6 +125,8 @@ void Sorted::Add (Record &rec)
 
 void Sorted::MergeBigQToSortedFile()
 {
+	m_bQueryOMCreated = false;
+
 	// Check if there's anything to merge
 	if (!m_pBigQ)
 		return;
@@ -214,6 +223,7 @@ void Sorted::MergeBigQToSortedFile()
 
 void Sorted::MoveFirst ()
 {
+	m_bQueryOMCreated = false;
 	m_pFile->MoveFirst();
 	m_pQueryOrderMaker = NULL;
 	m_bMatchingPageFound = false;
@@ -223,6 +233,7 @@ void Sorted::MoveFirst ()
 // Returns 0 on failure
 int Sorted::GetNext (Record &fetchme)
 {
+	m_bQueryOMCreated = false;
 	// If mode is not reading i.e. it is writing mode currently
 	// merge differential data to already sorted file
 	if (!m_bReadingMode)
@@ -262,22 +273,22 @@ int Sorted::GetNext (Record &fetchme, CNF &cnf, Record &literal)
 	}
 
 	// Make query-order-maker only if it is not already made
-	if (m_pQueryOrderMaker == NULL)
+	if (m_bQueryOMCreated == false)
 	{
 		#ifdef _DEBUG
-//	    m_pSortInfo->myOrder->Print();
+	    //m_pSortInfo->myOrder->Print();
 		#endif
 
-            m_pQueryOrderMaker = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
+        m_pQueryOrderMaker = cnf.GetMatchingOrder(*(m_pSortInfo->myOrder));
+		m_bQueryOMCreated = true;
 
 
-
-#ifdef _Sorted_DEBUG
-            if (m_pQueryOrderMaker != NULL)
-                m_pQueryOrderMaker->Print();
-            else
-                cout<<"NULL query order maker"<<endl;
-#endif
+		#ifdef _Sorted_DEBUG
+        if (m_pQueryOrderMaker != NULL)
+            m_pQueryOrderMaker->Print();
+        else
+            cout<<"NULL query order maker"<<endl;
+		#endif
 	}
 
 
