@@ -106,6 +106,33 @@ void q1 () {
 	dbf_ps.Close ();
 }
 
+// select * from partsupp where ps_supplycost < 1.03 AND ps_availqty < 1000;
+// first CNF by SelectFile
+// second CNF by SelectPipe
+// expected output: 2 or 19 (depending on 2nd CNF)
+void q9 () {
+
+    char *pred_ps = "(ps_supplycost < 1.03)";
+    init_SF_ps (pred_ps, 100);
+
+    SF_ps.Run (dbf_ps, _ps, cnf_ps, lit_ps);
+    SF_ps.WaitUntilDone ();
+
+	//char *pred_ps2 = "(ps_availqty < 1000)"; // <-- returns 2 recs
+	char *pred_ps2 = "(ps_availqty > 1000)"; // <-- returns 19 recs
+	// make cnf and lit
+	CNF cnf_ps2; Record lit_ps2;
+	get_cnf(pred_ps2, ps->schema (), cnf_ps2, lit_ps2);
+
+	SelectPipe SP_ps;
+	Pipe _ps_out(100);
+	SP_ps.Run(_ps, _ps_out, cnf_ps2, lit_ps2);
+
+    int cnt = clear_pipe (_ps_out, ps->schema (), true);
+    cout << "\n\n query9 returned " << cnt << " records \n";
+
+    dbf_ps.Close ();
+}
 
 // select p_partkey(0), p_name(1), p_retailprice(7) from part where (p_retailprice > 931.01) AND (p_retailprice < 931.3);
 // expected output: 22 records
@@ -339,24 +366,56 @@ W: write out records from in_pipe to a file using out_schema
 	cout << " TBA\n";
 }
 
-void q8 () { 
 /*
 select l_orderkey, l_partkey, l_suppkey
 from lineitem
-where l_returnflag = 'R' and l_discount < 0.04 or 
-l_returnflag = 'R' and l_shipmode = 'MAIL';
+where l_returnflag = 'R' and l_discount < 0.04 
+or 
+l_returnflag = 'R' and l_shipmode = 'MAIL'; 
 
-ANSWER: 671392 rows in set (29.45 sec)
+ANSWER: 671392 rows in set (29.45 sec)*/
+void q8 () 
+{ 
+	// init SelectFile
+	char * pred_li = "(l_returnflag = 'R') AND (l_shipmode = 'MAIL' OR l_discount < 0.04)";
+	init_SF_li(pred_li, 100);
+
+	// init Project
+    Project P_li;
+    Pipe _out (pipesz);
+    int keepMe[] = {0,1,2};
+    int numAttsIn = pAtts;
+    int numAttsOut = 3;
+    P_li.Use_n_Pages (buffsz);
+	Attribute att3[] = {IA, IA, IA};
+    Schema out_sch ("out_sch", numAttsOut, att3);
 
 
-possible plan:
+	// init WriteOut
+	WriteOut W;
+	char *fwpath = "li.w.tmp";
+	FILE *writefile = fopen (fwpath, "w");
+
+	// run everything
+	SF_li.Run(dbf_li, _li, cnf_li, lit_li);
+	P_li.Run(_li, _out, keepMe, numAttsIn, numAttsOut);		
+	W.Run(_out, writefile, out_sch);
+	
+	SF_li.WaitUntilDone();
+	P_li.WaitUntilDone();
+	W.WaitUntilDone();
+
+	cout << " query8 finished..output written to file " << fwpath << "\n";
+
+    dbf_li.Close ();
+/*	Possible Plan:
 	SF (l_returnflag = 'R' and ...) => _l
 	On _l:
 		P (l_orderkey,l_partkey,l_suppkey) => __l
 	On __l:
 		W (__l)
-*/
-	cout << " TBA\n";
+
+	cout << " TBA\n";*/
 }
 
 int main (int argc, char *argv[]) {
@@ -366,11 +425,11 @@ int main (int argc, char *argv[]) {
 		exit (0);
 	}
 
-	void (*query_ptr[]) () = {&q1, &q2, &q3, &q4, &q5, &q6, &q7, &q8};  
+	void (*query_ptr[]) () = {&q1, &q2, &q3, &q4, &q5, &q6, &q7, &q8, &q9};  
 	void (*query) ();
 	int qindx = atoi (argv[1]);
 
-	if (qindx > 0 && qindx < 9) {
+	if (qindx > 0 && qindx < 10) {
 		setup ();
 		query = query_ptr [qindx - 1];
 		query ();
