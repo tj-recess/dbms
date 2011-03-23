@@ -27,6 +27,7 @@ class Sorted : public GenericDBFile
 		bool m_bPageFetched;
 		OrderMaker *m_pQueryOrderMaker;
 		bool m_bMatchingPageFound;
+		bool m_bQueryOMCreated;
 
 		// Private functions
 		void WriteMetaData();
