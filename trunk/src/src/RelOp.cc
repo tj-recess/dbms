@@ -124,24 +124,97 @@ void* Join::DoOperation(void* p)
         Pipe outL(pipeSize), outR(pipeSize);
         BigQ bigqL(*(param->inputPipeL), outL, omL, m_nRunLen);
         BigQ bigR(*(param->inputPipeR), outR, omR, m_nRunLen);
-        Record recL, recR;
-        // fetch one leftRec and one righRec
-        // find stuff for merging using them
-        bool left_fetched = false;
-        if (outL.Remove(&recL))
-                left_fetched = true;
+        Record leftRec, rightRec;
 
-        bool right_fetched = false;
-        if (outR.Remove(&recR))
-                right_fetched = true;
+        /*new logic
+         *get all records from left until they don't change (based on omL)
+         * get all recs from right until they don't change (based on omR)
+         * merge these records in a nested for loop
+        */
+        vector<Record*> recsFromLeftPipe, recsFromRightPipe;
+        Record *newRec = NULL, *prvsRec = NULL;
+        ComparisonEngine ce;
+        bool left_fetched = false;  //have an extra record fetched from left pipe
+        bool right_fetched = false; //have an extra record fetched from right pipe
 
-        if (left_fetched && right_fetched)
+        bool fetchFromLeft = true, fetchFromRight = true;
+        while(fetchFromLeft && fetchFromRight)
         {
+            //also insert the record in last newRec before inserting new ones
+            prvsRec = newRec = NULL;
+            if(left_fetched)
+            {
+                Record* copy = new Record();
+                copy->Copy(&leftRec);
+                recsFromLeftPipe.push_back(copy);
+                newRec = copy;
+                left_fetched = false;
+            }
+
+            while(outL.Remove(&leftRec))
+            {
+                Record* copy = new Record();
+                copy->Copy(&leftRec);
+                prvsRec = newRec;
+                newRec = copy;
+                if((prvsRec == NULL) || (prvsRec && ce.Compare(prvsRec, newRec, &omL) == 0))
+                    recsFromLeftPipe.push_back(copy);
+                else
+                {
+                    delete copy;
+                    copy = NULL;
+                    left_fetched = true;  //we still hold 1 already fetched record in leftRec
+                    break;
+                }
+                
+            }
+            if(!left_fetched)
+            {
+                fetchFromLeft = false;
+                outL.ShutDown();
+            }
+
+            prvsRec = newRec = NULL;
+            //also insert the record in last newRec before inserting new ones
+            if(right_fetched)
+            {
+                Record* copy = new Record();
+                copy->Copy(&rightRec);
+                recsFromRightPipe.push_back(copy);
+                newRec = copy;
+                right_fetched = false;
+            }
+            while (outR.Remove(&rightRec))
+            {
+                Record* copy = new Record();
+                copy->Copy(&rightRec);
+                prvsRec = newRec;
+                newRec = copy;
+                if((prvsRec == NULL) || (prvsRec && ce.Compare(prvsRec, newRec, &omR) == 0))
+                    recsFromRightPipe.push_back(copy);
+                else
+                {
+                    delete copy;
+                    copy = NULL;
+                    right_fetched = true;
+                    break;
+                }
+            }
+            if(!right_fetched)
+            {
+                fetchFromRight = false;
+                outR.ShutDown();
+            }
+
+            if(recsFromLeftPipe.size() > 0 && recsFromRightPipe.size() > 0)
+            {
+                Record* fromLeftPipe = recsFromLeftPipe.at(0);
+                Record* fromRightPipe = recsFromRightPipe.at(0);
                 // Logic:
                 // <size of record><byte location of att 1><byte location of attribute 2>...<byte location of att n><att 1><att 2>...<att n>
                 // num atts in rec = (byte location of att 1)/(sizeof(int)) - 1
-                int left_tot = ((int *) recL.bits)[1]/sizeof(int) - 1;
-                int right_tot = ((int *) recR.bits)[1]/sizeof(int) - 1;
+                int left_tot = ((int *) fromLeftPipe->bits)[1]/sizeof(int) - 1;
+                int right_tot = ((int *) fromRightPipe->bits)[1]/sizeof(int) - 1;
                 int numAttsToKeep = left_tot + right_tot;
                 int attsToKeep[numAttsToKeep], attsToKeepLeft[omL.numAtts], attsToKeepRight[omR.numAtts];
 
@@ -155,9 +228,9 @@ void* Join::DoOperation(void* p)
 
                 // make attsToKeep - for final merged/joined record
                 // <all from left> + <all from right>
-        	int i;
-	        for (i = 0; i < left_tot; i++)
-    	        attsToKeep[i] = i;
+                int i;
+                for (i = 0; i < left_tot; i++)
+                attsToKeep[i] = i;
                 for (int j = 0; j < right_tot; j++)
                         attsToKeep[i++] = j;
 
@@ -175,135 +248,126 @@ void* Join::DoOperation(void* p)
                 // if equal, join ... fetch only right (fetch from FK table)
                 // if left < right, fetch next left
                 // if left > right, fetch next right
-	        Record joinResult, copy_left, copy_right;
+                Record joinResult, copy_left, copy_right;
                 ComparisonEngine ce;
-                bool bError = false;
-                int cnt = 1;
-                do
+                copy_left.Copy(fromLeftPipe);
+                copy_right.Copy(fromRightPipe);
+                copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
+                copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
+                // join attributes match, fetch from FK table (assume its right)
+                int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
+                if (ret == 0)   //if first record from the pool matches, merge all recs in left pool
+                {               // with all recs in right pool using nested loops
+                    for(int i = 0; i < recsFromLeftPipe.size(); i++)
+                    {
+                        for(int j = 0; j < recsFromRightPipe.size(); j++)
+                        {
+                            joinResult.MergeRecords(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+                            if(ce.Compare(&joinResult, param->literalRec, param->selectOp) ==0)
+                                param->outputPipe->Insert(&joinResult);
+                        }
+                    }
+                    ClearAndDestroy(recsFromLeftPipe);
+                    ClearAndDestroy(recsFromRightPipe);
+                    fetchFromLeft = true;
+                    fetchFromRight = true;
+                }
+                // left is smaller than right, clear current left pool and fetch new left pool
+                else if (ret < 0)
                 {
-                    copy_left.Copy(&recL);
-                    copy_right.Copy(&recR);
-                    copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
-                    copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
-                    // join attributes match, fetch from FK table (assume its right)
-                    int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
-                    if (ret == 0)
-                    {
-                        joinResult.MergeRecords(&recL, &recR, left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-                        #ifdef _RELOP_DEBUG
-                        cout << "\n" << cnt++ <<" Result col:  " << ((int *) joinResult.bits)[1]/sizeof(int) - 1;
-                        #endif
-                        param->outputPipe->Insert(&joinResult);
-
-                        if (!outR.Remove(&recR))
-                                bError = true;
-                    }
-                    // left is smaller than right, fetch new left
-                    else if (ret < 0)
-                    {
-                            if (!outL.Remove(&recL))
-                                bError = true;
-                    }
-                    else	// left is greater than right, fetch right
-                    {
-                            if (!outR.Remove(&recR))
-                            bError = true;
-                    }
-            } while(!bError);
+                    ClearAndDestroy(recsFromLeftPipe);
+                    fetchFromLeft = true;
+                    fetchFromRight = false;
+                }
+                else	// left is greater than right, clear current right pool and fetch new right pool
+                {
+                    ClearAndDestroy(recsFromRightPipe);
+                    fetchFromLeft = false;
+                    fetchFromRight = true;
+                }
+            }
         }
+    }
+    else
+    {
+            // block-nested-loop-join
 
-		// clear out pipes
-		while (outR.Remove(&recR))
-		{
-			// do nothing
-		}
-		while (outL.Remove(&recL))
-		{
-			// do nothing
-		}
-		outL.ShutDown();
-		outR.ShutDown();
-	}
-	else
-	{
-		// block-nested-loop-join
+            vector<Record*> left_vec;
+            vector<Record*> right_vec;
+            Record rec;
 
-		vector<Record*> left_vec;
-		vector<Record*> right_vec;
-		Record rec;
+            // push the whole left table in left_vec
+            while (param->inputPipeL->Remove(&rec))
+            {
+                    Record *copy_rec = new Record;
+                    copy_rec->Copy(&rec);
+                    left_vec.push_back(copy_rec);
+            }
 
-		// push the whole left table in left_vec	
-		while (param->inputPipeL->Remove(&rec))
-		{
-			Record *copy_rec = new Record;
-			copy_rec->Copy(&rec);
-			left_vec.push_back(copy_rec);
-		}
+            bool bJoinSchCreated = false;
+            int left_tot, right_tot, numAttsToKeep;
+            int *attsToKeep;
+            // push whatever possible (depending on how much memory is left)
+            // from right table into right_vec
+            bool bRightFileOver = false;
+            do
+            {
+                    int right_recs_fetched = 0;
+        while (right_recs_fetched++ < 20000 &&  param->inputPipeR->Remove(&rec))
+            {
+                Record *copy_rec = new Record;
+            copy_rec->Copy(&rec);
+                right_vec.push_back(copy_rec);
+            }
 
-		bool bJoinSchCreated = false;
-		int left_tot, right_tot, numAttsToKeep;
-		int *attsToKeep;
-		// push whatever possible (depending on how much memory is left)
-		// from right table into right_vec
-		bool bRightFileOver = false;
-		do
-		{
-			int right_recs_fetched = 0;
-    	    while (right_recs_fetched++ < 20000 &&  param->inputPipeR->Remove(&rec))
-        	{
-	            Record *copy_rec = new Record;
-    	        copy_rec->Copy(&rec);
-        	    right_vec.push_back(copy_rec);
-	        }
-		
-			if (right_recs_fetched == 20000)
-				right_recs_fetched = 0;
-			else
-				bRightFileOver = true;
+                    if (right_recs_fetched == 20000)
+                            right_recs_fetched = 0;
+                    else
+                            bRightFileOver = true;
 
-			// make join-schema for joint record
-			if (!bJoinSchCreated && left_vec.size() > 0 && right_vec.size() > 0)
-			{
-				bJoinSchCreated = true;
-				left_tot = ((int *) left_vec.at(0)->bits)[1]/sizeof(int) - 1;
-                right_tot = ((int *) right_vec.at(0)->bits)[1]/sizeof(int) - 1;
-                numAttsToKeep = left_tot + right_tot;
+                    // make join-schema for joint record
+                    if (!bJoinSchCreated && left_vec.size() > 0 && right_vec.size() > 0)
+                    {
+                            bJoinSchCreated = true;
+                            left_tot = ((int *) left_vec.at(0)->bits)[1]/sizeof(int) - 1;
+            right_tot = ((int *) right_vec.at(0)->bits)[1]/sizeof(int) - 1;
+            numAttsToKeep = left_tot + right_tot;
 
-				attsToKeep = new int(numAttsToKeep);
-				int i;
-		        for (i = 0; i < left_tot; i++)
-        	        attsToKeep[i] = i;
-                for (int j = 0; j < right_tot; j++)
-                    attsToKeep[i++] = j;
-			}
+                            attsToKeep = new int(numAttsToKeep);
+                            int i;
+                    for (i = 0; i < left_tot; i++)
+                    attsToKeep[i] = i;
+            for (int j = 0; j < right_tot; j++)
+                attsToKeep[i++] = j;
+                    }
 
-			Record joinResult;
-			ComparisonEngine ce;
-			// nested for loop, first left, then right
-			for (int i = 0; i < left_vec.size(); i++)
-			{
-				for (int j = 0; j < right_vec.size(); j++)
-				{
-					// merge left and right records
-					joinResult.MergeRecords(left_vec.at(i), right_vec.at(j), left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-					// check with CNF, if OK, push to outPipe
-					if (ce.Compare(&joinResult, param->literalRec, param->selectOp) == 0)
-						param->outputPipe->Insert(&joinResult);
-				}
-			}
-		
-			ClearAndDestroy(right_vec);	
-			
-		} while (bRightFileOver == false);
-		
-		delete [] attsToKeep;
-		attsToKeep = NULL;	
-		
-		ClearAndDestroy(left_vec);
-		ClearAndDestroy(right_vec);	
-	}
+                    Record joinResult;
+                    ComparisonEngine ce;
+                    // nested for loop, first left, then right
+                    for (int i = 0; i < left_vec.size(); i++)
+                    {
+                            for (int j = 0; j < right_vec.size(); j++)
+                            {
+                                    // merge left and right records
+                                    joinResult.MergeRecords(left_vec.at(i), right_vec.at(j), left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+                                    // check with CNF, if OK, push to outPipe
+                                    if (ce.Compare(&joinResult, param->literalRec, param->selectOp) == 0)
+                                            param->outputPipe->Insert(&joinResult);
+                            }
+                    }
 
-	// shutdown the output pipe
+                    ClearAndDestroy(right_vec);
+
+            } while (bRightFileOver == false);
+
+            delete [] attsToKeep;
+            attsToKeep = NULL;
+
+            ClearAndDestroy(left_vec);
+            ClearAndDestroy(right_vec);
+    }
+
+    // shutdown the output pipe
     param->outputPipe->ShutDown();
 }
 
@@ -316,6 +380,7 @@ void Join::ClearAndDestroy(vector<Record*> &v)
 		delete rec;
 		rec = NULL;
 	}
+        v.clear();
 }
 
 void Join::WaitUntilDone () 
@@ -485,7 +550,7 @@ void * Sum::DoOperation(void * p)
 		param->computeFunc->Apply(rec, ival, dval);
 		sum += (ival + dval);
 		#ifdef _RELOP_DEBUG
-			cout << "\nsum = "<< sum;
+//			cout << "\nsum = "<< sum;
 		#endif
 	}
 
@@ -662,6 +727,8 @@ void* GroupBy::DoOperation(void* p)
 #endif
         if(!currentGroupActive)
         {
+            //reset sum to 0.0
+            sum = 0.0;
             currentGroupRecord->Copy(&rec);
             currentGroupActive = true;
 #ifdef _RELOP_DEBUG
@@ -686,7 +753,7 @@ void* GroupBy::DoOperation(void* p)
         {
 #ifdef _RELOP_DEBUG
             cout<<"Records in a Group = "<<recordsInAGroup<<", and sum = "<<sum<<endl;
-            recordsInAGroup = 0;
+//            recordsInAGroup = 0;
 #endif
             //store old sum and group-by attribtues concatenated in outputPipe
             //and also start new group from here
