@@ -369,6 +369,8 @@ void* Join::DoOperation(void* p)
 
     // shutdown the output pipe
     param->outputPipe->ShutDown();
+    delete param;
+    param = NULL;
 }
 
 void Join::ClearAndDestroy(vector<Record*> &v)
@@ -727,8 +729,6 @@ void* GroupBy::DoOperation(void* p)
 #endif
         if(!currentGroupActive)
         {
-            //reset sum to 0.0
-            sum = 0.0;
             currentGroupRecord->Copy(&rec);
             currentGroupActive = true;
 #ifdef _RELOP_DEBUG
@@ -791,7 +791,18 @@ void* GroupBy::DoOperation(void* p)
             tuple.MergeRecords(&sumRec, currentGroupRecord, 1, numAttsToKeep - 1, attsToKeep,  numAttsToKeep, 1);
             // Push this record to outPipe
             
-            param->outputPipe->Insert(&tuple);            
+            param->outputPipe->Insert(&tuple);
+
+            //initialize sum from last unused record (if any)
+            if(rec.bits != NULL)
+            {
+                int ival = 0; double dval = 0;
+                param->computeMeFunction->Apply(rec, ival, dval);
+                sum = (ival + dval);    //not += here coz we are re-initializing sum
+                delete rec.bits;
+                rec.bits = NULL;
+            }
+
             //start new group for this record
             currentGroupActive = false;
             // delete file "tmp_sum_data_file"
