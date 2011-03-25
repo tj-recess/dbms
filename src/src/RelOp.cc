@@ -244,17 +244,17 @@ void* Join::DoOperation(void* p)
                 }
 
                 // Porject grp-atts of left and right record
-                // Compare them (make order maker)
-                // if equal, join ... fetch only right (fetch from FK table)
-                // if left < right, fetch next left
-                // if left > right, fetch next right
+                // Compare them using JoinAttsOM 
+                // if equal, apply SelOp and join
+                // if left < right, flush left pool and fetch next
+                // if left > right, flush right pool and fetch next
                 Record joinResult, copy_left, copy_right;
                 ComparisonEngine ce;
                 copy_left.Copy(fromLeftPipe);
                 copy_right.Copy(fromRightPipe);
                 copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
                 copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
-                // join attributes match, fetch from FK table (assume its right)
+                // see if join attributes match
                 int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
                 if (ret == 0)   //if first record from the pool matches, merge all recs in left pool
                 {               // with all recs in right pool using nested loops
@@ -262,8 +262,10 @@ void* Join::DoOperation(void* p)
                     {
                         for(int j = 0; j < recsFromRightPipe.size(); j++)
                         {
+							// see if CNF accepts the records
 							if (ce.Compare(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), param->literalRec, param->selectOp) == 1)
 							{
+								// all is good, now merge left+right
 	                            joinResult.MergeRecords(recsFromLeftPipe.at(i), 
 														recsFromRightPipe.at(j), 
 														left_tot, right_tot, 
@@ -294,83 +296,132 @@ void* Join::DoOperation(void* p)
             }
         }
     }
-    else
+    else //-------- block-nested-loop-join -------------
     {
-            // block-nested-loop-join
+        vector<Record*> left_vec;
+        vector<Record*> right_vec;
+        Record rec;
+        int numPagesUsedUp = 0;
+        Page currentPage;
 
-            vector<Record*> left_vec;
-            vector<Record*> right_vec;
-            Record rec;
-
-            // push the whole left table in left_vec
-            while (param->inputPipeL->Remove(&rec))
-            {
-                    Record *copy_rec = new Record;
-                    copy_rec->Copy(&rec);
-                    left_vec.push_back(copy_rec);
-            }
-
-            bool bJoinSchCreated = false;
-            int left_tot, right_tot, numAttsToKeep;
-            int *attsToKeep;
-            // push whatever possible (depending on how much memory is left)
-            // from right table into right_vec
-            bool bRightFileOver = false;
-            do
-            {
-                    int right_recs_fetched = 0;
-        while (right_recs_fetched++ < 20000 &&  param->inputPipeR->Remove(&rec))
-            {
-                Record *copy_rec = new Record;
+        // push the whole LEFT table in left_vec
+        while (param->inputPipeL->Remove(&rec))
+        {
+            Record *copy_rec = new Record;
             copy_rec->Copy(&rec);
-                right_vec.push_back(copy_rec);
+            if (!currentPage.Append(&rec))  // page full
+            {
+                numPagesUsedUp++;
+                currentPage.EmptyItOut();
+                // atleast one page needed for right table, and one for buffer              
+                if (numPagesUsedUp >= (m_nRunLen-2))
+                {
+                    cout << "\n\nExceeding memory limits! Exiting...\n";
+                    exit(1);
+                }
+                currentPage.Append(&rec);
+            }
+            left_vec.push_back(copy_rec);
+        }
+
+        // set things up for the RIGHT table
+        int numPagesAvailable = m_nRunLen - numPagesUsedUp;
+        currentPage.EmptyItOut();
+
+        // initialize variables
+        bool bJoinSchCreated = false;
+        int left_tot, right_tot, numAttsToKeep;
+        int *attsToKeep;
+        // push whatever possible (depending on how much memory is left)
+        // from right table into right_vec
+        bool bRightFileOver = false;
+        do
+        {
+            Record *copy_rec = NULL;
+            bool bCopyRecCanBePushed = true;
+            numPagesUsedUp = 0;
+            while (param->inputPipeR->Remove(&rec))
+            {
+                copy_rec = new Record;
+                copy_rec->Copy(&rec);
+                if (!currentPage.Append(&rec))
+                {
+                    numPagesUsedUp++;
+                    currentPage.EmptyItOut();
+					// see if any more pages are available. If not, stop fetching from pipe
+                    if (numPagesUsedUp >= numPagesAvailable)
+                    {
+                        //copy_rec contains data, and has not been pushed to vector yet
+                        // and can't be put in a new-page/vector, as we are out of memory
+                        bCopyRecCanBePushed = false;
+                        break;
+                    }
+                    else
+                        currentPage.Append(&rec);
+                }
+                if (bCopyRecCanBePushed)
+                    right_vec.push_back(copy_rec);
             }
 
-                    if (right_recs_fetched == 20000)
-                            right_recs_fetched = 0;
-                    else
-                            bRightFileOver = true;
+            // we are out of loop, so either current page limit is over
+            // or pipe data is over.
+            // if bCopyRecCanBePushed = false --> current page limit exceeded
+            //                                continue after joining this much
+            // if bCopyRecCanBePushed = true --> pipe data is over
 
-                    // make join-schema for joint record
-                    if (!bJoinSchCreated && left_vec.size() > 0 && right_vec.size() > 0)
-                    {
-                            bJoinSchCreated = true;
-                            left_tot = ((int *) left_vec.at(0)->bits)[1]/sizeof(int) - 1;
-            right_tot = ((int *) right_vec.at(0)->bits)[1]/sizeof(int) - 1;
-            numAttsToKeep = left_tot + right_tot;
+            // make join-schema for joint record
+            if (!bJoinSchCreated && left_vec.size() > 0 && right_vec.size() > 0)
+            {
+                bJoinSchCreated = true;
+                left_tot = ((int *) left_vec.at(0)->bits)[1]/sizeof(int) - 1;
+                right_tot = ((int *) right_vec.at(0)->bits)[1]/sizeof(int) - 1;
+                numAttsToKeep = left_tot + right_tot;
 
-                            attsToKeep = new int(numAttsToKeep);
-                            int i;
-                    for (i = 0; i < left_tot; i++)
+                attsToKeep = new int(numAttsToKeep);
+                int i;
+                for (i = 0; i < left_tot; i++)
                     attsToKeep[i] = i;
-            for (int j = 0; j < right_tot; j++)
-                attsToKeep[i++] = j;
-                    }
+                for (int j = 0; j < right_tot; j++)
+                    attsToKeep[i++] = j;
+             }
 
-                    Record joinResult;
-                    ComparisonEngine ce;
-                    // nested for loop, first left, then right
-                    for (int i = 0; i < left_vec.size(); i++)
-                    {
-                            for (int j = 0; j < right_vec.size(); j++)
-                            {
-                                    // merge left and right records
-                                    joinResult.MergeRecords(left_vec.at(i), right_vec.at(j), left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-                                    // check with CNF, if OK, push to outPipe
-                                    if (ce.Compare(&joinResult, param->literalRec, param->selectOp) == 0)
-                                            param->outputPipe->Insert(&joinResult);
-                            }
-                    }
+             Record joinResult;
+             ComparisonEngine ce;
+             // nested for loop, first left, then right
+             for (int i = 0; i < left_vec.size(); i++)
+             {
+                for (int j = 0; j < right_vec.size(); j++)
+                {
+					// see if CNF satisfies
+					if (ce.Compare(left_vec.at(i), right_vec.at(j), param->literalRec, param->selectOp) == 1)
+					{
+	                    // merge left and right records
+    	                joinResult.MergeRecords(left_vec.at(i), right_vec.at(j),
+                            	                left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
+                        param->outputPipe->Insert(&joinResult);
+					}
+                 }
+             }
 
-                    ClearAndDestroy(right_vec);
-
-            } while (bRightFileOver == false);
-
-            delete [] attsToKeep;
-            attsToKeep = NULL;
-
-            ClearAndDestroy(left_vec);
+            // empty out right_vec              
             ClearAndDestroy(right_vec);
+
+            // see if there's more data in the RIGHT pipe
+            if (bCopyRecCanBePushed == false)
+            {
+                right_vec.push_back(copy_rec);
+                bCopyRecCanBePushed = true;
+            }
+            else
+                bRightFileOver = true;
+
+        } while (bRightFileOver == false);
+
+        delete [] attsToKeep;
+        attsToKeep = NULL;
+
+        ClearAndDestroy(left_vec);
+        ClearAndDestroy(right_vec);
     }
 
     // shutdown the output pipe
