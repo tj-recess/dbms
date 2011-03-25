@@ -102,9 +102,11 @@ class Project : public RelationalOp
 		void WaitUntilDone ();
 		void Use_n_Pages (int n) { }
 };
-class Join : public RelationalOp {
+
+class Join : public RelationalOp 
+{
     private:
-        pthread_t thread;
+        pthread_t m_thread;
         static int m_nRunLen;
         struct Params
         {
