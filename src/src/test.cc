@@ -330,29 +330,63 @@ void q6 () {
 	cout << " query6 returned sum for " << cnt << " groups (expected 25 groups)\n"; 
 }
 
-void q7 () { 
+void q7 () 
+{
+	cout << " query7 \n";
+    char *pred_s = "(s_acctbal > 2500.0)";
+    init_SF_s (pred_s, 100);
+    SF_s.Run (dbf_s, _s, cnf_s, lit_s); 
+
+    char *pred_p = "(p_partkey = p_partkey)";
+    init_SF_p (pred_p, 100);
+    SF_p.Run (dbf_p, _p, cnf_p, lit_p);
+
+    char *pred_ps = "(ps_partkey = ps_partkey)";
+    init_SF_ps (pred_ps, 100);
+    SF_ps.Run (dbf_ps, _ps, cnf_ps, lit_ps);
+    
+    Join J;
+        
+    Pipe _p_ps (pipesz);
+    CNF cnf_p_ps;
+    Record lit_p_ps;
+    get_cnf ("(ps_partkey = p_partkey)", ps->schema(), p->schema(), cnf_p_ps, lit_p_ps);
+
+    Join J1;
+        
+    Pipe _s_p_ps (pipesz);
+    CNF cnf_s_ps;
+    Record lit_s_ps;
+    get_cnf ("(s_suppkey = ps_suppkey)", s->schema(), ps->schema(), cnf_s_ps, lit_s_ps);
+
+    int outAtts = sAtts + psAtts + pAtts;
+    Attribute ps_supplycost = {"ps_supplycost", Double};
+    Attribute joinatt[] = {IA,SA,SA,IA,SA,DA,SA,IA,IA,IA,ps_supplycost,SA,IA,SA,SA,SA,SA,IA,SA,DA,SA};
+    Schema join_sch ("join_sch", outAtts, joinatt);            
+
+    Sum T;
+    // _s (input pipe)
+    Pipe _out (1);
+    Function func;
+    char *str_sum = "(ps_supplycost)";
+    get_cnf (str_sum, &join_sch, func);
+    func.Print ();
+    T.Use_n_Pages (1);
+    J.Run (_ps, _p, _p_ps, cnf_p_ps, lit_p_ps);
+    J1.Run (_s, _p_ps, _s_p_ps, cnf_s_ps, lit_s_ps);
+    T.Run (_s_p_ps, _out, func);
+
+    SF_ps.WaitUntilDone ();
+    SF_s.WaitUntilDone ();
+    SF_p.WaitUntilDone ();
+    cout<<"\nselect file done";
+    T.WaitUntilDone ();
+    cout<<"\nSUM DONE";
+    Schema sum_sch ("sum_sch", 1, &DA);
+    int cnt = clear_pipe (_out, &sum_sch, true);
+    cout << " query7 returned " << cnt << " recs \n";
+ 
 /*
-select sum(ps_supplycost)
-from part, supplier, partsupp
-where p_partkey = ps_partkey and
-s_suppkey = ps_suppkey and
-s_acctbal > 2500;
-
-ANSWER: 274251601.96 (5.91 sec)
-
-possible plan:
-	SF(s_acctbal > 2500) => _s
-	SF(p_partkey = p_partkey) => _p 
-	SF(ps_partkey = ps_partkey) => _ps  
-	On records from pipes _p and _ps: 
-		J(p_partkey = ps_partkey) => _p_ps
-	On _s and _p_ps: 
-		J(s_suppkey = ps_suppkey) => _s_p_ps
-	On _s_p_ps:
-		S(s_supplycost) => __s_p_ps
-	On __s_p_ps:
-		W(__s_p_ps)
-
 Legend:
 SF : select all records that satisfy some simple cnf expr over recs from in_file 
 SP: same as SF but recs come from in_pipe
@@ -363,7 +397,6 @@ G: same as T but do it over each group identified by ordermaker
 D: stuff only distinct records into the out_pipe discarding duplicates
 W: write out records from in_pipe to a file using out_schema
 */
-	cout << " TBA\n";
 }
 
 /*
