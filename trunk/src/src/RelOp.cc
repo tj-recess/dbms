@@ -102,7 +102,7 @@ void Join::Run(Pipe& inPipeL, Pipe& inPipeR, Pipe& outPipe, CNF& selOp, Record& 
         exit(1);
     }
 
-    pthread_create(&thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal));
+    pthread_create(&m_thread, NULL, DoOperation, (void*)new Params(&inPipeL, &inPipeR, &outPipe, &selOp, &literal));
 }
 
 void* Join::DoOperation(void* p)
@@ -444,14 +444,14 @@ void Join::ClearAndDestroy(vector<Record*> &v)
 
 void Join::WaitUntilDone () 
 {
-	 pthread_join (thread, NULL);
+	 pthread_join (m_thread, NULL);
 }
 
 void Join::Use_n_Pages (int runlen)
 {
-    //not sure if this runLen should be halved as
-    //2 BigQs will be constructed
-    m_nRunLen = runlen;
+    //runLen should be halved as
+    //as 2 BigQs will be constructed
+    m_nRunLen = runlen/2;
 }
 
 //--------------- Project ------------------
