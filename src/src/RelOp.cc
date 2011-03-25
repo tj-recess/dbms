@@ -262,9 +262,15 @@ void* Join::DoOperation(void* p)
                     {
                         for(int j = 0; j < recsFromRightPipe.size(); j++)
                         {
-                            joinResult.MergeRecords(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
-                            if(ce.Compare(&joinResult, param->literalRec, param->selectOp) ==0)
+							if (ce.Compare(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), param->literalRec, param->selectOp) == 1)
+							{
+	                            joinResult.MergeRecords(recsFromLeftPipe.at(i), 
+														recsFromRightPipe.at(j), 
+														left_tot, right_tot, 
+														attsToKeep, numAttsToKeep, 
+														left_tot);
                                 param->outputPipe->Insert(&joinResult);
+							}
                         }
                     }
                     ClearAndDestroy(recsFromLeftPipe);
