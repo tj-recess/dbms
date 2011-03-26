@@ -125,6 +125,7 @@ class Join : public RelationalOp
         };
         static void* DoOperation(void*);
 		static void ClearAndDestroy(vector<Record *> &v);
+		static bool PopulateVec(DBFile &file, vector<Record *> &v);
 
     public:
 	void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal);

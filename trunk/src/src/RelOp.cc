@@ -300,38 +300,65 @@ void* Join::DoOperation(void* p)
     {
         vector<Record*> left_vec;
         vector<Record*> right_vec;
-        Record rec;
+        Record rec, *copy_rec_left = NULL, *copy_rec_right = NULL;
         int numPagesUsedUp = 0;
         Page currentPage;
+        // initialize variables
+        bool bJoinSchCreated = false, bRightFileCreated = false, bLeftFileOver = true;
+        int left_tot, right_tot, numAttsToKeep;
+        int *attsToKeep;
 
+		DBFile rightDBFile;
+	
+		/* Logic:
+		 * Get data from left pipe into N-2 pages
+		 * (leave 1 page for buffer, while page and vector are both full)
+		 * And leave 1 page for the data from the right pipe
+		 */	
+	  do
+ 	  {
+		bLeftFileOver = true;
         // push the whole LEFT table in left_vec
         while (param->inputPipeL->Remove(&rec))
         {
-            Record *copy_rec = new Record;
-            copy_rec->Copy(&rec);
+            copy_rec_left = new Record;
+            copy_rec_left->Copy(&rec);
             if (!currentPage.Append(&rec))  // page full
             {
                 numPagesUsedUp++;
                 currentPage.EmptyItOut();
                 // atleast one page needed for right table, and one for buffer              
-                if (numPagesUsedUp >= (m_nRunLen-2))
-                {
-                    cout << "\n\nExceeding memory limits! Exiting...\n";
-                    exit(1);
-                }
-                currentPage.Append(&rec);
+                if (numPagesUsedUp >= ((m_nRunLen*2)-2))
+				{
+					bLeftFileOver = false;
+					break;
+				}
+				else
+	                currentPage.Append(&rec);
             }
-            left_vec.push_back(copy_rec);
+			if (bLeftFileOver)
+	            left_vec.push_back(copy_rec_left);
+			// else, copy_rec_left contains a record
         }
 
         // set things up for the RIGHT table
-        int numPagesAvailable = m_nRunLen - numPagesUsedUp;
+        int numPagesAvailable = (m_nRunLen*2) - numPagesUsedUp;
         currentPage.EmptyItOut();
 
-        // initialize variables
-        bool bJoinSchCreated = false;
-        int left_tot, right_tot, numAttsToKeep;
-        int *attsToKeep;
+		// If left table fit in-memory, at this point bLeftFileOver will be true
+		// so we don't have to write records from right pipe into file
+		// But if bLeftFileOver = false, then we need to create rightDBFile
+		if (bLeftFileOver == false && bRightFileCreated == false)
+		{
+			bRightFileCreated = true;
+			rightDBFile.Create((char*)"right_file.data", heap, NULL);
+			while (param->inputPipeR->Remove(&rec))
+				rightDBFile.Add(rec);
+			rightDBFile.Close();
+			rightDBFile.Open((char*)"right_file.data");
+		}
+	
+
         // push whatever possible (depending on how much memory is left)
         // from right table into right_vec
         bool bRightFileOver = false;
@@ -363,11 +390,18 @@ void* Join::DoOperation(void* p)
                     right_vec.push_back(copy_rec);
             }
 
+			// *** Point 1 ***
             // we are out of loop, so either current page limit is over
             // or pipe data is over.
             // if bCopyRecCanBePushed = false --> current page limit exceeded
-            //                                continue after joining this much
+            //                                    continue after joining this much
             // if bCopyRecCanBePushed = true --> pipe data is over
+
+			// *** Point 2 ***
+			// if bRightFileCreated = true, that means we need to fetch 
+			// records from rightDBFile (only 1 page) and populate right_vec
+			if (bRightFileCreated)
+				bRightFileOver = PopulateVec(rightDBFile, right_vec);
 
             // make join-schema for joint record
             if (!bJoinSchCreated && left_vec.size() > 0 && right_vec.size() > 0)
@@ -407,9 +441,9 @@ void* Join::DoOperation(void* p)
             ClearAndDestroy(right_vec);
 
             // see if there's more data in the RIGHT pipe
-            if (bCopyRecCanBePushed == false)
+            if (!bRightFileCreated && bCopyRecCanBePushed == false)
             {
-                right_vec.push_back(copy_rec);
+                right_vec.push_back(copy_rec_right);
                 bCopyRecCanBePushed = true;
             }
             else
@@ -417,11 +451,19 @@ void* Join::DoOperation(void* p)
 
         } while (bRightFileOver == false);
 
-        delete [] attsToKeep;
-        attsToKeep = NULL;
-
         ClearAndDestroy(left_vec);
         ClearAndDestroy(right_vec);
+
+		if (!bLeftFileOver)
+	        left_vec.push_back(copy_rec_right);
+
+  	  } while (bLeftFileOver == false);
+
+      delete [] attsToKeep;
+      attsToKeep = NULL;
+
+      ClearAndDestroy(left_vec);
+      ClearAndDestroy(right_vec);
     }
 
     // shutdown the output pipe
@@ -430,6 +472,31 @@ void* Join::DoOperation(void* p)
     param = NULL;
 }
 
+// Populate vector with 1 page worth of data from DBFile
+// return true if file is over
+bool Join::PopulateVec(DBFile &rightDBFile, vector<Record*> &v)
+{
+	Page currentPage;
+	Record rec;
+	bool bPageFull;
+	do
+	{
+		bPageFull = false;
+		if (rightDBFile.GetNext(rec))
+		{
+			v.push_back(&rec); // cheat a little, push one extra than page
+			if (!currentPage.Append(&rec))
+			{
+				currentPage.EmptyItOut();
+				bPageFull = true;
+			}
+		}
+		else
+			return true;	// indicate file is over
+	} while (bPageFull == false);
+
+	return false;			// indicate file is not over
+}
 void Join::ClearAndDestroy(vector<Record*> &v)
 {
 	Record *rec;
