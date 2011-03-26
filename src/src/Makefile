@@ -1,4 +1,4 @@
-all: test.out a2-2test.out a2test.out a1test.out
+all: a3test.out a2-2test.out a2test.out a1test.out
 
 CC = g++ -O0 -Wno-deprecated
 
@@ -8,10 +8,10 @@ ifdef linux
 tag = -n
 endif
 
-test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o test.o
-	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o test.o -lfl -lpthread
+a3test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o a3test.o
+	$(CC) -o a3test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o a3test.o -lfl -lpthread
 
-a2-2test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o test.o EventLogger.o a2-2test.o
+a2-2test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o a3test.o EventLogger.o a2-2test.o
 	$(CC) -o a2-2test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o a2-2test.o EventLogger.o FileUtil.o Heap.o Sorted.o -lfl -lpthread
 
 a2test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o a2-test.o EventLogger.o
@@ -20,8 +20,8 @@ a2test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o 
 a1test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o DBFile.o Pipe.o EventLogger.o y.tab.o lex.yy.o a1-test.o
 	$(CC) -o a1test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o FileUtil.o Heap.o Sorted.o BigQ.o EventLogger.o DBFile.o Pipe.o y.tab.o lex.yy.o a1-test.o -lfl -lpthread
 
-test.o: test.cc
-	$(CC) -g -c test.cc
+a3test.o: a3test.cc
+	$(CC) -g -c a3test.cc
 
 a2-2test.o: a2-2test.cc
 	$(CC) -g -c a2-2test.cc
