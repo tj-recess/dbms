@@ -216,15 +216,7 @@ void* Join::DoOperation(void* p)
                 int left_tot = ((int *) fromLeftPipe->bits)[1]/sizeof(int) - 1;
                 int right_tot = ((int *) fromRightPipe->bits)[1]/sizeof(int) - 1;
                 int numAttsToKeep = left_tot + right_tot;
-                int attsToKeep[numAttsToKeep], attsToKeepLeft[omL.numAtts], attsToKeepRight[omR.numAtts];
-
-                // make attsToKeepLeft
-                for (int i = 0; i < omL.numAtts; i++)
-                        attsToKeepLeft[i] = omL.whichAtts[i];
-
-                // make attsToKeepRight
-                for (int i = 0; i < omR.numAtts; i++)
-                        attsToKeepRight[i] = omR.whichAtts[i];
+                int attsToKeep[numAttsToKeep];
 
                 // make attsToKeep - for final merged/joined record
                 // <all from left> + <all from right>
@@ -234,28 +226,13 @@ void* Join::DoOperation(void* p)
                 for (int j = 0; j < right_tot; j++)
                         attsToKeep[i++] = j;
 
-                // Make orderMaker for comparing records on the join-attributes
-                OrderMaker JoinAttsOM;
-                JoinAttsOM.numAtts = omR.numAtts;
-                for (int j = 0; j < omR.numAtts; j++)
-                {
-                        JoinAttsOM.whichAtts[j] = j;
-                        JoinAttsOM.whichTypes[j] = omR.whichTypes[j];
-                }
-
-                // Porject grp-atts of left and right record
-                // Compare them using JoinAttsOM 
+                Record joinResult;
+                ComparisonEngine ce;
+                // see if join attributes match
                 // if equal, apply SelOp and join
                 // if left < right, flush left pool and fetch next
                 // if left > right, flush right pool and fetch next
-                Record joinResult, copy_left, copy_right;
-                ComparisonEngine ce;
-                copy_left.Copy(fromLeftPipe);
-                copy_right.Copy(fromRightPipe);
-                copy_left.Project(attsToKeepLeft, omL.numAtts, left_tot);
-                copy_right.Project(attsToKeepRight, omR.numAtts, right_tot);
-                // see if join attributes match
-                int ret = ce.Compare(&copy_left, &copy_right, &JoinAttsOM);
+				int ret = ce.Compare(recsFromLeftPipe.at(0), &omL, recsFromRightPipe.at(0), &omR);
                 if (ret == 0)   //if first record from the pool matches, merge all recs in left pool
                 {               // with all recs in right pool using nested loops
                     for(int i = 0; i < recsFromLeftPipe.size(); i++)

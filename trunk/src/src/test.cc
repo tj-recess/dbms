@@ -379,9 +379,9 @@ void q7 ()
     SF_ps.WaitUntilDone ();
     SF_s.WaitUntilDone ();
     SF_p.WaitUntilDone ();
-    cout<<"\nselect file done";
+    cout<<"\nSelect file done\n";
     T.WaitUntilDone ();
-    cout<<"\nSUM DONE";
+    cout<<"\nSum done\n";
     Schema sum_sch ("sum_sch", 1, &DA);
     int cnt = clear_pipe (_out, &sum_sch, true);
     cout << " query7 returned " << cnt << " recs \n";
