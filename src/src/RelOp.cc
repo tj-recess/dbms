@@ -117,7 +117,12 @@ void* Join::DoOperation(void* p)
      */
     OrderMaker omL, omR;
     param->selectOp->GetSortOrders(omL, omR);
-	
+#ifdef _RELOP_DEBUG
+    int recsMerged = 0;
+    int lFetchCount = 0;
+    int rFetchCount = 0;
+    int tryingRecsMerge = 0;
+#endif
     if (omL.numAtts == omR.numAtts && omR.numAtts > 0)
     {
         const int pipeSize = 100;
@@ -138,8 +143,10 @@ void* Join::DoOperation(void* p)
         bool right_fetched = false; //have an extra record fetched from right pipe
 
         bool fetchFromLeft = true, fetchFromRight = true;
-        while(fetchFromLeft && fetchFromRight)
+        while(fetchFromLeft || fetchFromRight)
         {
+            if(fetchFromLeft)
+            {
             //also insert the record in last newRec before inserting new ones
             prvsRec = newRec = NULL;
             if(left_fetched)
@@ -153,6 +160,9 @@ void* Join::DoOperation(void* p)
 
             while(outL.Remove(&leftRec))
             {
+#ifdef _RELOP_DEBUG
+                lFetchCount++;
+#endif
                 Record* copy = new Record();
                 copy->Copy(&leftRec);
                 prvsRec = newRec;
@@ -173,7 +183,10 @@ void* Join::DoOperation(void* p)
                 fetchFromLeft = false;
                 outL.ShutDown();
             }
+            }
 
+            if(fetchFromRight)
+            {
             prvsRec = newRec = NULL;
             //also insert the record in last newRec before inserting new ones
             if(right_fetched)
@@ -186,6 +199,9 @@ void* Join::DoOperation(void* p)
             }
             while (outR.Remove(&rightRec))
             {
+#ifdef _RELOP_DEBUG
+                rFetchCount++;
+#endif
                 Record* copy = new Record();
                 copy->Copy(&rightRec);
                 prvsRec = newRec;
@@ -204,6 +220,7 @@ void* Join::DoOperation(void* p)
             {
                 fetchFromRight = false;
                 outR.ShutDown();
+            }
             }
 
             if(recsFromLeftPipe.size() > 0 && recsFromRightPipe.size() > 0)
@@ -239,6 +256,9 @@ void* Join::DoOperation(void* p)
                     {
                         for(int j = 0; j < recsFromRightPipe.size(); j++)
                         {
+#ifdef _RELOP_DEBUG
+                                tryingRecsMerge++;
+#endif
                             // see if CNF accepts the records
                             if (ce.Compare(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), param->literalRec, param->selectOp) == 1)
                             {
@@ -248,7 +268,10 @@ void* Join::DoOperation(void* p)
 	                        joinResult.MergeRecords(recsFromLeftPipe.at(i), &copyRec, left_tot, right_tot,
 							attsToKeep, numAttsToKeep, left_tot);
                                 param->outputPipe->Insert(&joinResult);
-							}
+#ifdef _RELOP_DEBUG
+                                recsMerged++;
+#endif
+                            }
                         }
                     }
                     ClearAndDestroy(recsFromLeftPipe);
@@ -271,6 +294,12 @@ void* Join::DoOperation(void* p)
                 }
             }
         }
+#ifdef _RELOP_DEBUG
+        cout<<lFetchCount<< " records fetched from left pipe"<<endl;
+        cout<<rFetchCount<< " records fetched from right pipe"<<endl;
+        cout<<tryingRecsMerge<< " records were tried for merge in join!"<<endl;
+        cout<<recsMerged<< " records merged in join!"<<endl;
+#endif
     }
     else //-------- block-nested-loop-join -------------
     {
