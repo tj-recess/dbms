@@ -239,15 +239,14 @@ void* Join::DoOperation(void* p)
                     {
                         for(int j = 0; j < recsFromRightPipe.size(); j++)
                         {
-							// see if CNF accepts the records
-							if (ce.Compare(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), param->literalRec, param->selectOp) == 1)
-							{
-								// all is good, now merge left+right
-	                            joinResult.MergeRecords(recsFromLeftPipe.at(i), 
-														recsFromRightPipe.at(j), 
-														left_tot, right_tot, 
-														attsToKeep, numAttsToKeep, 
-														left_tot);
+                            // see if CNF accepts the records
+                            if (ce.Compare(recsFromLeftPipe.at(i), recsFromRightPipe.at(j), param->literalRec, param->selectOp) == 1)
+                            {
+                                Record copyRec;
+                                copyRec.Copy(recsFromRightPipe.at(j));
+                                // all is good, now merge left+right
+	                        joinResult.MergeRecords(recsFromLeftPipe.at(i), &copyRec, left_tot, right_tot,
+							attsToKeep, numAttsToKeep, left_tot);
                                 param->outputPipe->Insert(&joinResult);
 							}
                         }
@@ -403,11 +402,13 @@ void* Join::DoOperation(void* p)
              {
                 for (int j = 0; j < right_vec.size(); j++)
                 {
-					// see if CNF satisfies
-					if (ce.Compare(left_vec.at(i), right_vec.at(j), param->literalRec, param->selectOp) == 1)
-					{
-	                    // merge left and right records
-    	                joinResult.MergeRecords(left_vec.at(i), right_vec.at(j),
+                    // see if CNF satisfies
+                    if (ce.Compare(left_vec.at(i), right_vec.at(j), param->literalRec, param->selectOp) == 1)
+                    {
+                        Record copyRec;
+                        copyRec.Copy(right_vec.at(j));
+	                // merge left and right records
+    	                joinResult.MergeRecords(left_vec.at(i), &copyRec,
                             	                left_tot, right_tot, attsToKeep, numAttsToKeep, left_tot);
                         param->outputPipe->Insert(&joinResult);
 					}
