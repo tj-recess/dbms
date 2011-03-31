@@ -1,15 +1,31 @@
-Project Members
-----------------
-NAME				UFID
+==============================================================================
+032608-1719
 
-Arpit Tripathi		61350118
-Malvika Agrawal		45163914
+readme 
+=========
+Previous drivers are not included!
+
+This driver is for assignment 4.1 (Query Compiler)
+
+To compile the driver, type
+	make a4-1.out
+
+To run the driver, type 'test.out' followed by the query # you wish to execute
+	./a4-1.out [0-11]
 
 
-Additional Information
-----------------------
-* Made q7, q8 and q9 for project 3 (they are in a3test.cc)
+Using the Driver:
+==================
+I modify Lexer.l, please use this new version. 
 
-* The executable is called a3.out
+For those who use Solaris machines, do not delete included lex.yy.c, otherwise, there may have
+link error.
 
-* Renamed test.cc and test.h to a3test.cc and a3test.h
+
+
+Submission Instructions: 
+========================= 
+
+ Create directory a4-1. The turnin file should be called a4-1.tar.gz)
+The executable produced by your file should be called a4-1.out
+-------------------------------------------------------------------------------

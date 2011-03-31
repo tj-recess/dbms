@@ -1,4 +1,4 @@
-all: a3.out a2-2test.out a2test.out a1test.out
+#all: a3.out a2-2test.out a2test.out a1test.out
 
 CC = g++ -O0 -Wno-deprecated
 
@@ -7,6 +7,12 @@ tag = -i
 ifdef linux
 tag = -n
 endif
+
+a4-1.out: Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o DBFile.o Heap.o Sorted.o Pipe.o BigQ.o y.tab.o lex.yy.o test.o
+	$(CC) -o a4-1.out Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o DBFile.o Heap.o Sorted.o Pipe.o BigQ.o y.tab.o lex.yy.o test.o -lfl -lpthread
+
+test.o: test.cc
+	$(CC) -g -c test.cc
 
 a3.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o a3test.o
 	$(CC) -o a3.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o a3test.o -lfl -lpthread
@@ -31,6 +37,9 @@ a2-test.o: a2-test.cc
 
 a1-test.o: a1-test.cc
 	$(CC) -g -c a1-test.cc
+
+Statistics.o: Statistics.cc
+	$(CC) -g -c Statistics.cc
 
 Heap.o: Heap.cc
 	$(CC) -g -c Heap.cc
@@ -76,7 +85,7 @@ EventLogger.o: EventLogger.cc
 
 y.tab.o: Parser.y
 	yacc -d Parser.y
-	#sed $(tag) y.tab.c -e "s/  __attribute__ ((__unused__))$$/# ifndef __cplusplus\n  __attribute__ ((__unused__));\n# endif/" 
+	sed $(tag) y.tab.c -e "s/  __attribute__ ((__unused__))$$/# ifndef __cplusplus\n  __attribute__ ((__unused__));\n# endif/" 
 	g++ -c y.tab.c
                 
 yyfunc.tab.o: ParserFunc.y

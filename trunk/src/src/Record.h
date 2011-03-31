@@ -64,13 +64,12 @@ public:
 	// attsToKeep[] = {0, 1, 2, 0, 2, 4} --gets 0,1,2 records from left 0, 2, 4 recs from right and startOfRight=3
 	// startOfRight is the index position in attsToKeep for the first att from right rec
 	void MergeRecords (Record *left, Record *right, int numAttsLeft, 
-		int numAttsRight, int *attsToKeep, int numAttsToKeep, int startOfRight);
+				       int numAttsRight, int *attsToKeep, int numAttsToKeep, int startOfRight);
 
 	// prints the contents of the record; this requires
 	// that the schema also be given so that the record can be interpreted
 	void Print (Schema *mySchema);
-
-        void PrintToFile(Schema*, std::ofstream&);
+    void PrintToFile(Schema*, std::ofstream&);
 };
 
 #endif
