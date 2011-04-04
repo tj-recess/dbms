@@ -94,6 +94,11 @@ void Statistics::AddAtt(char *relName, char *attName, int numDistincts)
 
 		// add it to the RelStats map
         m_mRelStats[string(relName)] = t_info;
+
+		// add col-table info in m_mColToTable
+		vector<string> v_tableName;
+		v_tableName.push_back(string(relName));
+		m_mColToTable[string(attName)] = v_tableName;
     }
     else // if relName found in the RelStats map
     {
@@ -102,7 +107,13 @@ void Statistics::AddAtt(char *relName, char *attName, int numDistincts)
 		att_itr = (rs_itr->second).Atts.find(string(attName));
 		// if no info for this attribute, add it
 		if (att_itr == (rs_itr->second).Atts.end())
+		{
 			(rs_itr->second).Atts[string(attName)] = numDistincts;
+			// add col-table info in m_mColToTable
+			vector<string> v_tableName;
+	        v_tableName.push_back(string(relName));
+	        m_mColToTable[string(attName)] = v_tableName;
+		}
 		else	// update the distinct count
 			att_itr->second = numDistincts;
     }
@@ -121,6 +132,16 @@ void Statistics::CopyRel(char *oldName, char *newName)
 	}
 	else
 	{
+		// Do 2 things:
+		// 1. 	Add new table name to the m_mColToTable
+		// 		col_name : <old_table, new_table>
+		// 2.	make a copy of this OldTableInfo structure
+		//		and associate it with the new table name
+
+		// make iterator for m_mColToTable map
+		map <string, vector <string> >::iterator c2t_itr;
+
+		// Fetch old table_info
 		TableInfo *pOldTableInfo = &(rs_itr->second);
 		
 		// make a copy of this OldTableInfo structure
@@ -128,6 +149,7 @@ void Statistics::CopyRel(char *oldName, char *newName)
 		t_info.numTuples = pOldTableInfo->numTuples;
 		//t_info.numPartition = pOldTableInfo->numPartition; <-- not sure of this!
 
+		// copy attributes and distinct values from map Atts
 		map <string, int>::iterator atts_itr;
 		for (atts_itr = pOldTableInfo->Atts.begin();
 			 atts_itr != pOldTableInfo->Atts.end();
@@ -135,10 +157,22 @@ void Statistics::CopyRel(char *oldName, char *newName)
 		{
 			//			attribute name   =>  distinct value
 			t_info.Atts[atts_itr->first] = atts_itr->second;
+		
+			// push new table name for each column
+			c2t_itr = m_mColToTable.find(atts_itr->first);
+			if (c2t_itr == m_mColToTable.end())
+			{
+				cerr << "\nColumn name " << (atts_itr->first).c_str()
+					 << " not found in m_mColToTable! ERROR!\n";
+				return;
+			}
+			(c2t_itr->second).push_back(string(newName));
 		}
 
 		// now set TableInfo structure for this relation
 		m_mRelStats[string(newName)] = t_info;
+
+		
 	}
 
 	// TODO: how does this operation affect the m_mPartitionInfoMap?
