@@ -1,5 +1,5 @@
 #include "Statistics.h"
-#include <iostream>
+#include <string.h>
 using namespace std;
 
 Statistics::Statistics() : m_nPartitionNum(0)
@@ -148,9 +148,85 @@ void Statistics::CopyRel(char *oldName, char *newName)
 
 void Statistics::Read(char *fromWhere)
 {
+	FILE * fptr = fopen(fromWhere, "r");
+	if (fptr == NULL)
+		return;
+
+	// this is enough space to hold any tokens
+    char buffer[200];
+	// other variables
+	string relName, attName;
+	int numValues;
+
+	while (fscanf(fptr, "%s", buffer) != EOF)
+	{
+		if (strcmp(buffer, "BEGIN") == 0)
+		{
+			TableInfo t_info;
+			fscanf(fptr, "%s", buffer);
+			relName = buffer;
+			fscanf(fptr, "%d", &t_info.numTuples);
+			fscanf(fptr, "%s", buffer);
+			while (strcmp(buffer, "END") != 0)
+			{
+				attName = buffer;
+				fscanf(fptr, "%d", &numValues);
+				t_info.Atts[attName] = numValues;
+				// read next row
+				fscanf(fptr, "%s", buffer);
+			}
+			m_mRelStats[relName] = t_info;
+		}
+	}	
 }
-void Statistics::Write(char *fromWhere)
+
+void Statistics::Write(char *toWhere)
 {
+/* 	The file format is:
+
+BEGIN
+relName
+numTuples
+attName distinc-values
+attName distinc-values
+...
+END
+
+BEGIN
+relName
+numTuples
+attName distinc-values
+attName distinc-values
+...
+END
+*/
+
+	FILE * fptr = fopen(toWhere, "w");
+	map <string, TableInfo>::iterator rs_itr;
+	map <string, int>::iterator atts_itr;
+
+	// scan through the map
+	for (rs_itr = m_mRelStats.begin();
+		 rs_itr != m_mRelStats.end(); rs_itr++)
+	{
+		fprintf(fptr, "\nBEGIN");
+		// write relation name
+		fprintf(fptr, "\n%s", rs_itr->first.c_str());
+		TableInfo * pTInfo = &(rs_itr->second);
+		// write number of tuples
+		fprintf(fptr, "\n%d", pTInfo->numTuples);
+		// go thru atts map and write attribute-name & distinct value
+		for (atts_itr = pTInfo->Atts.begin();
+			 atts_itr != pTInfo->Atts.end(); atts_itr++)
+		{
+			fprintf(fptr, "\n%s", atts_itr->first.c_str());
+			fprintf(fptr, " %d", atts_itr->second); 
+		}
+		fprintf(fptr, "\nEND\n");
+	}
+	
+	// close the file
+	fclose(fptr);
 }
 
 void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJoin)

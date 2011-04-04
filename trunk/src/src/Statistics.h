@@ -4,7 +4,8 @@
 #include <map>
 #include <vector>
 #include <string>
-
+#include <fstream>
+#include <iostream>
 using namespace std;
 
 // Structure to store stats of a relation
