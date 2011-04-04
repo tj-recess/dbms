@@ -8,14 +8,14 @@
 using namespace std;
 
 // Structure to store stats of a relation
-struct AttsStats
+struct TableInfo
 {
-	int numTuples;		// total num of rows in this relation
-	int numPartition;	// partition this relation belongs to
-						// -1 signifies that its still singleton
+	int numTuples;			// total num of rows in this relation
+	int numPartition;		// partition this relation belongs to
+							// -1 signifies that its still singleton
 	map <string, int> Atts;	// <attribute-name, distinct values>
 
-	AttsStats(): numTuples(0), numPartition(-1)
+	TableInfo(): numTuples(0), numPartition(-1)
 	{}		
 };
 
@@ -24,7 +24,7 @@ class Statistics
 {
 private:
 	int m_nPartitionNum;
-	map <string, AttsStats> m_mRelStats;
+	map <string, TableInfo> m_mRelStats;
 	map <int, vector<string> > m_mPartitionInfoMap;
  	
 public:
@@ -49,7 +49,7 @@ public:
 		return m_nPartitionNum;
 	}
 	
-	map<string, AttsStats> * GetRelStats()
+	map<string, TableInfo> * GetRelStats()
 	{
 		return &m_mRelStats;	// return pointer to m_mRelStats
 	}
