@@ -27,6 +27,7 @@ private:
 	int m_nPartitionNum;
 	map <string, TableInfo> m_mRelStats;
 	map <int, vector<string> > m_mPartitionInfoMap;
+	map <string, vector <string> > m_mColToTable;
  	
 public:
 	Statistics();
