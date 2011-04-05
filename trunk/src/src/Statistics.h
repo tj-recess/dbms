@@ -1,8 +1,12 @@
 #ifndef STATISTICS_
 #define STATISTICS_
+
+#define _STATISTICS_DEBUG 0
+
 #include "ParseTree.h"
 #include <map>
 #include <vector>
+#include <algorithm>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -11,10 +15,10 @@ using namespace std;
 // Structure to store stats of a relation
 struct TableInfo
 {
-	int numTuples;			// total num of rows in this relation
+	unsigned long int numTuples;			// total num of rows in this relation
 	int numPartition;		// partition this relation belongs to
 							// -1 signifies that its still singleton
-	map <string, int> Atts;	// <attribute-name, distinct values>
+	map <string, unsigned long int> Atts;	// <attribute-name, distinct values>
 
 	TableInfo(): numTuples(0), numPartition(-1)
 	{}		
@@ -27,6 +31,8 @@ private:
 	int m_nPartitionNum;
 	map <string, TableInfo> m_mRelStats;
 	map <int, vector<string> > m_mPartitionInfoMap;
+        //returns true if parseTree is error free, false otherwise
+        bool checkParseTreeForErrors(struct AndList *parseTree, char *relNames[], int numToJoin, vector<string>&);
 	map <string, vector <string> > m_mColToTable;
  	
 public:
