@@ -144,6 +144,7 @@ void Statistics::CopyRel(char *oldName, char *newName)
 		map <string, vector <string> >::iterator c2t_itr;
 
 		// Fetch old table_info
+                rs_itr = m_mRelStats.find(string(oldName));
 		TableInfo *pOldTableInfo = &(rs_itr->second);
 		
 		// make a copy of this OldTableInfo structure
@@ -555,7 +556,7 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
 
 	// some variables needed
 	int prefixedTabNamePos;
-	string sTableName;
+	string sTableName, sColName;
 	map<string, vector<string> >::iterator c2t_itr;
 
     //first create copy of passed AndList
@@ -589,35 +590,40 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
 
             if(leftCode == NAME)    //check if column belongs to some table or not
             {
-				c2t_itr = m_mColToTable.find(leftVal);
-                if (c2t_itr == m_mColToTable.end())	// column not found
-                    return false;
-
-                //also check if the column name has "table_name." prefixed with it
-				prefixedTabNamePos = leftVal.find(".");
-                if (prefixedTabNamePos != string::npos)     // table_name.col_name format
-                    sTableName = leftVal.substr(0, prefixedTabNamePos);
-				else
-				{
-					// column name is not prefixed by table_name "."
-					// so check if column has more than one associated tables
-					if ((c2t_itr->second).size() > 1)
-						return false;	// ambiguity error!
-					else
-						sTableName = (c2t_itr->second).at(0);
-				}
-				table_names_set.insert(sTableName);
-            }
-            if(rightCode == NAME)   //check if column belongs to some table or not
-            {
-                c2t_itr = m_mColToTable.find(rightVal);
-                if (c2t_itr == m_mColToTable.end()) // column not found
-                    return false;
-
                 //also check if the column name has "table_name." prefixed with it
                 prefixedTabNamePos = leftVal.find(".");
                 if (prefixedTabNamePos != string::npos)     // table_name.col_name format
+                {
                     sTableName = leftVal.substr(0, prefixedTabNamePos);
+                    sColName = leftVal.substr(prefixedTabNamePos + 1);
+                }
+                else
+                {
+                    // column name is not prefixed by table_name "."
+                    // so check if column has more than one associated tables
+                    if ((c2t_itr->second).size() > 1)
+                            return false;	// ambiguity error!
+                    else
+                            sTableName = (c2t_itr->second).at(0);
+
+                    sColName = leftVal;
+                }
+                table_names_set.insert(sTableName);
+
+                c2t_itr = m_mColToTable.find(sColName);
+                if (c2t_itr == m_mColToTable.end())	// column not found
+                    return false;
+
+            }
+            if(rightCode == NAME)   //check if column belongs to some table or not
+            {
+                //also check if the column name has "table_name." prefixed with it
+                prefixedTabNamePos = leftVal.find(".");
+                if (prefixedTabNamePos != string::npos)     // table_name.col_name format
+                {
+                    sTableName = leftVal.substr(0, prefixedTabNamePos);
+                    sColName = leftVal.substr(prefixedTabNamePos + 1);
+                }
                 else
                 {
                     // column name is not prefixed by table_name "."
@@ -626,8 +632,14 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
                         return false;   // ambiguity error!
                     else
                         sTableName = (c2t_itr->second).at(0);
+
+                    sColName = rightVal;
                 }
                 table_names_set.insert(sTableName);
+
+                c2t_itr = m_mColToTable.find(sColName);
+                if (c2t_itr == m_mColToTable.end()) // column not found
+                    return false;
             }
 
             //move to next orList inside first AND
