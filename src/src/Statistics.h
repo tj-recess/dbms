@@ -6,6 +6,7 @@
 #include "ParseTree.h"
 #include <map>
 #include <vector>
+#include <set>
 #include <algorithm>
 #include <string>
 #include <fstream>
@@ -31,9 +32,11 @@ private:
 	int m_nPartitionNum;
 	map <string, TableInfo> m_mRelStats;
 	map <int, vector<string> > m_mPartitionInfoMap;
-    //returns true if parseTree is error free, false otherwise
-    bool checkParseTreeForErrors(struct AndList *parseTree, char *relNames[], int numToJoin, vector<string>&);
 	map <string, vector <string> > m_mColToTable;
+
+    //returns true if parseTree is error free, false otherwise
+    bool checkParseTreeForErrors(struct AndList *parseTree, char *relNames[], 
+								 int numToJoin, vector<string>&, set<string>&);
  	
 public:
 	Statistics();
