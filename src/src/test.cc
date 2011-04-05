@@ -569,8 +569,7 @@ int main(int argc, char *argv[]) {
 
 	void (*query_ptr[]) () = {&q0,&q1, &q2, &q3, &q4, &q5, &q6, &q7, &q8,&q9,&q10,&q11};  
 	void (*query) ();
-//	int qindx = atoi (argv[1]);
-        int qindx = 3;
+	int qindx = atoi (argv[1]);
 
 	if (qindx >=0 && qindx < 12) {
 		query = query_ptr [qindx ];
