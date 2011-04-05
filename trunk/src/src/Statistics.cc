@@ -125,62 +125,57 @@ void Statistics::CopyRel(char *oldName, char *newName)
 {
 	// make sure newName doesn't already exist in the map
 	map <string, TableInfo>::iterator rs_itr;
-	rs_itr = m_mRelStats.find(string(newName));
-	if (rs_itr != m_mRelStats.end())
+	
+	#ifdef _STATISTICS_DEBUG
+	// Print map	
+	for (rs_itr = m_mRelStats.begin();
+		 rs_itr != m_mRelStats.end(); rs_itr++)
 	{
-		cerr << "\n" << newName << " already exists! Can't make a copy "
-			 << "with this name. Please choose a new name!\n";
-		return;
+		cout << "\n Table name: "<< (rs_itr->first).c_str();
 	}
-	else
+	#endif
+
+	// Do 2 things:
+	// 1. 	Add new table name to the m_mColToTable
+	// 		col_name : <old_table, new_table>
+	// 2.	make a copy of this OldTableInfo structure
+	//		and associate it with the new table name
+
+	// make iterator for m_mColToTable map
+	map <string, vector <string> >::iterator c2t_itr;
+	rs_itr = m_mRelStats.find(string(oldName));
+
+	// Fetch old table_info
+	TableInfo *pOldTableInfo = &(rs_itr->second);
+
+	// make a copy of this OldTableInfo structure
+	TableInfo t_info;
+	t_info.numTuples = pOldTableInfo->numTuples;
+
+	// copy attributes and distinct values from map Atts
+	map <string, unsigned long int>::iterator atts_itr;
+	for (atts_itr = pOldTableInfo->Atts.begin();
+					atts_itr != pOldTableInfo->Atts.end();
+					atts_itr++)
 	{
-		// Do 2 things:
-		// 1. 	Add new table name to the m_mColToTable
-		// 		col_name : <old_table, new_table>
-		// 2.	make a copy of this OldTableInfo structure
-		//		and associate it with the new table name
+		//			attribute name   =>  distinct value
+		t_info.Atts[atts_itr->first] = atts_itr->second;
 
-		// make iterator for m_mColToTable map
-		map <string, vector <string> >::iterator c2t_itr;
-
-		// Fetch old table_info
-                rs_itr = m_mRelStats.find(string(oldName));
-		TableInfo *pOldTableInfo = &(rs_itr->second);
-		
-		// make a copy of this OldTableInfo structure
-		TableInfo t_info;
-		t_info.numTuples = pOldTableInfo->numTuples;
-		//t_info.numPartition = pOldTableInfo->numPartition; <-- not sure of this!
-
-		// copy attributes and distinct values from map Atts
-		map <string, unsigned long int>::iterator atts_itr;
-		for (atts_itr = pOldTableInfo->Atts.begin();
-			 atts_itr != pOldTableInfo->Atts.end();
-			 atts_itr++)
+		// push new table name for each column
+		c2t_itr = m_mColToTable.find(atts_itr->first);
+		if (c2t_itr == m_mColToTable.end())
 		{
-			//			attribute name   =>  distinct value
-			t_info.Atts[atts_itr->first] = atts_itr->second;
-		
-			// push new table name for each column
-			c2t_itr = m_mColToTable.find(atts_itr->first);
-			if (c2t_itr == m_mColToTable.end())
-			{
 				cerr << "\nColumn name " << (atts_itr->first).c_str()
-					 << " not found in m_mColToTable! ERROR!\n";
+						<< " not found in m_mColToTable! ERROR!\n";
 				return;
-			}
-			(c2t_itr->second).push_back(string(newName));
 		}
-
-		// now set TableInfo structure for this relation
-		m_mRelStats[string(newName)] = t_info;
-
-		
+		(c2t_itr->second).push_back(string(newName));
 	}
+	// now set TableInfo structure for this relation
+	m_mRelStats[string(newName)] = t_info;
 
-	// TODO: how does this operation affect the m_mPartitionInfoMap?
-	// new rel belongs to the same partition as the old one?
-	// or to a singleton partition?
+	// NOTE: copyRel will not affect m_mPartitionInfoMap
+	// copied relation does not have to belong to old table's partition
 }
 
 void Statistics::Read(char *fromWhere)
