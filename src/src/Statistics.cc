@@ -314,9 +314,12 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 /*			// create a set of table names, to which these attributes belong
 			set <string> join_table_set;
 			string sTableName;
-			for (int i = 0; i < v_joinAtts.size(); i++)
-			{
-				string sColName = v_joinAtts.at(i);
+
+                        for(int i = 0; i < v_joinAtts.size(); i+=3)
+                        {
+                            if(v_joinAtts.at(i).compare("4") == 0)
+                            {
+				string sColName = v_joinAtts.at(i+1);
 				int prefixedTabNamePos = sColName.find(".");
 				if (prefixedTabNamePos != string::npos)		// table name is prefixed with col-name
 					sTableName = sColName.substr(0, prefixedTabNamePos);
@@ -325,6 +328,7 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 				
 				// push this table in the set
 				join_table_set.insert(sTableName);
+                            }
 
 			}*/
 
@@ -359,10 +363,9 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
 {
     for (int i = 0; i < numToJoin; i++)
         cout<< relNames[i] << endl;
-
+    set <string> dummy;
     vector<string> joinAttsInPair;
-	set <string> join_table_set;
-    if(checkParseTreeForErrors(parseTree, relNames, numToJoin, joinAttsInPair, join_table_set))
+    if(checkParseTreeForErrors(parseTree, relNames, numToJoin, joinAttsInPair, dummy))
         cout<< "\nsuccessfully parsed" << endl;
     else
     {
@@ -387,7 +390,146 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
      * return the final estimate
      */
 
+    set <string> join_table_set;
+    vector<long double> estimates;
+    string last_connector = "";
+    int i = 0;
+    long double prvsEstimate = 1;
+    while(i < joinAttsInPair.size())
+    {
+        long double localEstimate = -1;
+
+        int col1Type = atoi(joinAttsInPair.at(i++).c_str());
+        string col1Val = joinAttsInPair.at(i++);
+        int operatorCode = atoi(joinAttsInPair.at(i++).c_str());
+        int col2Type = atoi(joinAttsInPair.at(i++).c_str());
+        string col2Val = joinAttsInPair.at(i++);
+        string connector = joinAttsInPair.at(i++);
+
+        string tab1;
+        int prefixedTabNamePos;
+        if(col1Type == NAME)
+        {
+            prefixedTabNamePos = col1Val.find(".");
+            if(prefixedTabNamePos != string::npos)
+                tab1 = col1Val.substr(0, prefixedTabNamePos);
+            else
+                tab1 = m_mColToTable[col1Val].at(0);
+
+            join_table_set.insert(tab1);
+        }
+        
+
+
+        string tab2;
+        if(col2Type == NAME)
+        {
+            prefixedTabNamePos = col2Val.find(".");
+            if(prefixedTabNamePos != string::npos)
+                tab2 = col2Val.substr(0, prefixedTabNamePos);
+            else
+                tab2 = m_mColToTable[col2Val].at(0);
+
+            join_table_set.insert(tab2);
+        }
+
+        if(col1Type == NAME && col2Type == NAME)    //join condition
+        {
+            TableInfo t1;
+            TableInfo t2;
+            //find localEstimate
+            t1 = m_mRelStats[tab1];
+            t2 = m_mRelStats[tab2];
+
+            localEstimate = 1.0/(max(t1.Atts[col1Val], t2.Atts[col2Val]));
+
+            //as this is a join condition so we are expecting it to be in a separate AndList
+            //so no need to check the connector (AND, OR or .); therefore push this estimate onto vector
+            estimates.push_back(localEstimate);
+        }
+        else if(col1Type == NAME || col2Type == NAME)
+        {
+            TableInfo t;
+            string colName;
+            if(col1Type == NAME)
+            {
+                t = m_mRelStats[tab1];
+                colName = col1Val;
+            }
+            else
+            {
+                t = m_mRelStats[tab2];
+                colName = col2Val;
+            }
+            if(operatorCode == EQUALS)
+            {
+                if(connector.compare("OR") == 0 || last_connector.compare("OR") == 0)
+                {
+                    localEstimate = (1.0- 1.0/t.Atts[colName]);
+                    if(connector.compare("OR") != 0)    //i.e. it's either AND or "." so current orList is done
+                    {
+                        //compute all estimates and load onto vector
+                        //using the formula [1.0 - (1 - 1/f1)(1-1/f2)...]
+                        long double totalCurrentEstimate = 1.0 - prvsEstimate*localEstimate;
+                        estimates.push_back(totalCurrentEstimate);
+                        //re-init prvsEstimate
+                        prvsEstimate = 1;
+                    }
+                    else    //someone is still left in the orList
+                    {
+                        prvsEstimate = prvsEstimate*localEstimate;
+                    }
+                }
+                else
+                {
+                    localEstimate = 1.0/t.Atts[colName];
+                    estimates.push_back(localEstimate);
+                    //re-init prvsEstimate
+                    prvsEstimate = 1;
+                }
+            }
+            else    // operator is either > or <
+            {
+                if(connector.compare("OR") == 0 || last_connector.compare("OR"))
+                {
+                    localEstimate = (1.0 - 1.0/3);
+                    if(connector.compare("OR") != 0)    //i.e. it's either AND or "." so current orList is done
+                    {
+                        //compute all estimates and load onto vector
+                        int totalCurrentEstimate = 1.0/(1.0 - prvsEstimate*localEstimate);
+                        estimates.push_back(totalCurrentEstimate);
+                    }
+                    else    //someone is still left in the orList
+                    {
+                        prvsEstimate = prvsEstimate*localEstimate;
+                    }
+                }
+                else
+                {
+                    localEstimate = (1.0/3);
+                    estimates.push_back(localEstimate);
+                }
+            }
+        }
+        else    //this is literal = literal kind of comparison
+        {
+            //TODO
+        }
+        last_connector = connector;
+    }
+    //done with all computation, now return the estimation
     
+    //compute the numerator
+    unsigned long long int numerator = 1;
+    set <string>::iterator set_itr = join_table_set.begin();
+    for (; set_itr != join_table_set.end(); set_itr++)
+        numerator *= m_mRelStats[*set_itr].numTuples;
+
+    double result = numerator;
+    for(int i = 0; i < estimates.size(); i++)
+        result *= estimates.at(i);
+
+    return result;
 }
 
 //parse the parseTree and check for errors
@@ -425,7 +567,7 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
         OrList* theOrList = parseTree->left;
         while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
         {
-            ComparisonOp* theComparisonOp = parseTree->left->left;
+            ComparisonOp* theComparisonOp = theOrList->left;
             if(theComparisonOp == NULL)
                 break;
             //first push the left value
