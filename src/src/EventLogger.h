@@ -42,6 +42,13 @@ public:
         return ss.str();
     }
 
+    static string my_itoa(int x)
+    {
+        stringstream ss;
+        ss << x;
+        return ss.str();
+    }
+
 };
 
 #endif /* EVENTLOGGER_H_ */
