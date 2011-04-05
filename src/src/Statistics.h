@@ -16,8 +16,8 @@ using namespace std;
 struct TableInfo
 {
 	unsigned long int numTuples;			// total num of rows in this relation
-	int numPartition;		// partition this relation belongs to
-							// -1 signifies that its still singleton
+	int numPartition;						// partition this relation belongs to
+											// -1 signifies that its still singleton
 	map <string, unsigned long int> Atts;	// <attribute-name, distinct values>
 
 	TableInfo(): numTuples(0), numPartition(-1)
@@ -31,8 +31,8 @@ private:
 	int m_nPartitionNum;
 	map <string, TableInfo> m_mRelStats;
 	map <int, vector<string> > m_mPartitionInfoMap;
-        //returns true if parseTree is error free, false otherwise
-        bool checkParseTreeForErrors(struct AndList *parseTree, char *relNames[], int numToJoin, vector<string>&);
+    //returns true if parseTree is error free, false otherwise
+    bool checkParseTreeForErrors(struct AndList *parseTree, char *relNames[], int numToJoin, vector<string>&);
 	map <string, vector <string> > m_mColToTable;
  	
 public:
