@@ -298,7 +298,7 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 	else
 	{
 		// create a set of table names, to which these attributes belong
-        set <string> join_table_set;
+                set <string> join_table_set;
 		vector<string> v_joinAtts;
 		if (!checkParseTreeForErrors(parseTree, relNames, numToJoin, v_joinAtts, join_table_set))
 		{
@@ -408,7 +408,10 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
         {
             prefixedTabNamePos = col1Val.find(".");
             if(prefixedTabNamePos != string::npos)
+            {
                 tab1 = col1Val.substr(0, prefixedTabNamePos);
+                col1Val = col1Val.substr(prefixedTabNamePos + 1);
+            }
             else
                 tab1 = m_mColToTable[col1Val].at(0);
 
@@ -422,7 +425,10 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
         {
             prefixedTabNamePos = col2Val.find(".");
             if(prefixedTabNamePos != string::npos)
+            {
                 tab2 = col2Val.substr(0, prefixedTabNamePos);
+                col2Val = col2Val.substr(prefixedTabNamePos + 1);
+            }
             else
                 tab2 = m_mColToTable[col2Val].at(0);
 
@@ -663,7 +669,7 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
 			vector<string> v_tbl_names = m_mPartitionInfoMap[partitionNum];
 			for (int j = 0; j < v_tbl_names.size(); j++)
 			{
-				string t1 = v_tbl_names.at(i);
+				string t1 = v_tbl_names.at(j);
 				bool found = false;
 				for (int k = 0; k < numToJoin; k++)
 				{

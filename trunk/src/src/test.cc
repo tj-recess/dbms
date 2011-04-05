@@ -117,8 +117,7 @@ void q0 (){
 	if(fabs(dummy*3.0-result) <0.1)
 	{
 		cout<<"Read or write or last apply is not correct\n";
-	}	
-	
+	}
 }
 
 void q1 (){
@@ -179,7 +178,7 @@ void q2 (){
 	yyparse();
 	
 	double result = s.Estimate(final, relName, 3);
-	if(fabs(result-1500000)<0.1)
+	if(fabs(result-1500000) > 0.1)
 		cout<<"error in estimating Q2\n";
 	s.Apply(final, relName, 3);
 
@@ -225,7 +224,7 @@ void q3 (){
 	s.Apply(final, set2, 2);
 
 	char *set3[] = {"c","s","n1","n2"};
-	cnf = " (n1.n_nationkey = n2.n_nationkey and n2.n_nationkey =2)";
+	cnf = " (n1.n_nationkey = n2.n_nationkey) AND (n2.n_nationkey =2)";
 	yy_scan_string(cnf);
 	yyparse();
 
@@ -562,15 +561,16 @@ void q11 (){
 }
 
 int main(int argc, char *argv[]) {
-	if (argc < 2) {
-		cerr << "You need to supply me the query number to run as a command-line arg.." << endl;
-		cerr << "Usage: ./test.out [0-11] >" << endl;
-		exit (1);
-	}
+//	if (argc < 2) {
+//		cerr << "You need to supply me the query number to run as a command-line arg.." << endl;
+//		cerr << "Usage: ./test.out [0-11] >" << endl;
+//		exit (1);
+//	}
 
 	void (*query_ptr[]) () = {&q0,&q1, &q2, &q3, &q4, &q5, &q6, &q7, &q8,&q9,&q10,&q11};  
 	void (*query) ();
-	int qindx = atoi (argv[1]);
+//	int qindx = atoi (argv[1]);
+        int qindx = 3;
 
 	if (qindx >=0 && qindx < 12) {
 		query = query_ptr [qindx ];
