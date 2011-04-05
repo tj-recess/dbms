@@ -574,24 +574,25 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
                 {
                     sTableName = leftVal.substr(0, prefixedTabNamePos);
                     sColName = leftVal.substr(prefixedTabNamePos + 1);
+                	c2t_itr = m_mColToTable.find(sColName);
+	                if (c2t_itr == m_mColToTable.end())	// column not found
+    	                return false;
                 }
                 else
                 {
+                    sColName = leftVal;
+                	c2t_itr = m_mColToTable.find(sColName);
+	                if (c2t_itr == m_mColToTable.end())	// column not found
+    	                return false;
+
                     // column name is not prefixed by table_name "."
                     // so check if column has more than one associated tables
                     if ((c2t_itr->second).size() > 1)
-                            return false;	// ambiguity error!
+    	                return false;	// ambiguity error!
                     else
-                            sTableName = (c2t_itr->second).at(0);
-
-                    sColName = leftVal;
+	                    sTableName = (c2t_itr->second).at(0);
                 }
                 table_names_set.insert(sTableName);
-
-                c2t_itr = m_mColToTable.find(sColName);
-                if (c2t_itr == m_mColToTable.end())	// column not found
-                    return false;
-
             }
             if(rightCode == NAME)   //check if column belongs to some table or not
             {
@@ -601,23 +602,25 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
                 {
                     sTableName = rightVal.substr(0, prefixedTabNamePos);
                     sColName = rightVal.substr(prefixedTabNamePos + 1);
+                	c2t_itr = m_mColToTable.find(sColName);
+	                if (c2t_itr == m_mColToTable.end()) // column not found
+    	                return false;
                 }
                 else
                 {
+                    sColName = rightVal;
+                	c2t_itr = m_mColToTable.find(sColName);
+	                if (c2t_itr == m_mColToTable.end()) // column not found
+    	                return false;
+
                     // column name is not prefixed by table_name "."
                     // so check if column has more than one associated tables
                     if ((c2t_itr->second).size() > 1)
                         return false;   // ambiguity error!
                     else
                         sTableName = (c2t_itr->second).at(0);
-
-                    sColName = rightVal;
                 }
                 table_names_set.insert(sTableName);
-
-                c2t_itr = m_mColToTable.find(sColName);
-                if (c2t_itr == m_mColToTable.end()) // column not found
-                    return false;
             }
 
             //move to next orList inside first AND
