@@ -1,7 +1,6 @@
 #include "Statistics.h"
 #include "EventLogger.h"
 #include <string.h>
-#include <set>
 
 using namespace std;
 
@@ -302,15 +301,17 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 	}
 	else
 	{
+		// create a set of table names, to which these attributes belong
+        set <string> join_table_set;
 		vector<string> v_joinAtts;
-		if (!checkParseTreeForErrors(parseTree, relNames, numToJoin, v_joinAtts))
+		if (!checkParseTreeForErrors(parseTree, relNames, numToJoin, v_joinAtts, join_table_set))
 		{
 			cerr << "\nError during CNF parsing. Cannot proceed with Apply().\n";
 			return;
 		}
 		else
 		{
-			// create a set of table names, to which these attributes belong
+/*			// create a set of table names, to which these attributes belong
 			set <string> join_table_set;
 			string sTableName;
 			for (int i = 0; i < v_joinAtts.size(); i++)
@@ -325,7 +326,8 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 				// push this table in the set
 				join_table_set.insert(sTableName);
 
-			}
+			}*/
+
 			// At this point join_table_set contains the tables to be joined
 			// So change their partition info
 			// New partition number
@@ -359,7 +361,8 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
         cout<< relNames[i] << endl;
 
     vector<string> joinAttsInPair;
-    if(checkParseTreeForErrors(parseTree, relNames, numToJoin, joinAttsInPair))
+	set <string> join_table_set;
+    if(checkParseTreeForErrors(parseTree, relNames, numToJoin, joinAttsInPair, join_table_set))
         cout<< "\nsuccessfully parsed" << endl;
     else
     {
@@ -387,9 +390,11 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
     
 }
 
-bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *relNames[], int numToJoin, vector<string>& joinAttsInPair)
+//parse the parseTree and check for errors
+bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *relNames[], 
+										 int numToJoin, vector<string>& joinAttsInPair,
+										 set<string>& table_names_set)
 {
-    //parse the parseTree and check for errors
     /**
      * 1. check if stats obj even contains the relations in relNames
      * 2. //check for unambiguity of column names (not required as of now with TPCH)
@@ -406,6 +411,11 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
             return false;
     }
 
+	// some variables needed
+	int prefixedTabNamePos;
+	string sTableName;
+	map<string, vector<string> >::iterator c2t_itr;
+
     //first create copy of passed AndList
     AndList* parseTree = someParseTree;
     
@@ -420,7 +430,7 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
                 break;
             //first push the left value
             int leftCode = theComparisonOp->left->code;
-            char* leftVal = theComparisonOp->left->value;
+            string leftVal = theComparisonOp->left->value;
 
             joinAttsInPair.push_back(System::my_itoa(leftCode));
             joinAttsInPair.push_back(leftVal);   //remember to apply itoa before using double or int
@@ -430,21 +440,52 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
 
             //and now the right value
             int rightCode = theComparisonOp->right->code;
-            char* rightVal = theComparisonOp->right->value;
+            string rightVal = theComparisonOp->right->value;
 
             joinAttsInPair.push_back(System::my_itoa(rightCode));
             joinAttsInPair.push_back(rightVal);   //remember to apply itoa before using double or int
 
             if(leftCode == NAME)    //check if column belongs to some table or not
             {
-                if(m_mColToTable.find(leftVal) == m_mColToTable.end())
+				c2t_itr = m_mColToTable.find(leftVal);
+                if (c2t_itr == m_mColToTable.end())	// column not found
                     return false;
-                //also check if the column name has "table_name." prefixed in it
+
+                //also check if the column name has "table_name." prefixed with it
+				prefixedTabNamePos = leftVal.find(".");
+                if (prefixedTabNamePos != string::npos)     // table_name.col_name format
+                    sTableName = leftVal.substr(0, prefixedTabNamePos);
+				else
+				{
+					// column name is not prefixed by table_name "."
+					// so check if column has more than one associated tables
+					if ((c2t_itr->second).size() > 1)
+						return false;	// ambiguity error!
+					else
+						sTableName = (c2t_itr->second).at(0);
+				}
+				table_names_set.insert(sTableName);
             }
             if(rightCode == NAME)   //check if column belongs to some table or not
             {
-                if(m_mColToTable.find(rightVal) == m_mColToTable.end())
+                c2t_itr = m_mColToTable.find(rightVal);
+                if (c2t_itr == m_mColToTable.end()) // column not found
                     return false;
+
+                //also check if the column name has "table_name." prefixed with it
+                prefixedTabNamePos = leftVal.find(".");
+                if (prefixedTabNamePos != string::npos)     // table_name.col_name format
+                    sTableName = leftVal.substr(0, prefixedTabNamePos);
+                else
+                {
+                    // column name is not prefixed by table_name "."
+                    // so check if column has more than one associated tables
+                    if ((c2t_itr->second).size() > 1)
+                        return false;   // ambiguity error!
+                    else
+                        sTableName = (c2t_itr->second).at(0);
+                }
+                table_names_set.insert(sTableName);
             }
 
             //move to next orList inside first AND
@@ -460,6 +501,54 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
         parseTree = parseTree->rightAnd;
     }
     
+	// Now check if the tables being joined (from ParseTree) makes sense
+	// with respect to the partitions	
+	for (int i=0; i<numToJoin; i++)
+	{
+		sTableName = relNames[i];
+		int partitionNum = m_mRelStats[sTableName].numPartition;
+		if (partitionNum != -1)
+		{
+			// now iterate over all tables in this partition
+			// and see if all tables exist in relNames
+			vector<string> v_tbl_names = m_mPartitionInfoMap[partitionNum];
+			for (int j = 0; j < v_tbl_names.size(); j++)
+			{
+				string t1 = v_tbl_names.at(i);
+				bool found = false;
+				for (int k = 0; k < numToJoin; k++)
+				{
+					string t2 = relNames[k];
+					if (t1.compare(t2) == 0)
+					{
+						found = true;
+						break;
+					}
+				}	
+				if (found == false)
+					return false;		// table belonging to a partition not found in relNames
+			}
+		}
+	}
+
+	// Also check if table_names_set contains table names that are in relNames
+	set <string>::iterator set_itr = table_names_set.begin();
+    for (; set_itr != table_names_set.end(); set_itr++)
+	{
+		string t1 = *set_itr;
+		bool found = false;
+        for (int k = 0; k < numToJoin; k++)
+		{
+        	string t2 = relNames[k];
+            if (t1.compare(t2) == 0)
+            {   
+            	found = true;
+                break;
+            }
+		}
+        if (found == false)
+        	return false;       // table belonging to a partition not found in relNames
+	}
 
     //control is here that means parseTree passed every test
     return true;
