@@ -229,7 +229,7 @@ void q3 (){
 	yyparse();
 
 	double result = s.Estimate(final, set3, 4);
-	if(fabs(result-2400000.0)<0.1)
+	if(fabs(result-2400000.0)>0.1)
 		cout<<"error in estimating Q3\n";
 
 	s.Apply(final, set3, 4);
