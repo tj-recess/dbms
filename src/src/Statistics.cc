@@ -298,7 +298,7 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 	else
 	{
 		// create a set of table names, to which these attributes belong
-                set <string> join_table_set;
+        set <string> join_table_set;
 		vector<string> v_joinAtts;
 		if (!checkParseTreeForErrors(parseTree, relNames, numToJoin, v_joinAtts, join_table_set))
 		{
@@ -307,27 +307,6 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 		}
 		else
 		{
-/*			// create a set of table names, to which these attributes belong
-			set <string> join_table_set;
-			string sTableName;
-
-                        for(int i = 0; i < v_joinAtts.size(); i+=3)
-                        {
-                            if(v_joinAtts.at(i).compare("4") == 0)
-                            {
-				string sColName = v_joinAtts.at(i+1);
-				int prefixedTabNamePos = sColName.find(".");
-				if (prefixedTabNamePos != string::npos)		// table name is prefixed with col-name
-					sTableName = sColName.substr(0, prefixedTabNamePos);
-				else
-					sTableName = m_mColToTable[sColName].at(0);	// first table this col is associated with
-				
-				// push this table in the set
-				join_table_set.insert(sTableName);
-                            }
-
-			}*/
-
 			// At this point join_table_set contains the tables to be joined
 			// So change their partition info
 			// New partition number
@@ -417,8 +396,6 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
 
             join_table_set.insert(tab1);
         }
-        
-
 
         string tab2;
         if(col2Type == NAME)
@@ -619,11 +596,11 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
             if(rightCode == NAME)   //check if column belongs to some table or not
             {
                 //also check if the column name has "table_name." prefixed with it
-                prefixedTabNamePos = leftVal.find(".");
+                prefixedTabNamePos = rightVal.find(".");
                 if (prefixedTabNamePos != string::npos)     // table_name.col_name format
                 {
-                    sTableName = leftVal.substr(0, prefixedTabNamePos);
-                    sColName = leftVal.substr(prefixedTabNamePos + 1);
+                    sTableName = rightVal.substr(0, prefixedTabNamePos);
+                    sColName = rightVal.substr(prefixedTabNamePos + 1);
                 }
                 else
                 {
