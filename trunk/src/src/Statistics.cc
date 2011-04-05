@@ -1,6 +1,8 @@
 #include "Statistics.h"
 #include "EventLogger.h"
 #include <string.h>
+#include <set>
+
 using namespace std;
 
 Statistics::Statistics() : m_nPartitionNum(0)
@@ -192,8 +194,8 @@ void Statistics::Read(char *fromWhere)
 	// other variables
 	string relName, attName;
 	unsigned long int numValues;
-        // make iterator for m_mColToTable map
-        map <string, vector <string> >::iterator c2t_itr;
+    // make iterator for m_mColToTable map
+    map <string, vector <string> >::iterator c2t_itr;
 
 	while (fscanf(fptr, "%s", buffer) != EOF)
 	{
@@ -210,16 +212,16 @@ void Statistics::Read(char *fromWhere)
 				fscanf(fptr, "%lu", &numValues);
 				t_info.Atts[attName] = numValues;
 
-                                // push col-name : table-name into m_mColToTable map
-                                c2t_itr = m_mColToTable.find(string(attName));
-                                if (c2t_itr == m_mColToTable.end()) // not found
-                                {
-                                    vector<string> v_tableName;
-                                    v_tableName.push_back(string(relName));
-                                    m_mColToTable[string(attName)] = v_tableName;
-                                }
-                                else // found, add table to vector
-                                    (c2t_itr->second).push_back(string(relName));
+                // push col-name : table-name into m_mColToTable map
+                c2t_itr = m_mColToTable.find(string(attName));
+                if (c2t_itr == m_mColToTable.end()) // not found
+                {
+	                vector<string> v_tableName;
+                    v_tableName.push_back(string(relName));
+                    m_mColToTable[string(attName)] = v_tableName;
+                }
+                else // found, add table to vector
+    	            (c2t_itr->second).push_back(string(relName));
                                 
 				// read next row
 				fscanf(fptr, "%s", buffer);
@@ -278,40 +280,79 @@ END
 	fclose(fptr);
 }
 
-/**
- *
- * @param parseTree
- * @param relNames
- * @param numToJoin
- */
 void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJoin)
 {
+	/* Logic:
+	 * Call estimate
+	 *    Will return new tuple count
+     *    Will do error checking
+	 * Call checkParseTreeForErrors(), pass it a vector
+	 * 	  Will populate this vector with parsed parseTree
+	 * Use the vector to find tables being joined (put them in a set)
+	 * Set the numTuples to new estimated value of these tables
+	 * Change their numPartition
+	 * Add new entry in m_mPartitionInfoMap <new-partition-num, <table names> >
+	 */
 
+	double new_row_count = Estimate(parseTree, relNames, numToJoin);
+	if (new_row_count == -1)	// Error found during estimation
+	{
+		cerr << "\nError during Estimate(). Cannot proceed with Apply().\n";
+		return;
+	}
+	else
+	{
+		vector<string> v_joinAtts;
+		if (!checkParseTreeForErrors(parseTree, relNames, numToJoin, v_joinAtts))
+		{
+			cerr << "\nError during CNF parsing. Cannot proceed with Apply().\n";
+			return;
+		}
+		else
+		{
+			// create a set of table names, to which these attributes belong
+			set <string> join_table_set;
+			string sTableName;
+			for (int i = 0; i < v_joinAtts.size(); i++)
+			{
+				string sColName = v_joinAtts.at(i);
+				int prefixedTabNamePos = sColName.find(".");
+				if (prefixedTabNamePos != string::npos)		// table name is prefixed with col-name
+					sTableName = sColName.substr(0, prefixedTabNamePos);
+				else
+					sTableName = m_mColToTable[sColName].at(0);	// first table this col is associated with
+				
+				// push this table in the set
+				join_table_set.insert(sTableName);
 
-    /*
-    vector<string> newPartitionTabs;
-    int newPartitionNum = ++m_nPartitionNum;
-    for(int i = 0; i < numToJoin; i++)
-    {
-        if(m_mRelStats[relNames[i]].numPartition == -1)
-        {
-            newPartitionTabs.push_back(relNames[i]);
-            m_mRelStats[relNames[i]].numPartition = newPartitionNum;
-        }
-    }
-    //create a new partition with the vector
-    m_mPartitionInfoMap[newPartitionNum] = newPartitionTabs;
-
-    int estimatedTuples = 0;
-    for(int i = 0; i < newPartitionTabs.size(); i+=2)
-    {
-        TableInfo t1 = m_mRelStats[newPartitionTabs.at(i)];
-        TableInfo t2 = m_mRelStats[newPartitionTabs.at(i+1)];
-        estimatedTuples = t1.numTuples * t2.numTuples / max(t1.Atts[parseTree->left->left->left->value], t1.Atts[parseTree->left->left->right->value]);
-    }
-    */
-
+			}
+			// At this point join_table_set contains the tables to be joined
+			// So change their partition info
+			// New partition number
+			m_nPartitionNum++;
+			vector <string> vTableNames;
+			map <string, TableInfo>::iterator rs_itr;
+			set <string>::iterator set_itr = join_table_set.begin();
+			for (; set_itr != join_table_set.end(); set_itr++)
+			{
+				rs_itr = m_mRelStats.find(*set_itr);
+				if (rs_itr == m_mRelStats.end())
+				{
+					cerr << "\n Table " << (*set_itr).c_str() << " details not found! error! \n";
+					return;
+				}
+				(rs_itr->second).numPartition = m_nPartitionNum;
+				(rs_itr->second).numTuples = (unsigned long int)new_row_count;
+	
+				// push this table name in vTableNames vector (used after this loop)
+				vTableNames.push_back(*set_itr);
+			}
+			// add new entry in m_mPartitionInfoMap
+			m_mPartitionInfoMap[m_nPartitionNum] = vTableNames;
+		}
+	}
 }
+
 double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numToJoin)
 {
     for (int i = 0; i < numToJoin; i++)
