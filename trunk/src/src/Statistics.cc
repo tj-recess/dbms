@@ -469,13 +469,13 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
             }
             else    // operator is either > or <
             {
-                if(connector.compare("OR") == 0 || last_connector.compare("OR"))
+                if(connector.compare("OR") == 0 || last_connector.compare("OR") == 0)
                 {
                     localEstimate = (1.0 - 1.0/3);
                     if(connector.compare("OR") != 0)    //i.e. it's either AND or "." so current orList is done
                     {
                         //compute all estimates and load onto vector
-                        int totalCurrentEstimate = 1.0/(1.0 - prvsEstimate*localEstimate);
+                        int totalCurrentEstimate = 1.0 - prvsEstimate*localEstimate;
                         estimates.push_back(totalCurrentEstimate);
                     }
                     else    //someone is still left in the orList
