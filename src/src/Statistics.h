@@ -30,7 +30,9 @@ class Statistics
 {
 private:
 	int m_nPartitionNum;
-	map <string, TableInfo> m_mRelStats;
+	bool m_bRelStatsCopied;
+	map <string, TableInfo> m_mRelStats;		// is modified with Apply()
+	map <string, TableInfo> m_mRelStatsCopy;	// is written to file
 	map <int, vector<string> > m_mPartitionInfoMap;
 	map <string, vector <string> > m_mColToTable;
 

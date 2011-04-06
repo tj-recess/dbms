@@ -4,14 +4,13 @@
 
 using namespace std;
 
-Statistics::Statistics() : m_nPartitionNum(0)
+Statistics::Statistics() : m_nPartitionNum(0), m_bRelStatsCopied(false)
 {}
 
 // Performs a deep copy
 Statistics::Statistics(Statistics &copyMe)
 {
 	m_nPartitionNum = copyMe.GetPartitionNumber();
-
 	// fetch the m_mRelStats of copyMe
 	map <string, TableInfo> * pRelStats = copyMe.GetRelStats();
 
@@ -252,8 +251,8 @@ END
 	map <string, unsigned long int>::iterator atts_itr;
 
 	// scan through the map
-	for (rs_itr = m_mRelStats.begin();
-		 rs_itr != m_mRelStats.end(); rs_itr++)
+	for (rs_itr = m_mRelStatsCopy.begin();
+		 rs_itr != m_mRelStatsCopy.end(); rs_itr++)
 	{
 		fprintf(fptr, "\nBEGIN");
 		// write relation name
@@ -289,6 +288,33 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 	 * Add new entry in m_mPartitionInfoMap <new-partition-num, <table names> >
 	 */
 
+	if (m_bRelStatsCopied == false)
+	{
+		// make a copy of m_mRelStats
+		m_bRelStatsCopied = true;
+
+	    map <string, TableInfo>::iterator rs_itr;
+    	map <string, unsigned long int>::iterator atts_itr;
+
+	    // scan through the map
+    	for (rs_itr = m_mRelStats.begin();
+        	 rs_itr != m_mRelStats.end(); rs_itr++)
+	    {
+			TableInfo tInfoCopy;
+
+    	    TableInfo * pTInfo = &(rs_itr->second);
+			tInfoCopy.numTuples = pTInfo->numTuples;
+    	    // go thru atts map and copy attribute-name & distinct value
+        	for (atts_itr = pTInfo->Atts.begin();
+            	 atts_itr != pTInfo->Atts.end(); atts_itr++)
+	        {
+				tInfoCopy.Atts[atts_itr->first] = atts_itr->second;
+	        }
+		
+			m_mRelStatsCopy[rs_itr->first] = tInfoCopy;	
+	    }
+	}
+
 	double new_row_count = Estimate(parseTree, relNames, numToJoin);
 	if (new_row_count == -1)	// Error found during estimation
 	{
@@ -308,28 +334,69 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 		else
 		{
 			// At this point join_table_set contains the tables to be joined
-			// So change their partition info
-			// New partition number
-			m_nPartitionNum++;
-			vector <string> vTableNames;
-			map <string, TableInfo>::iterator rs_itr;
+			// Suppose {A,B} is already a partition
+			// Case-1: Now if join_table_set contains {B,C}
+			// 		   Resultant partition should be {A, B, C}
+			// Case-2: But if join_table_set contains {C,D}
+			// 		   Resultant should be {A,B} and {C,D}
+
+			int nOldPartitionNum = -1;
+			string sOldJoinTableName;
 			set <string>::iterator set_itr = join_table_set.begin();
-			for (; set_itr != join_table_set.end(); set_itr++)
-			{
+			map <string, TableInfo>::iterator rs_itr;
+            for (; set_itr != join_table_set.end(); set_itr++)
+            {
 				rs_itr = m_mRelStats.find(*set_itr);
 				if (rs_itr == m_mRelStats.end())
+                {
+                    cerr << "\n Table " << (*set_itr).c_str() << " details not found! error! \n";
+                    return;
+                }	
+				if ((rs_itr->second).numPartition != -1)
 				{
-					cerr << "\n Table " << (*set_itr).c_str() << " details not found! error! \n";
-					return;
+					nOldPartitionNum = (rs_itr->second).numPartition;
+					break;
 				}
-				(rs_itr->second).numPartition = m_nPartitionNum;
-				(rs_itr->second).numTuples = (unsigned long int)new_row_count;
-	
-				// push this table name in vTableNames vector (used after this loop)
-				vTableNames.push_back(*set_itr);
 			}
-			// add new entry in m_mPartitionInfoMap
-			m_mPartitionInfoMap[m_nPartitionNum] = vTableNames;
+
+			// Independent new partition has to be created
+			if (nOldPartitionNum == -1)
+			{
+				m_nPartitionNum++;
+				vector <string> vTableNames;
+	            for (set_itr = join_table_set.begin(); set_itr != join_table_set.end(); set_itr++)
+    	        {
+        	        rs_itr = m_mRelStats.find(*set_itr);
+            	    (rs_itr->second).numPartition = m_nPartitionNum;
+                	(rs_itr->second).numTuples = (unsigned long int)new_row_count;
+
+	                // push this table name in vTableNames vector (used after this loop)
+    	            vTableNames.push_back(*set_itr);
+        	    }
+            	// add new entry in m_mPartitionInfoMap
+	            m_mPartitionInfoMap[m_nPartitionNum] = vTableNames;
+			}
+			// Old partition has to be modified
+			else	
+			{
+				// collect all table names in join_table_set
+				vector <string> vTableNames = m_mPartitionInfoMap[nOldPartitionNum];
+				for (int i=0; i<vTableNames.size(); i++)
+					join_table_set.insert(vTableNames.at(i));
+
+				vTableNames.clear();
+				for (set_itr = join_table_set.begin(); set_itr != join_table_set.end(); set_itr++)
+				{
+					rs_itr = m_mRelStats.find(*set_itr);
+					(rs_itr->second).numPartition = nOldPartitionNum;
+					(rs_itr->second).numTuples = (unsigned long int)new_row_count;
+		
+					// push this table name in vTableNames vector (used after this loop)
+					vTableNames.push_back(*set_itr);
+				}
+				// add new entry in m_mPartitionInfoMap
+				m_mPartitionInfoMap[nOldPartitionNum] = vTableNames;
+			}
 		}
 	}
 }
@@ -475,7 +542,7 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
                     if(connector.compare("OR") != 0)    //i.e. it's either AND or "." so current orList is done
                     {
                         //compute all estimates and load onto vector
-                        int totalCurrentEstimate = 1.0 - prvsEstimate*localEstimate;
+						int totalCurrentEstimate = 1.0 - prvsEstimate*localEstimate;
                         estimates.push_back(totalCurrentEstimate);
                     }
                     else    //someone is still left in the orList

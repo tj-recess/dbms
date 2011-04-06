@@ -269,37 +269,38 @@ void q4 (){
 	s.CopyRel("supplier","s");
 	s.CopyRel("nation","n");
 	s.CopyRel("region","r");
-
+	
+	char *set1[] ={"p","ps"};
 	char *cnf = "(p.p_partkey=ps.ps_partkey) AND (p.p_size = 2)";
 	yy_scan_string(cnf);
 	yyparse();
-	s.Apply(final, relName, 2);
+	s.Apply(final, set1 , 2);
 
+	char *set2[] ={"p","ps","s"};
 	cnf ="(s.s_suppkey = ps.ps_suppkey)";
 	yy_scan_string(cnf);
 	yyparse();
-	s.Apply(final, relName, 3);
+	s.Apply(final, set2, 3);
 
+	char *set3[] ={"p","ps","s","n"};
 	cnf =" (s.s_nationkey = n.n_nationkey)";
 	yy_scan_string(cnf);
 	yyparse();
-	s.Apply(final, relName, 4);
+	s.Apply(final, set3, 4);
 
+	char *set4[] ={"p","ps","s","n","r"};
 	cnf ="(n.n_regionkey = r.r_regionkey) AND (r.r_name = 'AMERICA') ";
 	yy_scan_string(cnf);
 	yyparse();
 
-	double result = s.Estimate(final, relName, 5);
-	if(fabs(result-3200)<0.1)
+	double result = s.Estimate(final, set4, 5);
+	if(fabs(result-3200)>0.1)
 		cout<<"error in estimating Q4\n";
 
-	s.Apply(final, relName, 5);	
+	s.Apply(final, set4, 5);	
 	
 	s.Write(fileName);
 	
-
-
-
 }
 
 void q5 (){
@@ -314,6 +315,7 @@ void q5 (){
 	s.AddRel(relName[1],1500000);
 	s.AddAtt(relName[1], "o_orderkey",1500000);
 	s.AddAtt(relName[1], "o_custkey",150000);
+	s.AddAtt(relName[1], "o_orderdate",0);
 	
 	s.AddRel(relName[2],6001215);
 	s.AddAtt(relName[2], "l_orderkey",1500000);
@@ -332,7 +334,7 @@ void q5 (){
 
 	double result = s.Estimate(final, relName, 3);
 
-	if(fabs(result-40081)<0.1)
+	if(fabs(result-400081)>0.1)
 		cout<<"error in estimating Q5\n";
 
 	s.Apply(final, relName, 3);
@@ -372,7 +374,7 @@ void q6 (){
 
 	double result = s.Estimate(final, relName, 3);
 
-	if(fabs(result-3200)<0.1)
+	if(fabs(result-32000)>0.1)
 		cout<<"error in estimating Q6\n";
 	s.Apply(final, relName, 3);
 	
@@ -396,6 +398,7 @@ void q7(){
 	
 	s.AddRel(relName[1],6001215);
 	s.AddAtt(relName[1], "l_orderkey",1500000);
+	s.AddAtt(relName[1], "l_receiptdate",0);
 	
 
 	char *cnf = "(l_receiptdate >'1995-02-01' ) AND (l_orderkey = o_orderkey)";
@@ -404,7 +407,7 @@ void q7(){
 	yyparse();
 	double result = s.Estimate(final, relName, 2);
 
-	if(fabs(result-2000405)<0.1)
+	if(fabs(result-2000405) > 0.1)
 		cout<<"error in estimating Q7\n";
 
 	s.Apply(final, relName, 2);
@@ -437,7 +440,7 @@ void q8 (){
 		
 	double result = s.Estimate(final, relName,2);
 
-	if(fabs(result-48000)<0.1)
+	if(fabs(result-48000)>0.1)
 		cout<<"error in estimating Q8\n";
 
 	s.Apply(final, relName,2);
@@ -472,7 +475,7 @@ void q9(){
 	yyparse();
 
 	double result = s.Estimate(final, relName,3);
-	if(fabs(result-4)<0.5)
+	if(fabs(result-4)>0.5)
 		cout<<"error in estimating Q9\n";
 
 	s.Apply(final, relName,3);
@@ -497,6 +500,7 @@ void q10 (){
 	s.AddRel(relName[1],1500000);
 	s.AddAtt(relName[1], "o_orderkey",1500000);
 	s.AddAtt(relName[1], "o_custkey",150000);
+	s.AddAtt(relName[1], "o_orderdate",0);
 	
 	s.AddRel(relName[2],6001215);
 	s.AddAtt(relName[2], "l_orderkey",1500000);
@@ -518,7 +522,7 @@ void q10 (){
 	yy_scan_string(cnf);                                                                               	yyparse();	
 	
 	double result = s.Estimate(final, relName, 4);
-	if(fabs(result-2000405)<0.1)
+	if(fabs(result-2000405) > 0.1)
 		cout<<"error in estimating Q10\n";
 
 	s.Apply(final, relName, 4);  
@@ -551,7 +555,7 @@ void q11 (){
 	
 	double result = s.Estimate(final, relName,2);
 
-	if(fabs(result-150040)<0.1)
+	if(fabs(result-150040) > 0.1)
 		cout<<"error in estimating Q11\n";
 	s.Apply(final, relName,2);
 	
