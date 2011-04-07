@@ -431,12 +431,12 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
      * 4. repeat step 3 until relNames is exhausted
      * return the final estimate
      */
-
+    
     set <string> join_table_set;
     vector<long double> estimates;
+    map<string, ColCountAndEstimate> localOrListEstimates;
     string last_connector = "";
     int i = 0;
-    long double prvsEstimate = 1;
     while(i < joinAttsInPair.size())
     {
         long double localEstimate = -1;
@@ -509,29 +509,53 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
             }
             if(operatorCode == EQUALS)
             {
+                //if we are inside an OrList, we must have either last connector as OR or next connector as OR
                 if(connector.compare("OR") == 0 || last_connector.compare("OR") == 0)
                 {
-                    localEstimate = (1.0- 1.0/t.Atts[colName]);
+                    //check if the current column-name (with = sign) has already been encountered once
+                    //if yes, update it completely, otherwise just place it in map
+                    if(localOrListEstimates.find(colName + "=") == localOrListEstimates.end())
+                    {
+                        localEstimate = (1.0- 1.0/t.Atts[colName]);
+                        ColCountAndEstimate *cce = new ColCountAndEstimate();
+                        cce->repeatCount = 1;
+                        cce->estimate = localEstimate;
+                        localOrListEstimates[colName + "="] = *cce;
+                    }
+                    else    // we did find some column name repeated with = sign
+                    {
+                        localEstimate = 1.0/t.Atts[colName];
+                        ColCountAndEstimate* cce = &(localOrListEstimates[colName + "="]);
+                        cce->repeatCount += 1;
+                        cce->estimate = cce->repeatCount*localEstimate;
+                    }
                     if(connector.compare("OR") != 0)    //i.e. it's either AND or "." so current orList is done
                     {
                         //compute all estimates and load onto vector
                         //using the formula [1.0 - (1 - 1/f1)(1-1/f2)...]
-                        long double totalCurrentEstimate = 1.0 - prvsEstimate*localEstimate;
+
+                        //iterate over map, and find min(T(R), estimate) before multiplying them all
+                        long double tempResult = 1.0;
+                        map<string, ColCountAndEstimate>::iterator it = localOrListEstimates.begin();
+                        for(; it != localOrListEstimates.end(); it++)
+                        {
+                            if(it->second.repeatCount == 1)
+                                tempResult *= it->second.estimate;
+                            else
+                                tempResult *= (1 - it->second.estimate);
+                        }
+
+                        long double totalCurrentEstimate = 1.0 - tempResult;
                         estimates.push_back(totalCurrentEstimate);
-                        //re-init prvsEstimate
-                        prvsEstimate = 1;
-                    }
-                    else    //someone is still left in the orList
-                    {
-                        prvsEstimate = prvsEstimate*localEstimate;
+                        //clear the map for next columns/orList
+                        localOrListEstimates.clear();
+                        
                     }
                 }
                 else
                 {
                     localEstimate = 1.0/t.Atts[colName];
                     estimates.push_back(localEstimate);
-                    //re-init prvsEstimate
-                    prvsEstimate = 1;
                 }
             }
             else    // operator is either > or <
@@ -539,15 +563,32 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
                 if(connector.compare("OR") == 0 || last_connector.compare("OR") == 0)
                 {
                     localEstimate = (1.0 - 1.0/3);
+                    //*not* grouping on same column name here
+                    ColCountAndEstimate *cce = new ColCountAndEstimate();
+                    cce->repeatCount = 1;
+                    cce->estimate = localEstimate;
+                    localOrListEstimates[colName] = *cce;
+
                     if(connector.compare("OR") != 0)    //i.e. it's either AND or "." so current orList is done
                     {
                         //compute all estimates and load onto vector
-						int totalCurrentEstimate = 1.0 - prvsEstimate*localEstimate;
+                        //using the formula [1.0 - (1 - 1/f1)(1-1/f2)...]
+
+                        //iterate over map, and find min(T(R), estimate) before multiplying them all
+			long double tempResult = 1.0;
+                        map<string, ColCountAndEstimate>::iterator it = localOrListEstimates.begin();
+                        for(; it != localOrListEstimates.end(); it++)
+                        {
+                            if(it->second.repeatCount == 1)
+                                tempResult *= it->second.estimate;
+                            else
+                                tempResult *= (1 - it->second.estimate);
+                        }
+
+                        long double totalCurrentEstimate = 1.0 - tempResult;
                         estimates.push_back(totalCurrentEstimate);
-                    }
-                    else    //someone is still left in the orList
-                    {
-                        prvsEstimate = prvsEstimate*localEstimate;
+                        //clear the map for next columns/orList
+                        localOrListEstimates.clear();
                     }
                 }
                 else
@@ -573,8 +614,16 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
 
     double result = numerator;
     for(int i = 0; i < estimates.size(); i++)
+    {
         result *= estimates.at(i);
-
+#ifdef _STATISTICS_DEBUG
+        cout << "Estimate[" << i << "] = " << estimates.at(i) << endl;
+#endif
+    }
+#ifdef _STATISTICS_DEBUG
+    cout << "Numerator = " << numerator << endl;
+    cout << "result = " << result << endl;
+#endif
     return result;
 }
 

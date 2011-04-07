@@ -35,6 +35,14 @@ private:
 	map <string, TableInfo> m_mRelStatsCopy;	// is written to file
 	map <int, vector<string> > m_mPartitionInfoMap;
 	map <string, vector <string> > m_mColToTable;
+        
+        //used for estimation, need to declare as class member or global
+        //due to template restrictions
+        struct ColCountAndEstimate
+        {
+            int repeatCount;  //number of times same column is repeated
+            long double estimate;   //this might change depending on how many columns participate
+        };
 
     //returns true if parseTree is error free, false otherwise
     bool checkParseTreeForErrors(struct AndList *parseTree, char *relNames[], 
