@@ -53,12 +53,10 @@ Statistics::Statistics(Statistics &copyMe)
 		// now set <part-num, <rel-names...> >
 		m_mPartitionInfoMap[partInfo_itr->first] = vecRelNames;
 	}
-
 }
 
 Statistics::~Statistics()
-{
-}
+{ }
 
 void Statistics::AddRel(char *relName, int numTuples)
 {
@@ -91,7 +89,6 @@ void Statistics::AddAtt(char *relName, char *attName, int numDistincts)
 		// fill into TableInfo structure
         TableInfo t_info;
 		t_info.Atts[string(attName)] = numDistincts;
-        //TODO: t_info.numTuples = numDistincts; <-- new info is created
 
 		// add it to the RelStats map
         m_mRelStats[string(relName)] = t_info;
@@ -403,24 +400,31 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 
 double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numToJoin)
 {
+	#ifdef _STATISTICS_DEBUG
     for (int i = 0; i < numToJoin; i++)
         cout<< relNames[i] << endl;
+	#endif
+
     set <string> dummy;
     vector<string> joinAttsInPair;
-    if(checkParseTreeForErrors(parseTree, relNames, numToJoin, joinAttsInPair, dummy))
+    if (checkParseTreeForErrors(parseTree, relNames, numToJoin, joinAttsInPair, dummy))
+	{
+		#ifdef _STATISTICS_DEBUG
         cout<< "\nsuccessfully parsed" << endl;
+		#endif
+	}
     else
     {
-        cout<< "\ninvalid parseTree" << endl;
+        cout<< "\nInvalid parseTree" << endl;
         return -1;
     }
-//    parseTree->left = copyLeft;
+	//parseTree->left = copyLeft;
 
-#ifdef _STATISTICS_DEBUG
+	#ifdef _STATISTICS_DEBUG
     for(int i = 0; i < joinAttsInPair.size(); i++)
         cout << joinAttsInPair[i] << " ";
     cout<<"\n|||||\n";
-#endif
+	#endif
 
     //start performing join and applying stats
     /**
@@ -548,8 +552,7 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
                         long double totalCurrentEstimate = 1.0 - tempResult;
                         estimates.push_back(totalCurrentEstimate);
                         //clear the map for next columns/orList
-                        localOrListEstimates.clear();
-                        
+                        localOrListEstimates.clear();                        
                     }
                 }
                 else
@@ -616,14 +619,14 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
     for(int i = 0; i < estimates.size(); i++)
     {
         result *= estimates.at(i);
-#ifdef _STATISTICS_DEBUG
+		#ifdef _STATISTICS_DEBUG
         cout << "Estimate[" << i << "] = " << estimates.at(i) << endl;
-#endif
+		#endif
     }
-#ifdef _STATISTICS_DEBUG
+	#ifdef _STATISTICS_DEBUG
     cout << "Numerator = " << numerator << endl;
     cout << "result = " << result << endl;
-#endif
+	#endif
     return result;
 }
 
