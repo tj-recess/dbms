@@ -114,7 +114,7 @@ void q0 (){
 	yy_scan_string(cnf);
 	yyparse();
 	double dummy = s1.Estimate(final, relName, 2);
-	if(fabs(dummy*3.0-result) <0.1)
+	if(fabs(dummy*3.0-result) > 0.1)
 	{
 		cout<<"Read or write or last apply is not correct\n";
 	}
@@ -451,7 +451,7 @@ void q8 (){
 void q9(){
 
 	Statistics s;
-        char *relName[] = { "part",  "partsupp","supplier"};
+    char *relName[] = { "part",  "partsupp","supplier"};
 
 	
 	s.AddRel(relName[0],200000);
@@ -489,7 +489,7 @@ void q9(){
 void q10 (){
 
 	Statistics s;
-        char *relName[] = { "customer", "orders", "lineitem","nation"};
+    char *relName[] = { "customer", "orders", "lineitem","nation"};
 
 	s.Read(fileName);
 	
@@ -514,12 +514,14 @@ void q10 (){
 	s.Apply(final, relName, 2);
 
 	cnf = " (l_orderkey = o_orderkey) ";
-	yy_scan_string(cnf);                                                                               	yyparse();
+	yy_scan_string(cnf);                                                                               	
+	yyparse();
 
 	s.Apply(final, relName, 3);  
 	
 	cnf = "(c_nationkey = n_nationkey) ";
-	yy_scan_string(cnf);                                                                               	yyparse();	
+	yy_scan_string(cnf);                                                                               	
+	yyparse();	
 	
 	double result = s.Estimate(final, relName, 4);
 	if(fabs(result-2000405) > 0.1)
@@ -535,20 +537,20 @@ void q10 (){
 void q11 (){
 
 	Statistics s;
-        char *relName[] = { "part",  "lineitem"};
+    char *relName[] = { "part",  "lineitem"};
 
 	s.Read(fileName);
 	
 	s.AddRel(relName[0],200000);
 	s.AddAtt(relName[0], "p_partkey",200000);
-	s.AddAtt(relName[0], "p_conatiner",40);
+	s.AddAtt(relName[0], "p_container",40);
 
 	s.AddRel(relName[1],6001215);
 	s.AddAtt(relName[1], "l_partkey",200000);
 	s.AddAtt(relName[1], "l_shipinstruct",4);
 	s.AddAtt(relName[1], "l_shipmode",7);
 
-	char *cnf = "l_partkey = p_partkey) AND (l_shipmode = 'AIR' OR l_shipmode = 'AIR REG') AND (p_container ='SM BOX' OR p_container = 'SM PACK')  AND (l_shipinstruct = 'DELIVER IN PERSON')";
+	char *cnf = "(l_partkey = p_partkey) AND (l_shipmode = 'AIR' OR l_shipmode = 'AIR REG') AND (p_container ='SM BOX' OR p_container = 'SM PACK')  AND (l_shipinstruct = 'DELIVER IN PERSON')";
 
 	yy_scan_string(cnf);
 	yyparse();
@@ -565,11 +567,11 @@ void q11 (){
 }
 
 int main(int argc, char *argv[]) {
-//	if (argc < 2) {
-//		cerr << "You need to supply me the query number to run as a command-line arg.." << endl;
-//		cerr << "Usage: ./test.out [0-11] >" << endl;
-//		exit (1);
-//	}
+	if (argc < 2) {
+		cerr << "You need to supply me the query number to run as a command-line arg.." << endl;
+		cerr << "Usage: ./test.out [0-11] >" << endl;
+		exit (1);
+	}
 
 	void (*query_ptr[]) () = {&q0,&q1, &q2, &q3, &q4, &q5, &q6, &q7, &q8,&q9,&q10,&q11};  
 	void (*query) ();

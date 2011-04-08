@@ -575,7 +575,7 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
                         //using the formula [1.0 - (1 - 1/f1)(1-1/f2)...]
 
                         //iterate over map, and find min(T(R), estimate) before multiplying them all
-			long double tempResult = 1.0;
+						long double tempResult = 1.0;
                         map<string, ColCountAndEstimate>::iterator it = localOrListEstimates.begin();
                         for(; it != localOrListEstimates.end(); it++)
                         {

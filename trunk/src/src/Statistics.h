@@ -1,7 +1,7 @@
 #ifndef STATISTICS_
 #define STATISTICS_
 
-#define _STATISTICS_DEBUG 0
+//#define _STATISTICS_DEBUG 0
 
 #include "ParseTree.h"
 #include <map>
