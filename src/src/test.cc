@@ -224,12 +224,12 @@ void q3 (){
 	s.Apply(final, set2, 2);
 
 	char *set3[] = {"c","s","n1","n2"};
-	cnf = " (n1.n_nationkey = n2.n_nationkey) AND (n2.n_nationkey =2)";
+	cnf = " (n1.n_nationkey = n2.n_nationkey)";
 	yy_scan_string(cnf);
 	yyparse();
 
 	double result = s.Estimate(final, set3, 4);
-	if(fabs(result-2400000.0)>0.1)
+	if(fabs(result-60000000.0)>0.1)
 		cout<<"error in estimating Q3\n";
 
 	s.Apply(final, set3, 4);
@@ -557,7 +557,7 @@ void q11 (){
 	
 	double result = s.Estimate(final, relName,2);
 
-	if(fabs(result-150040) > 0.1)
+	if(fabs(result-21432.9)>0.5)
 		cout<<"error in estimating Q11\n";
 	s.Apply(final, relName,2);
 	
