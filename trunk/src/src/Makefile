@@ -1,6 +1,6 @@
 #all: a3.out a2-2test.out a2test.out a1test.out
 
-CC = g++ -O0 -Wno-deprecated
+CC = g++ -O2 -Wno-deprecated
 
 tag = -i
 

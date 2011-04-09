@@ -15,7 +15,7 @@ Statistics::Statistics(Statistics &copyMe)
 	map <string, TableInfo> * pRelStats = copyMe.GetRelStats();
 
 	// now go over pRelStats and copy into m_mRelStats
-	map <string, unsigned long int >::iterator atts_itr;
+	map <string, unsigned long long int >::iterator atts_itr;
 	map <string, TableInfo>::iterator rs_itr = pRelStats->begin();
 	for ( ;rs_itr != pRelStats->end(); rs_itr++)
 	{
@@ -101,7 +101,7 @@ void Statistics::AddAtt(char *relName, char *attName, int numDistincts)
     else // if relName found in the RelStats map
     {
 		// check if info for "attName" exists
-		map <string, unsigned long int>::iterator att_itr;
+		map <string, unsigned long long int>::iterator att_itr;
 		att_itr = (rs_itr->second).Atts.find(string(attName));
 		// if no info for this attribute, add it
 		if (att_itr == (rs_itr->second).Atts.end())
@@ -149,7 +149,7 @@ void Statistics::CopyRel(char *oldName, char *newName)
 	t_info.numTuples = pOldTableInfo->numTuples;
 
 	// copy attributes and distinct values from map Atts
-	map <string, unsigned long int>::iterator atts_itr;
+	map <string, unsigned long long int>::iterator atts_itr;
 	for (atts_itr = pOldTableInfo->Atts.begin();
 					atts_itr != pOldTableInfo->Atts.end();
 					atts_itr++)
@@ -168,6 +168,7 @@ void Statistics::CopyRel(char *oldName, char *newName)
 		(c2t_itr->second).push_back(string(newName));
 	}
 	// now set TableInfo structure for this relation
+
 	m_mRelStats[string(newName)] = t_info;
 
 	// NOTE: copyRel will not affect m_mPartitionInfoMap
@@ -184,7 +185,7 @@ void Statistics::Read(char *fromWhere)
     char buffer[200];
 	// other variables
 	string relName, attName;
-	unsigned long int numValues;
+	unsigned long long int numValues;
     // make iterator for m_mColToTable map
     map <string, vector <string> >::iterator c2t_itr;
 
@@ -195,12 +196,12 @@ void Statistics::Read(char *fromWhere)
 			TableInfo t_info;
 			fscanf(fptr, "%s", buffer);
 			relName = buffer;
-			fscanf(fptr, "%lu", &t_info.numTuples);
+			fscanf(fptr, "%llu", &t_info.numTuples);
 			fscanf(fptr, "%s", buffer);
 			while (strcmp(buffer, "END") != 0)
 			{
 				attName = buffer;
-				fscanf(fptr, "%lu", &numValues);
+				fscanf(fptr, "%llu", &numValues);
 				t_info.Atts[attName] = numValues;
 
                 // push col-name : table-name into m_mColToTable map
@@ -243,26 +244,30 @@ attName distinc-values
 END
 */
 
+// NOTE: If modified stats are NOT to be written to file,
+//	     change m_mRelStats to m_mRelStatsCopy in this function
+//	     and uncomment the code at line:292 in Apply()
+
 	FILE * fptr = fopen(toWhere, "w");
 	map <string, TableInfo>::iterator rs_itr;
-	map <string, unsigned long int>::iterator atts_itr;
+	map <string, unsigned long long int>::iterator atts_itr;
 
 	// scan through the map
-	for (rs_itr = m_mRelStatsCopy.begin();
-		 rs_itr != m_mRelStatsCopy.end(); rs_itr++)
+	for (rs_itr = m_mRelStats.begin();
+		 rs_itr != m_mRelStats.end(); rs_itr++)
 	{
 		fprintf(fptr, "\nBEGIN");
 		// write relation name
 		fprintf(fptr, "\n%s", rs_itr->first.c_str());
 		TableInfo * pTInfo = &(rs_itr->second);
 		// write number of tuples
-		fprintf(fptr, "\n%lu", pTInfo->numTuples);
+		fprintf(fptr, "\n%llu", pTInfo->numTuples);
 		// go thru atts map and write attribute-name & distinct value
 		for (atts_itr = pTInfo->Atts.begin();
 			 atts_itr != pTInfo->Atts.end(); atts_itr++)
 		{
 			fprintf(fptr, "\n%s", atts_itr->first.c_str());
-			fprintf(fptr, " %lu", atts_itr->second);
+			fprintf(fptr, " %llu", atts_itr->second);
 		}
 		fprintf(fptr, "\nEND\n");
 	}
@@ -285,13 +290,13 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 	 * Add new entry in m_mPartitionInfoMap <new-partition-num, <table names> >
 	 */
 
-	if (m_bRelStatsCopied == false)
+	/*if (m_bRelStatsCopied == false)
 	{
 		// make a copy of m_mRelStats
 		m_bRelStatsCopied = true;
 
 	    map <string, TableInfo>::iterator rs_itr;
-    	map <string, unsigned long int>::iterator atts_itr;
+    	map <string, unsigned long long int>::iterator atts_itr;
 
 	    // scan through the map
     	for (rs_itr = m_mRelStats.begin();
@@ -310,7 +315,7 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 		
 			m_mRelStatsCopy[rs_itr->first] = tInfoCopy;	
 	    }
-	}
+	}*/
 
 	double new_row_count = Estimate(parseTree, relNames, numToJoin);
 	if (new_row_count == -1)	// Error found during estimation
@@ -365,7 +370,7 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
     	        {
         	        rs_itr = m_mRelStats.find(*set_itr);
             	    (rs_itr->second).numPartition = m_nPartitionNum;
-                	(rs_itr->second).numTuples = (unsigned long int)new_row_count;
+                	(rs_itr->second).numTuples = (unsigned long long int)new_row_count;
 
 	                // push this table name in vTableNames vector (used after this loop)
     	            vTableNames.push_back(*set_itr);
@@ -386,7 +391,7 @@ void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJo
 				{
 					rs_itr = m_mRelStats.find(*set_itr);
 					(rs_itr->second).numPartition = nOldPartitionNum;
-					(rs_itr->second).numTuples = (unsigned long int)new_row_count;
+					(rs_itr->second).numTuples = (unsigned long long int)new_row_count;
 		
 					// push this table name in vTableNames vector (used after this loop)
 					vTableNames.push_back(*set_itr);

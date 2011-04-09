@@ -306,7 +306,7 @@ void q4 (){
 void q5 (){
 
 	Statistics s;
-        char *relName[] = { "customer", "orders", "lineitem"};
+    char *relName[] = { "customer", "orders", "lineitem"};
 
 	s.AddRel(relName[0],150000);
 	s.AddAtt(relName[0], "c_custkey",150000);
@@ -347,7 +347,7 @@ void q5 (){
 void q6 (){
 
 	Statistics s;
-        char *relName[] = { "partsupp", "supplier", "nation"};
+    char *relName[] = { "partsupp", "supplier", "nation"};
 
 	s.Read(fileName);
 	
@@ -387,7 +387,7 @@ void q6 (){
 void q7(){
 
 	Statistics s;
-        char *relName[] = { "orders", "lineitem"};
+    char *relName[] = { "orders", "lineitem"};
 
 	s.Read(fileName);
 	
@@ -420,7 +420,7 @@ void q7(){
 void q8 (){
 
 	Statistics s;
-        char *relName[] = { "part",  "partsupp"};
+    char *relName[] = { "part",  "partsupp"};
 
 	s.Read(fileName);
 	
