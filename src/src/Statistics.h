@@ -16,10 +16,10 @@ using namespace std;
 // Structure to store stats of a relation
 struct TableInfo
 {
-	unsigned long int numTuples;			// total num of rows in this relation
+	unsigned long long int numTuples;			// total num of rows in this relation
 	int numPartition;						// partition this relation belongs to
 											// -1 signifies that its still singleton
-	map <string, unsigned long int> Atts;	// <attribute-name, distinct values>
+	map <string, unsigned long long int> Atts;	// <attribute-name, distinct values>
 
 	TableInfo(): numTuples(0), numPartition(-1)
 	{}		
