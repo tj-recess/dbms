@@ -8,6 +8,12 @@ ifdef linux
 tag = -n
 endif
 
+main: y.tab.o lex.yy.o main.o
+	$(CC) -o main y.tab.o lex.yy.o main.o -lfl
+    
+main.o : main.cc
+	$(CC) -g -c main.cc
+
 a4-1.out: Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o DBFile.o Heap.o Sorted.o Pipe.o BigQ.o y.tab.o lex.yy.o test.o
 	$(CC) -o a4-1.out Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o EventLogger.o FileUtil.o DBFile.o Heap.o Sorted.o Pipe.o BigQ.o y.tab.o lex.yy.o test.o -lfl -lpthread
 
