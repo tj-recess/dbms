@@ -812,3 +812,55 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
     //control is here that means parseTree passed every test
     return true;
 }
+
+void Statistics::PrepareStatisticsFile(char* fileName)
+{
+    Statistics s;
+    char *relName[] = {"supplier","partsupp", "lineitem", "orders","customer","nation", "part", "region"};
+
+    s.AddRel(relName[0],10000);     //supplier
+    s.AddRel(relName[1],800000);    //partsupp
+    s.AddRel(relName[2],6001215);   //lineitem
+    s.AddRel(relName[3],1500000);   //orders
+    s.AddRel(relName[4],150000);    //customer
+    s.AddRel(relName[5],25);        //nation
+    s.AddRel(relName[6], 200000);   //part
+    s.AddRel(relName[7], 5);        //region
+
+
+    s.AddAtt(relName[0], "s_suppkey",10000);
+    s.AddAtt(relName[0], "s_nationkey",25);
+
+    s.AddAtt(relName[1], "ps_suppkey", 10000);
+    s.AddAtt(relName[1], "ps_partkey", 200000);
+
+
+    s.AddAtt(relName[2], "l_returnflag",3);
+    s.AddAtt(relName[2], "l_discount",11);
+    s.AddAtt(relName[2], "l_shipmode",7);
+    s.AddAtt(relName[2], "l_orderkey",1500000);
+    s.AddAtt(relName[2], "l_receiptdate",0);
+
+
+    s.AddAtt(relName[3], "o_custkey",150000);
+    s.AddAtt(relName[3], "o_orderkey",1500000);
+    s.AddAtt(relName[3], "o_orderdate",0);
+
+
+    s.AddAtt(relName[4], "c_custkey",150000);
+    s.AddAtt(relName[4], "c_nationkey",25);
+    s.AddAtt(relName[4], "c_mktsegment",5);
+
+    s.AddAtt(relName[5], "n_nationkey",25);
+    s.AddAtt(relName[5], "n_regionkey",5);
+    s.AddAtt(relName[5], "n_name",25);
+
+    s.AddAtt(relName[6], "p_partkey",200000);
+    s.AddAtt(relName[6], "p_size",50);
+    s.AddAtt(relName[6], "p_container",40);
+
+    s.AddAtt(relName[7], "r_regionkey",5);
+    s.AddAtt(relName[7], "r_name",5);
+
+    s.Write(fileName);
+}
