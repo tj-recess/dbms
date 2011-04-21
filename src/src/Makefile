@@ -1,6 +1,8 @@
-#all: a3.out a2-2test.out a2test.out a1test.out
+all: main
 
-CC = g++ -O2 -Wno-deprecated
+#a3.out a2-2test.out a2test.out a1test.out
+
+CC = g++ -O0 -Wno-deprecated
 
 tag = -i
 
@@ -8,8 +10,8 @@ ifdef linux
 tag = -n
 endif
 
-main: y.tab.o lex.yy.o main.o
-	$(CC) -o main y.tab.o lex.yy.o main.o -lfl
+main: y.tab.o lex.yy.o main.o Statistics.o
+	$(CC) -o main y.tab.o lex.yy.o Statistics.o main.o -lfl
     
 main.o : main.cc
 	$(CC) -g -c main.cc

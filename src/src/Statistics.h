@@ -64,6 +64,8 @@ public:
 	void  Apply(struct AndList *parseTree, char *relNames[], int numToJoin);
 	double Estimate(struct AndList *parseTree, char **relNames, int numToJoin);
 
+        static void PrepareStatisticsFile(char* fileName);
+        
 	// getter functions
 	int GetPartitionNumber()
 	{
