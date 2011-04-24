@@ -112,7 +112,9 @@ void PrintTableList(struct TableList *tables)
             cout << "tables specified is null" << endl;
 }
 
-void PrintTableCombinations(struct TableList *tables)
+// handles the base case when we have to find 2 table combos
+void TableComboBaseCase(struct TableList *tables, vector <string> & vOrigTables,
+							vector <string> & vTempCombos)
 {
 	/* Logic:
 		1. Put table names in a map --> will get sorted automagically
@@ -130,29 +132,122 @@ void PrintTableCombinations(struct TableList *tables)
 	}
 
 	// Step 2
-	vector <string> vTableName;
 	map <string, int>::iterator map_itr = table_map.begin();
 	for (; map_itr != table_map.end(); map_itr++)
 	{
-		vTableName.push_back(map_itr->first);
+		vOrigTables.push_back(map_itr->first);
 	}
 
 	// Step 3
-	vector <string> vTable2Names;
 	cout << "\n\n--- Table combinations ---\n";
-	int len = vTableName.size();
+	int len = vOrigTables.size();
 	for (int i = 0; i < len; i++)
 	{
 		for (int j = i+1; j < len; j++)
 		{
-			cout << vTableName.at(i) << "." << vTableName.at(j) << endl;
-			vTable2Names.push_back(vTableName.at(i) + "." + vTableName.at(j));
+			string sName = vOrigTables.at(i) + "." + vOrigTables.at(j);
+			cout << sName.c_str() << endl;
+			vTempCombos.push_back(sName);
 		}
 	}
-	cout << endl;
+	cout << endl;	
 }
 
-int main () {
+/* ABCDE
+
+	2 combos:
+	AB AC AD AE
+	BC BD BE
+	CD CE
+	DE
+
+	3 combos:
+	A (find location after all A.x finish) --> BC BD BE CD CE DE
+	B (find location after all B.x finish) --> CD CE DE
+	C (find location after all C.x finish) --> DE
+	D (find location after all D.x finish) --> none
+	E (find location after all E.x finish) --> none
+
+	==> ABC ABD ABE ACD ACE ADE BCD BCE BDE CDE
+
+	4 combos: 
+	A (find location after all A.x finish) --> BCD BCE BDE
+	B (find location after all B.x finish) --> CDE
+	C (find location after all C.x finish) --> none
+	D (find location after all D.x finish) --> none
+	E (find location after all E.x finish) --> none
+
+*/
+
+// fwd declaration
+int find_after_loc(vector<string>&, string);
+
+// recursive function to find all combinations of table
+vector<string> PrintTableCombinations(struct TableList *tables, vector<string> & vOrigTables, int combo_len)
+{
+	vector <string> vTempCombos, vNewCombo;
+	if (combo_len == 2)
+	{
+		TableComboBaseCase(tables, vOrigTables, vTempCombos);
+		//cout << vOrigTables.size() << " " << vTempCombos.size() << endl;
+		return vTempCombos;
+	}
+	else
+	{
+		vTempCombos = PrintTableCombinations(tables, vOrigTables, combo_len-1);
+		//cout << vOrigTables.size() << " " << vTempCombos.size() << endl;
+		int len = vOrigTables.size();
+		int loc = 0;
+		for (int i = 0; i <	len; i++)
+		{
+			loc = find_after_loc(vTempCombos, vOrigTables.at(i));
+			// if lec = -1 --> error
+			if (loc != -1)
+			{
+				for (int j = loc; j < vTempCombos.size(); j++)
+				{
+					string sName = vOrigTables.at(i) + "." + vTempCombos.at(j);
+					cout << sName.c_str() << endl;
+					vNewCombo.push_back(sName);
+				}
+			}
+		}
+		return vNewCombo;
+	}
+}
+
+// Find the location where "sTableToFind" stops being the 1st table
+// Logic: sTableToFind should appear first at least once, then stop
+int find_after_loc(vector<string> & vTempCombos, string sTableToFind)
+{
+	// example: vTempCombos = A.B A.C A.D B.C B.D C.D
+	// 		    sTableToFind = A, return 3
+	//			sTableToFind = B, return 5
+	int len = vTempCombos.size();
+	int dotPos;
+	bool bFoundOnce = false;
+	for (int i = 0; i < len; i++)
+	{
+		string sTab = vTempCombos.at(i);
+		dotPos = sTab.find(".");
+		if (dotPos == string::npos)
+			return -1;				// "." not found... error
+		else
+		{
+			string sFirstTab = sTab.substr(0, dotPos);
+			if (sFirstTab.compare(sTableToFind) == 0)
+				bFoundOnce = true;
+			else if (bFoundOnce == true)
+				return i;
+			else
+				continue;
+		}
+	}
+	return -1;
+}
+
+int main () 
+{
     yyparse();
 
     //print FuncOperator
@@ -161,8 +256,8 @@ int main () {
     //print Tables list
     PrintTableList(tables);
 
-	PrintTableCombinations(tables);
-
+	vector<string> vOT;
+	PrintTableCombinations(tables, vOT, 3);
     char *fileName = "Statistics.txt";
     Statistics::PrepareStatisticsFile(fileName);
     Statistics s;
