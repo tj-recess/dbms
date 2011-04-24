@@ -12,12 +12,13 @@ extern "C" {
 
 extern struct FuncOperator *finalFunction;
 extern struct TableList *tables;
+extern struct AndList *boolean;
 
 int main () 
 {
     yyparse();
 
-	Estimator E(finalFunction, tables);
+	Estimator E(finalFunction, tables, boolean);
 
 	E.PrintFuncOperator();
 	E.PrintTableList();

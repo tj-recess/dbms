@@ -1,18 +1,33 @@
 #include "Estimator.h"
 using namespace std;
 
-Estimator::Estimator() : m_pFuncOp(NULL), m_pTblList(NULL), m_nNumTables(-1)
+Estimator::Estimator() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
+						 m_aTableNames(NULL), m_nNumTables(-1)
 {}
 
 Estimator::Estimator(struct FuncOperator *finalFunction,
-					 struct TableList *tables)
-			: m_pFuncOp(finalFunction), m_pTblList(tables)
+					 struct TableList *tables,
+					 struct AndList * boolean)
+			: m_pFuncOp(finalFunction), m_pTblList(tables),
+			  m_pCNF(boolean)
 {
 	// Store tables in sorted fashion in m_vSortedTables
 	// and the number of tables in m_nNumTables
 	m_nNumTables = SortTables();
 	if (m_nNumTables != -1)
+	{	
+		// Print tables
 		PrintTableCombinations(m_nNumTables);
+		// Populate m_aTableNames with real names + alias
+		PopulateTableNames();
+	}
+
+	// make vector of m_pCNF
+	TokenizeAndList();
+
+	#ifdef _ESTIMATOR_DEBUG
+	PrintTokenizedAndList();
+	#endif
 }
 
 Estimator::~Estimator()
@@ -48,6 +63,39 @@ int Estimator::SortTables()
 	    }
 		return m_vSortedTables.size();
 	}
+}
+
+void Estimator::PopulateTableNames()
+{
+	m_aTableNames = new char*[m_nNumTables*2];
+	struct TableList *p_TblList = m_pTblList;
+	int len, j = 0;
+	while (p_TblList != NULL)
+    {
+		// copy name
+		len = strlen(p_TblList->tableName);
+		char * name = new char [len + 1];
+		strcpy(name, p_TblList->tableName);
+		name[len] = '\0';
+		m_aTableNames[j++] = name;
+
+		// copy alias
+		len = strlen(p_TblList->aliasAs);
+		char * alias = new char [len + 1];
+		strcpy(alias, p_TblList->aliasAs);
+		alias[len] = '\0';
+		m_aTableNames[j++] = alias;
+
+		p_TblList = p_TblList->next;
+	}
+
+	#ifdef _ESTIMATOR_DEBUG
+	cout << "\n\n---------- names and alias ---------" << j << "\n";
+	for (int i = 0; i < j; i++)
+		cout << m_aTableNames[i] << " "; 
+
+	cout << "\n--- done ---\n";
+	#endif
 }
 
 void Estimator::PrintFuncOperator()
@@ -249,4 +297,59 @@ int Estimator::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
     return -1;
 }
 
+// Break the m_pCNF apart into tokens
+// Format:
+// type left_value operator type right_value OR type left_value operator type right_value
+// AND
+// type left_value operator type right_value OR type left_value operator type right_value .
+// NOTE: the "." at the end signifies the end
+void Estimator::TokenizeAndList()
+{
+    //first create copy of passed AndList
+    AndList* parseTree = m_pCNF;;
 
+    while(parseTree != NULL)
+    {
+        OrList* theOrList = parseTree->left;
+        while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
+        {
+            ComparisonOp* theComparisonOp = theOrList->left;
+            if(theComparisonOp == NULL)
+                break;
+            //first push the left value
+            int leftCode = theComparisonOp->left->code;
+            string leftVal = theComparisonOp->left->value;
+
+            m_vWholeCNF.push_back(System::my_itoa(leftCode));
+            m_vWholeCNF.push_back(leftVal);   //remember to apply itoa before using double or int
+
+            //now push the operator
+            m_vWholeCNF.push_back(System::my_itoa(theComparisonOp->code));
+
+            //and now the right value
+            int rightCode = theComparisonOp->right->code;
+            string rightVal = theComparisonOp->right->value;
+
+            m_vWholeCNF.push_back(System::my_itoa(rightCode));
+            m_vWholeCNF.push_back(rightVal);   //remember to apply itoa before using double or int
+            //move to next orList inside first AND
+            if(theOrList->rightOr != NULL)
+                m_vWholeCNF.push_back("OR");
+            theOrList = theOrList->rightOr;
+        }
+
+        //move to next AndList node of the parseTree
+        if(parseTree->rightAnd != NULL)
+            m_vWholeCNF.push_back("AND");
+        else
+            m_vWholeCNF.push_back(".");
+        parseTree = parseTree->rightAnd;
+    }	
+}
+
+void Estimator::PrintTokenizedAndList()
+{
+	cout << "\n\n-------- Tokenized AND-list ----------\n";
+	for (int i = 0; i < m_vWholeCNF.size(); i++)
+		cout << m_vWholeCNF.at(i) << "  ";
+}
