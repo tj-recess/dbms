@@ -1,15 +1,16 @@
-#include "Estimator.h"
+#include "Optimizer.h"
 using namespace std;
 
-Estimator::Estimator() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
+Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
 						 m_aTableNames(NULL), m_nNumTables(-1)
 {}
 
-Estimator::Estimator(struct FuncOperator *finalFunction,
+Optimizer::Optimizer(struct FuncOperator *finalFunction,
 					 struct TableList *tables,
-					 struct AndList * boolean)
+					 struct AndList * boolean,
+					 Statistics & s)
 			: m_pFuncOp(finalFunction), m_pTblList(tables),
-			  m_pCNF(boolean)
+			  m_pCNF(boolean), m_Stats(s)
 {
 	// Store tables in sorted fashion in m_vSortedTables
 	// and the number of tables in m_nNumTables
@@ -30,12 +31,12 @@ Estimator::Estimator(struct FuncOperator *finalFunction,
 	#endif
 }
 
-Estimator::~Estimator()
+Optimizer::~Optimizer()
 {
 	// some cleanup if needed
 }
 
-int Estimator::SortTables()
+int Optimizer::SortTables()
 {
 	if (m_pTblList == NULL)
 		return -1;
@@ -65,7 +66,38 @@ int Estimator::SortTables()
 	}
 }
 
-void Estimator::PopulateTableNames()
+// Sort alias and push them in m_vSortedAlias vector
+int Optimizer::SortAlias()
+{
+    if (m_pTblList == NULL)
+        return -1;
+    else
+    {
+        /* Logic:
+            1. Put table names in a map --> will get sorted automagically
+            2. Take them out and put in a vector (easier to iterate over)
+        */
+
+        // Step 1
+        struct TableList *p_TblList = m_pTblList;
+        map <string, int> table_map;
+        while (p_TblList != NULL)
+        {
+            table_map[p_TblList->aliasAs] = 1;
+            p_TblList = p_TblList->next;
+        }
+
+        // Step 2
+        map <string, int>::iterator map_itr = table_map.begin();
+        for (; map_itr != table_map.end(); map_itr++)
+        {
+            m_vSortedAlias.push_back(map_itr->first);
+        }
+        return m_vSortedAlias.size();
+    }
+}
+
+void Optimizer::PopulateTableNames()
 {
 	m_aTableNames = new char*[m_nNumTables*2];
 	struct TableList *p_TblList = m_pTblList;
@@ -98,7 +130,7 @@ void Estimator::PopulateTableNames()
 	#endif
 }
 
-void Estimator::PrintFuncOperator()
+void Optimizer::PrintFuncOperator()
 {
 /* Structure of FuncOperator
    -------------------------
@@ -137,7 +169,7 @@ void Estimator::PrintFuncOperator()
 		}
 }
 
-void Estimator::PrintFuncOpRecur(struct FuncOperator * func_node)
+void Optimizer::PrintFuncOpRecur(struct FuncOperator * func_node)
 {
         static int pfo2_i = 1;
         struct FuncOperator *temp;
@@ -165,7 +197,7 @@ void Estimator::PrintFuncOpRecur(struct FuncOperator * func_node)
 }
 
 
-void Estimator::PrintTableList()
+void Optimizer::PrintTableList()
 {
 	if(m_pTblList == NULL)
     	cout << "tables specified is null" << endl;
@@ -186,16 +218,28 @@ void Estimator::PrintTableList()
 
 // handles the base case when we have to find 2 table combos
 // nested for loop over m_vSortedTables to make combos of 2 tables
-void Estimator::TableComboBaseCase(vector <string> & vTempCombos)
+void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 {
     cout << "\n\n--- Table combinations ---\n";
     for (int i = 0; i < m_nNumTables; i++)
     {
         for (int j = i+1; j < m_nNumTables; j++)
         {
+			// TODO
+			// -- Find AndList related to these 2 tables
+			// new_AndList = find_new_AndList(m_vSortedTables.at(i), m_vSortedTables.at(j));
+			//
+			// Statistics * pStats = new Statistics(m_Stats);
+			// -- call pStats->Apply(new_AndList, {these 2 table names}, 2);
+			//			--> change distinct values
+			// -- call pStats->Estimate(new_AndList, {these 2 table names}, 2);
+			//			--> apply select condition before join condition
+			// Use the result of estimate anywhere?
+			// 
+
             string sName = m_vSortedTables.at(i) + "." + m_vSortedTables.at(j);
             cout << sName.c_str() << endl;
-			m_mJoinEstimate[sName] = 0;		// Push this join in map
+			m_mJoinEstimate[sName] = 0;		// Push pStats into this map
             vTempCombos.push_back(sName);
         }
     }
@@ -229,7 +273,7 @@ void Estimator::TableComboBaseCase(vector <string> & vTempCombos)
 */
 
 // recursive function to find all combinations of table
-vector<string> Estimator::PrintTableCombinations(int combo_len)
+vector<string> Optimizer::PrintTableCombinations(int combo_len)
 {
     vector <string> vTempCombos, vNewCombo;
 
@@ -237,13 +281,11 @@ vector<string> Estimator::PrintTableCombinations(int combo_len)
     if (combo_len == 2)
     {
         TableComboBaseCase(vTempCombos);
-        //cout <<  vTempCombos.size() << endl;
         return vTempCombos;
     }
     else
     {
         vTempCombos = PrintTableCombinations(combo_len-1);
-        //cout << vTempCombos.size() << endl;
         for (int i = 0; i < m_nNumTables; i++)
         {
 			int loc = -1;
@@ -255,9 +297,20 @@ vector<string> Estimator::PrintTableCombinations(int combo_len)
 				int len = vTempCombos.size();
                 for (int j = loc; j < len; j++)
                 {
+					// TODO
+					// Make char ** with all the table names being used here
+					// Find AndList with all these tables
+					// Statistics * pStats = new Statistics(m_Stats);
+		            // -- call pStats->Apply(new_AndList, {these n table names}, n);
+					//			--> somehow use the stats from the map for 2-table base combos
+        		    //          --> change distinct values
+		            // -- call pStats->Estimate(new_AndList, {these n table names}, n);
+        		    //          --> apply select condition before join condition
+		            // Use the result of estimate anywhere?
+
                     string sName = m_vSortedTables.at(i) + "." + vTempCombos.at(j);
                     cout << sName.c_str() << endl;
-					m_mJoinEstimate[sName] = 0;     // Push this join in map				
+					m_mJoinEstimate[sName] = 0;    	// Push pStats into this map 
                     vNewCombo.push_back(sName);
                 }
             }
@@ -268,7 +321,7 @@ vector<string> Estimator::PrintTableCombinations(int combo_len)
 
 // Find the location where "sTableToFind" stops being the 1st table
 // Logic: sTableToFind should appear first at least once, then stop
-int Estimator::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableToFind)
+int Optimizer::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableToFind)
 {
     // example: vTempCombos = A.B A.C A.D B.C B.D C.D
     //          sTableToFind = A, return 3
@@ -303,7 +356,7 @@ int Estimator::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
 // AND
 // type left_value operator type right_value OR type left_value operator type right_value .
 // NOTE: the "." at the end signifies the end
-void Estimator::TokenizeAndList()
+void Optimizer::TokenizeAndList()
 {
     //first create copy of passed AndList
     AndList* parseTree = m_pCNF;;
@@ -347,7 +400,7 @@ void Estimator::TokenizeAndList()
     }	
 }
 
-void Estimator::PrintTokenizedAndList()
+void Optimizer::PrintTokenizedAndList()
 {
 	cout << "\n\n-------- Tokenized AND-list ----------\n";
 	for (int i = 0; i < m_vWholeCNF.size(); i++)

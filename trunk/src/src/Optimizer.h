@@ -8,12 +8,14 @@
 #include <iostream>
 #include "ParseTree.h"
 #include "EventLogger.h"
+#include "Statistics.h"
+
 using namespace std;
 
 
 #define _ESTIMATOR_DEBUG 1
 
-class Estimator
+class Optimizer
 {
 private:
 	// members
@@ -23,25 +25,30 @@ private:
 
 	int m_nNumTables;
 	vector <string> m_vSortedTables;
+	vector <string> m_vSortedAlias;
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
 	map <string, long long unsigned int> m_mJoinEstimate;
+	Statistics m_Stats;
 
 	// functions
-	Estimator();
+	Optimizer();
 	int SortTables();
+	int SortAlias();
 	void TokenizeAndList();
 	void PrintTokenizedAndList();	// TODO: delete this
-	void PopulateTableNames();
+	void PopulateTableNames();		// in m_aTableNames char** array
 	void TableComboBaseCase(vector <string> &);
 	int ComboAfterCurrTable(vector<string> &, string);
 	void PrintFuncOpRecur(struct FuncOperator *func_node);
 
+
 public:
-	Estimator(struct FuncOperator *finalFunction,
+	Optimizer(struct FuncOperator *finalFunction,
 			  struct TableList *tables,
-			  struct AndList * boolean);
-	~Estimator();
+			  struct AndList * boolean,
+			  Statistics & s);
+	~Optimizer();
 
 	void PrintFuncOperator();
 	void PrintTableList();
