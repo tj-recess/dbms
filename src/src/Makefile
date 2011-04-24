@@ -10,8 +10,8 @@ ifdef linux
 tag = -n
 endif
 
-main: y.tab.o lex.yy.o main.o Statistics.o
-	$(CC) -o main y.tab.o lex.yy.o Statistics.o main.o -lfl
+main: y.tab.o lex.yy.o main.o Statistics.o Estimator.o
+	$(CC) -o main y.tab.o lex.yy.o Statistics.o Estimator.o main.o -lfl
     
 main.o : main.cc
 	$(CC) -g -c main.cc
@@ -48,6 +48,9 @@ a1-test.o: a1-test.cc
 
 Statistics.o: Statistics.cc
 	$(CC) -g -c Statistics.cc
+
+Estimator.o: Estimator.cc
+	$(CC) -g -c Estimator.cc
 
 Heap.o: Heap.cc
 	$(CC) -g -c Heap.cc
