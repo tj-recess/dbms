@@ -49,7 +49,8 @@ public:
 		cout << "\n*** Select Pipe Operation ***";
 		cout << "\nInput pipe ID: " << m_nInPipe;
 		cout << "\nOutput pipe ID: " << m_nOutPipe;
-//		cout << "\nSelect CNF : " << m_pCNF->print();
+		cout << "\nSelect CNF : ";
+		m_pCNF->Print();
 //		cout << "\nRecord Literal: " << m_pLiteral->print(); 
 	}
 };
@@ -73,7 +74,8 @@ public:
         cout << "\n*** Select File Operation ***";
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nInput filename: " << m_sInFileName.c_str();
-//        cout << "\nSelect CNF : " << m_pCNF->print();
+        cout << "\nSelect CNF : ";
+		m_pCNF->Print();
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
     }
 };
@@ -98,8 +100,8 @@ public:
         cout << "\n*** Select Pipe Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
-//        cout << "\nSelect CNF : " << m_pCNF->print();
-//        cout << "\nRecord Literal: " << m_pLiteral->print();
+		cout << "\nNum atts to Keep: " << m_nAttsToKeep;
+		cout << "\nNum total atts: " << m_nTotalAtts;
     }
 };
 
@@ -125,7 +127,8 @@ public:
         cout << "\nInput pipe-1 ID: " << m_nInPipe;
         cout << "\nInput pipe-2 ID: " << m_nRightInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
-//        cout << "\nSelect CNF : " << m_pCNF->print();
+        cout << "\nSelect CNF : ";
+		m_pCNF->Print();
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
     }
 };
@@ -147,7 +150,8 @@ public:
 		cout << "\n*** Sum Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
-//		cout << "\nFunction: " << m_pFunc->print();
+		cout << "\nFunction: ";
+		m_pFunc->Print();
 	}
 };
 
@@ -170,8 +174,10 @@ public:
 		cout << "\n*** Group-by Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
-//		cout << "\nFunction: " << m_pFunc->print();
-//		cout << "\nOrderMaker: " << m_pOM->print();
+		cout << "\nFunction: ";
+		m_pFunc->Print();
+		cout << "\nOrderMaker: ";
+		m_pOM->Print();
     }
 };
 
@@ -192,7 +198,7 @@ public:
         cout << "\n*** WriteOut Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput file: " << m_sOutFileName;
-//      cout << "\nSchema: " << m_pSchema->print();
+//        cout << "\nSchema: " << m_pSchema->Print();
     }
 };
 
