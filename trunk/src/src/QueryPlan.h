@@ -26,8 +26,8 @@ public:
 					left(NULL), right(NULL), parent(NULL)
 	{}
 
-	virtual void PrintNode()=0;
-	virtual ~QueryPlanNode();
+	virtual void PrintNode() {}
+	virtual ~QueryPlanNode() {}	
 };
 
 class Node_SelectPipe : public QueryPlanNode
@@ -53,6 +53,12 @@ public:
 		m_pCNF->Print();
 //		cout << "\nRecord Literal: " << m_pLiteral->print(); 
 	}
+
+	~Node_SelectPipe()
+    {
+        delete m_pCNF; m_pCNF = NULL;
+        delete m_pLiteral; m_pLiteral = NULL;
+    }
 };
 
 class Node_SelectFile : public QueryPlanNode
@@ -78,6 +84,12 @@ public:
 		m_pCNF->Print();
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
     }
+
+	~Node_SelectFile()
+	{
+		delete m_pCNF; m_pCNF = NULL;
+		delete m_pLiteral; m_pLiteral = NULL;
+	}
 };
 
 class Node_Project : public QueryPlanNode
@@ -103,6 +115,11 @@ public:
 		cout << "\nNum atts to Keep: " << m_nAttsToKeep;
 		cout << "\nNum total atts: " << m_nTotalAtts;
     }
+	
+	~Node_Project()
+	{
+		delete [] atts_list; atts_list = NULL;
+	}
 };
 
 class Node_Join : public QueryPlanNode
@@ -131,6 +148,12 @@ public:
 		m_pCNF->Print();
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
     }
+	
+	~Node_Join()
+    {
+        delete m_pCNF; m_pCNF = NULL;
+        delete m_pLiteral; m_pLiteral = NULL;
+    }
 };
 
 class Node_Sum : public QueryPlanNode
@@ -152,6 +175,11 @@ public:
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nFunction: ";
 		m_pFunc->Print();
+	}
+
+	~Node_Sum()
+	{
+		delete m_pFunc; m_pFunc = NULL;
 	}
 };
 
@@ -179,6 +207,12 @@ public:
 		cout << "\nOrderMaker: ";
 		m_pOM->Print();
     }
+
+	~Node_GroupBy()
+	{
+		delete m_pFunc; m_pFunc = NULL;
+		delete m_pOM; m_pOM = NULL;
+	}
 };
 
 class Node_WriteOut : public QueryPlanNode
@@ -200,6 +234,11 @@ public:
         cout << "\nOutput file: " << m_sOutFileName;
 //        cout << "\nSchema: " << m_pSchema->Print();
     }
+
+	~Node_WriteOut()
+	{
+		delete m_pSchema; m_pSchema = NULL;
+	}
 };
 
 #endif

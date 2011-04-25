@@ -25,7 +25,7 @@ private:
 	struct TableList * m_pTblList;
 	struct AndList * m_pCNF;
 
-	int m_nNumTables;
+	int m_nNumTables, m_nGlobalPipeID;
 	vector <string> m_vSortedTables;
 	vector <string> m_vSortedAlias;
 	char ** m_aTableNames;
