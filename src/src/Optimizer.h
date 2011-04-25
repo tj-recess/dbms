@@ -2,6 +2,7 @@
 #define ESTIMATOR_H_
 
 #include <map>
+#include <utility>
 #include <vector>
 #include <string>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include "ParseTree.h"
 #include "EventLogger.h"
 #include "Statistics.h"
+#include "QueryPlan.h"
 
 using namespace std;
 
@@ -28,7 +30,7 @@ private:
 	vector <string> m_vSortedAlias;
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
-	map <string, long long unsigned int> m_mJoinEstimate;
+	map <string, pair <Statistics *, QueryPlanNode*> > m_mJoinEstimate;
 	Statistics m_Stats;
 
 	// functions

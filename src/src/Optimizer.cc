@@ -225,6 +225,12 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
     {
         for (int j = i+1; j < m_nNumTables; j++)
         {
+			pair <Statistics *, QueryPlanNode *> stats_node_pair;
+			Statistics * pStats = new Statistics(m_Stats);
+			QueryPlanNode * pNode = NULL; 
+			stats_node_pair.first = pStats;
+			stats_node_pair.second = pNode;
+
 			// TODO
 			// -- Find AndList related to these 2 tables
 			// new_AndList = find_new_AndList(m_vSortedTables.at(i), m_vSortedTables.at(j));
@@ -239,7 +245,7 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 
             string sName = m_vSortedTables.at(i) + "." + m_vSortedTables.at(j);
             cout << sName.c_str() << endl;
-			m_mJoinEstimate[sName] = 0;		// Push pStats into this map
+			m_mJoinEstimate[sName] = stats_node_pair;		// Push pStats into this map
             vTempCombos.push_back(sName);
         }
     }
@@ -297,6 +303,12 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 				int len = vTempCombos.size();
                 for (int j = loc; j < len; j++)
                 {
+					pair <Statistics *, QueryPlanNode *> stats_node_pair;
+			        Statistics * pStats = new Statistics(m_Stats); // <-- use m_stats of vTempCombos.at(j) tables
+            		QueryPlanNode * pNode = NULL; 
+			        stats_node_pair.first = pStats;
+            		stats_node_pair.second = pNode;
+
 					// TODO
 					// Make char ** with all the table names being used here
 					// Find AndList with all these tables
@@ -310,7 +322,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 
                     string sName = m_vSortedTables.at(i) + "." + vTempCombos.at(j);
                     cout << sName.c_str() << endl;
-					m_mJoinEstimate[sName] = 0;    	// Push pStats into this map 
+					m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map 
                     vNewCombo.push_back(sName);
                 }
             }
