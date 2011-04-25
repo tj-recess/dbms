@@ -34,6 +34,7 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 Optimizer::~Optimizer()
 {
 	// some cleanup if needed
+	// m_mJoinEstimate map
 }
 
 int Optimizer::SortTables()
@@ -83,6 +84,9 @@ int Optimizer::SortAlias()
         map <string, int> table_map;
         while (p_TblList != NULL)
         {
+			// Make a copy of this table name AS alias name
+			m_Stats.CopyRel(p_TblList->tableName, p_TblList->aliasAs);
+			// Push the name in map with a dummy key
             table_map[p_TblList->aliasAs] = 1;
             p_TblList = p_TblList->next;
         }
@@ -97,6 +101,7 @@ int Optimizer::SortAlias()
     }
 }
 
+// Put all table names and alias in char*[] as needed by estimate
 void Optimizer::PopulateTableNames()
 {
 	m_aTableNames = new char*[m_nNumTables*2];
