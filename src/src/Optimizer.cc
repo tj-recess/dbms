@@ -2,7 +2,7 @@
 using namespace std;
 
 Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
-						 m_aTableNames(NULL), m_nNumTables(-1)
+						 m_aTableNames(NULL), m_nNumTables(-1), m_nGlobalPipeID(0)
 {}
 
 Optimizer::Optimizer(struct FuncOperator *finalFunction,
@@ -81,21 +81,41 @@ int Optimizer::SortAlias()
 
         // Step 1
         struct TableList *p_TblList = m_pTblList;
-        map <string, int> table_map;
+        map <string, string> table_map;
         while (p_TblList != NULL)
         {
 			// Make a copy of this table name AS alias name
 			m_Stats.CopyRel(p_TblList->tableName, p_TblList->aliasAs);
-			// Push the name in map with a dummy key
-            table_map[p_TblList->aliasAs] = 1;
+			// Push the alias name in map with original table name as value
+			// Reason, we need the original table name to find the .bin file
+            table_map[p_TblList->aliasAs] = p_TblList->tableName;
             p_TblList = p_TblList->next;
         }
 
         // Step 2
-        map <string, int>::iterator map_itr = table_map.begin();
+        map <string, string>::iterator map_itr = table_map.begin();
         for (; map_itr != table_map.end(); map_itr++)
         {
+			// Push alias name in the vector
             m_vSortedAlias.push_back(map_itr->first);
+
+			// Make attributes to create select file node
+			string sInFile = map_itr->second + ".bin";
+			int outPipeId = m_nGlobalPipeID++;
+			CNF * pCNF = new CNF();
+			Record * pLit = new Record();
+			Schema schema_obj("catalog", (char*)map_itr->second.c_str());
+//			pCNF->GrowFromParseTree(new_AndList, schema_obj, *pLit);
+            QueryPlanNode * pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
+
+			// Apply "select" CNF on it and push the result in map
+            Statistics * pStats = new Statistics(m_Stats);
+			// pStats->Apply(new_AndList, {this alias name as char *[]}, 1)
+
+            pair <Statistics *, QueryPlanNode *> stats_node_pair;			
+            stats_node_pair.first = pStats;
+            stats_node_pair.second = pNode;
+			m_mJoinEstimate[map_itr->first] = stats_node_pair; 
         }
         return m_vSortedAlias.size();
     }
