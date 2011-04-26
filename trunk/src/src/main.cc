@@ -25,8 +25,8 @@ int main ()
 
 	// Start estimator after Stats object is ready
 	Optimizer Oz(finalFunction, tables, boolean, s);
-	Oz.PrintFuncOperator();
-	Oz.PrintTableList();
+	//Oz.PrintFuncOperator();
+	//Oz.PrintTableList();
 
 }
 
