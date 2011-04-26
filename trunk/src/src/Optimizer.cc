@@ -121,34 +121,40 @@ int Optimizer::SortAlias()
             		PrintAndList(new_AndList);
 		            cout << "\n";
             #endif
-			QueryPlanNode * pNode = NULL;
-			if (new_AndList != NULL)
-			{
-				// Apply "select" CNF on it and push the result in map
-				char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
-				vector <string> vec_rels;
-				vec_rels.push_back(sAlias);
-				vec_rels.push_back(m_mAliasToTable[sAlias]);
-				PopulateTableNames(vec_rels);
-				m_Stats.Apply(new_AndList, m_aTableNames, 2);
+            QueryPlanNode * pNode = NULL;
+            if (new_AndList != NULL)
+            {
+                // Apply "select" CNF on it and push the result in map
+                char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
+                vector <string> vec_rels;
+                vec_rels.push_back(sAlias);
+                vec_rels.push_back(m_mAliasToTable[sAlias]);
+                PopulateTableNames(vec_rels);
+                m_Stats.Apply(new_AndList, m_aTableNames, 2);
 
-				pCNF = new CNF();
-				pLit = new Record();
+                pCNF = new CNF();
+                pLit = new Record();
 
-				//remove dots from column name in the selected node
+                //remove dots from column name in the selected node
                 RemoveAliasFromColumnName(new_AndList);
     	        pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
-			}
-			// Now create the SelectFile Node
+            }
+            // Now create the SelectFile Node
        	    pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
-			// push outPipe --> combo name in the map
+            // push outPipe --> combo name in the map
             m_mOutPipeToCombo[outPipeId] = sAlias;
 
-            pair <Statistics *, QueryPlanNode *> stats_node_pair;			
-            stats_node_pair.first = &m_Stats;
-            stats_node_pair.second = pNode;
-			m_mJoinEstimate[sAlias] = stats_node_pair; 
+//            pair <Statistics *, QueryPlanNode *> stats_node_pair;
+//            stats_node_pair.first = &m_Stats;
+//            stats_node_pair.second = pNode;
+//            m_mJoinEstimate[sAlias] = stats_node_pair;
+            JoinValue jv;
+            jv.stats = &m_Stats;
+            jv.queryPlanNode = pNode;
+            jv.joinOrder = sAlias;  //default join order for singleton (unjoined) table
+//            jv.schema = ;
+            m_mJoinEstimate[sAlias] = jv;
         }
 		
 		#ifdef _ESTIMATOR_DEBUG
@@ -348,40 +354,48 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
             string sName = sLeftAlias + "." + sRightAlias;
             cout << sName.c_str() << endl;
 
-			// Make attributes to create Join node
-			int in_pipe_left = m_mJoinEstimate[sLeftAlias].second->m_nOutPipe;
-			int in_pipe_right = m_mJoinEstimate[sRightAlias].second->m_nOutPipe;
-			int out_pipe = m_nGlobalPipeID++;
-			CNF * pCNF = NULL;
+            int in_pipe_left;
+            int in_pipe_right;
+            int out_pipe;
+            CNF * pCNF = NULL;
             Record * pLit = NULL;
-		
-			Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
-			Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
 
-			vector <string> vec_rel_names;
-			ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
+            vector <string> vec_rel_names;
+            ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
 
-			AndList * new_AndList = GetJoinsFromAndList(vec_rel_names);
-			#ifdef _DEBUG_OPTIMIZER
-                        TokenizeAndList(new_AndList);
-                        PrintTokenizedAndList();
-                        m_vWholeCNF.clear();
-			#endif
+            AndList * new_AndList = GetJoinsFromAndList(vec_rel_names);
+            #ifdef _DEBUG_OPTIMIZER
+            TokenizeAndList(new_AndList);
+            PrintTokenizedAndList();
+            m_vWholeCNF.clear();
+            #endif
 
-			QueryPlanNode * pNode = NULL;
-			Statistics * pStats = NULL;
-			pStats = new Statistics(m_Stats);
+            QueryPlanNode * pNode = NULL;
+            Statistics * pStats = NULL;
             if (new_AndList != NULL)
             {
-				// copy alias as well as table names in a new vector
-				vector <string> rel_names;
-				for (int i = 0; i < vec_rel_names.size(); i++)
-				{
-					rel_names.push_back(vec_rel_names.at(i));
-					rel_names.push_back(m_mAliasToTable[vec_rel_names.at(i)]);
-				}
-				// This function will fill up m_aTableNamesTableNames
+                    // copy alias as well as table names in a new vector
+                    vector <string> rel_names;
+                    for (int i = 0; i < vec_rel_names.size(); i++)
+                    {
+                            rel_names.push_back(vec_rel_names.at(i));
+                            rel_names.push_back(m_mAliasToTable[vec_rel_names.at(i)]);
+                    }
+                    // This function will fill up m_aTableNamesTableNames
 	            PopulateTableNames(rel_names);
+                    
+                    //get optimal order, call stats  object from the map accordingly, apply on that stats object
+                    pair<string, string> *optimalPair = FindOptimalPairing(vec_rel_names, new_AndList);
+                    
+                    pStats = new Statistics(*(m_mJoinEstimate[optimalPair->second].stats));
+                    
+                    // Make attributes to create Join node
+                    in_pipe_left = m_mJoinEstimate[optimalPair->first].queryPlanNode->m_nOutPipe;
+                    in_pipe_right = m_mJoinEstimate[optimalPair->second].queryPlanNode->m_nOutPipe;
+                    out_pipe = m_nGlobalPipeID++;
+
+                    Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
+                    Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
 
 				// Now call apply
         	    pStats->Apply(new_AndList, m_aTableNames, rel_names.size());
@@ -389,10 +403,10 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 				// change distinct values
 	            pCNF = new CNF();
 	            pLit = new Record();
-				//remove dots from column name in the selected node
-                RemoveAliasFromColumnName(new_AndList);
-				pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
-			}
+                    //remove dots from column name in the selected node
+                    RemoveAliasFromColumnName(new_AndList);
+                    pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+            }
 			// Then create the Join Node	
 			pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe, pCNF, pLit);
 
@@ -400,10 +414,17 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			m_mOutPipeToCombo[out_pipe] = sName;
 
 			// make stats + node pair and push in the map
-			pair <Statistics *, QueryPlanNode *> stats_node_pair;
-			stats_node_pair.first = pStats;
-			stats_node_pair.second = pNode;
-			m_mJoinEstimate[sName] = stats_node_pair;		// Push pStats into this map
+//			pair <Statistics *, QueryPlanNode *> stats_node_pair;
+//			stats_node_pair.first = pStats;
+//			stats_node_pair.second = pNode;
+//			m_mJoinEstimate[sName] = stats_node_pair;		// Push pStats into this map
+
+                        JoinValue jv;
+                        jv.stats = &m_Stats;
+                        jv.queryPlanNode = pNode;
+//                        jv.joinOrder = ;
+//                        jv.schema = ;
+                        m_mJoinEstimate[sName] = jv;
             vTempCombos.push_back(sName);
         }
     }
@@ -457,8 +478,8 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
             // if lec = -1 --> error
             if (loc != -1)
             {
-				// Append current table with the other combinations (see logic above)
-				int len = vTempCombos.size();
+                // Append current table with the other combinations (see logic above)
+                int len = vTempCombos.size();
                 for (int j = loc; j < len; j++)
                 {
                     string sLeftAlias = m_vSortedAlias.at(i);
@@ -466,13 +487,13 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                     string sName = sLeftAlias + "." + sRightAlias;
                     cout << sName.c_str() << endl;
 
-                    int in_pipe_left = m_mJoinEstimate[sLeftAlias].second->m_nOutPipe;
-                    int in_pipe_right = m_mJoinEstimate[sRightAlias].second->m_nOutPipe;
+                    int in_pipe_left = m_mJoinEstimate[sLeftAlias].queryPlanNode->m_nOutPipe;
+                    int in_pipe_right = m_mJoinEstimate[sRightAlias].queryPlanNode->m_nOutPipe;
                     int out_pipe = m_nGlobalPipeID++;
                     CNF * pCNF = NULL;
                     Record * pLit = NULL;
 
-                    Statistics * pStats = new Statistics(m_mJoinEstimate[sRightAlias].first);
+                    Statistics * pStats = new Statistics(*(m_mJoinEstimate[sRightAlias].stats));
                     QueryPlanNode * pNode = NULL;
 
                     // TODO
@@ -517,11 +538,17 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                         pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
                     }
                     
-                    pair <Statistics *, QueryPlanNode *> stats_node_pair;
-                    stats_node_pair.first = pStats;
-                    stats_node_pair.second = pNode;
+//                    pair <Statistics *, QueryPlanNode *> stats_node_pair;
+//                    stats_node_pair.first = pStats;
+//                    stats_node_pair.second = pNode;
+//                    m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map
 
-                    m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map
+                    JoinValue jv;
+                    jv.stats = &m_Stats;
+                    jv.queryPlanNode = pNode;
+//                    jv.joinOrder = ;
+//                    jv.schema = ;
+                    m_mJoinEstimate[sName] = jv;
                     vNewCombo.push_back(sName);
                 }
             }
@@ -755,6 +782,62 @@ void Optimizer::RemoveAliasFromColumnName(AndList* parseTreeNode)
         parseTreeNode = parseTreeNode->rightAnd;
     }
 }
+
+
+pair<string, string>* Optimizer::FindOptimalPairing(vector<string>& vAliases, AndList* parseTree)
+{
+    map<pair<string, string>, double> allEstimates;
+    //find all possible combis, sort out best one by looking at numTuples from Stats object
+    for(int i = 0; i < vAliases.size(); i++)
+    {
+        pair<string, string> joinOrder;
+        joinOrder.first = vAliases.at(i);
+        
+        string concat = "";
+        for(int j = 0; j < vAliases.size(); j++)
+        {
+            if(j == i)
+                continue;
+            concat += vAliases.at(j);
+            concat += ".";
+        }
+        //remove last "." from concat
+        concat = concat.substr(0,concat.size()-1);
+        joinOrder.second = concat;
+
+        //check if this pair is minimal
+        //get Stats object of second, make a copy, apply estimate
+        //put all estimates in a map, find minimum and return corresponding
+        Statistics *tempStats = new Statistics(*(m_mJoinEstimate[joinOrder.second].stats));
+        allEstimates[joinOrder] = tempStats->Estimate(parseTree, m_aTableNames, vAliases.size()*2);
+        //m_aTableNames is expected to be filled by caller
+    }
+
+    map<pair<string, string>, double>::iterator it = allEstimates.begin();
+    pair<string, string> *optimalPair ;//= new pair<string, string>();
+    double minTuples = -1.0;
+    while(it != allEstimates.end())
+    {
+        if(minTuples == -1)
+        {
+            minTuples = it->second;
+            optimalPair = const_cast<pair<string, string>* >(&(it->first));
+        }
+        else
+        {
+            if(minTuples > it->second)
+            {
+                minTuples = it->second;
+                optimalPair = const_cast<pair<string, string>* >(&(it->first));
+            }
+        }
+
+        it++;
+    }
+
+    return optimalPair;
+}
+
 
 // Break the m_pCNF apart into tokens
 // Format:

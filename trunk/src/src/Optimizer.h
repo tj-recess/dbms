@@ -32,7 +32,15 @@ private:
 	vector <string> m_vSortedAlias;
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
-	map <string, pair <Statistics *, QueryPlanNode*> > m_mJoinEstimate;
+        struct JoinValue
+        {
+            Statistics *stats;
+            QueryPlanNode *queryPlanNode;
+            string joinOrder;
+//            Schema schema;
+        };
+//	map <string, pair <Statistics *, QueryPlanNode*> > m_mJoinEstimate;
+        map <string, JoinValue> m_mJoinEstimate;
 	Statistics m_Stats;				// master copy of the stats object
     map <string, string> m_mAliasToTable;           // alias to original table name
 	map <int, string> m_mOutPipeToCombo;			// map of outpipe to combo name
@@ -56,6 +64,7 @@ private:
     void PrintComparisonOp(struct ComparisonOp *pCom);
     void PrintOperand(struct Operand *pOperand);
     void PrintAndList(struct AndList *pAnd);
+    pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
 
 public:
 	Optimizer(struct FuncOperator *finalFunction,
