@@ -128,13 +128,15 @@ public:
 	int m_nRightInPipe;
     CNF* m_pCNF;
     Record * m_pLiteral;
+	Schema * m_pSchema;
 
-    Node_Join(int ip1, int ip2, int op, CNF* pCNF, Record * pLit)
+    Node_Join(int ip1, int ip2, int op, CNF* pCNF, Schema * pSch, Record * pLit)
     {
 		m_nInPipe = ip1;
 		m_nRightInPipe = ip2;
 		m_nOutPipe = op;
 		m_pCNF = pCNF;
+		m_pSchema = pSch;
 		m_pLiteral = pLit;
 	}
 
@@ -152,6 +154,7 @@ public:
 	~Node_Join()
     {
         delete m_pCNF; m_pCNF = NULL;
+        delete m_pSchema; m_pSchema = NULL;
         delete m_pLiteral; m_pLiteral = NULL;
     }
 };
