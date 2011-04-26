@@ -110,7 +110,8 @@ int Optimizer::SortAlias()
 			CNF * pCNF = new CNF();
 			Record * pLit = new Record();
 			Schema schema_obj("catalog", (char*)map_itr->second.c_str());
-//			pCNF->GrowFromParseTree(new_AndList, schema_obj, *pLit);
+			AndList * new_AndList = GetSelectionsFromAndList(map_itr->first);
+			pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
             QueryPlanNode * pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
 			// Apply "select" CNF on it and push the result in map
@@ -206,7 +207,7 @@ void Optimizer::ComboToVector(string sCombo, vector <string> & rel_vec)
 	rel_vec.push_back(sTemp);
 
 	#ifdef _ESTIMATOR_DEBUG
-	cout << "\n--- [ComboToVector] ---\nOriginal string: " << sCombo.c_str();
+	cout << "\n--- [ComboToSet] ---\nOriginal string: " << sCombo.c_str();
 	cout << "\nVector data: \n";
 	for (int i = 0; i < rel_vec.size(); i++)
 		cout << rel_vec.at(i) << endl;
@@ -309,11 +310,29 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
     {
         for (int j = i+1; j < m_nNumTables; j++)
         {
-			pair <Statistics *, QueryPlanNode *> stats_node_pair;
+			string sLeftTable = m_vSortedTables.at(i);
+			string sRightTable = m_vSortedTables.at(j);
+
+            string sName = sLeftTable + "." + sRightTable;
+            cout << sName.c_str() << endl;
+
+			// Make attributes to create Join node
+			int in_pipe_left = m_mJoinEstimate[sLeftTable].second->m_nOutPipe;
+			int in_pipe_right = m_mJoinEstimate[sRightTable].second->m_nOutPipe;
+			int out_pipe = m_nGlobalPipeID++;
+			CNF * pCNF = new CNF();
+            Record * pLit = new Record();
+			Schema LeftSchema("catalog", (char*)sLeftTable.c_str());
+			Schema RightSchema("catalog", (char*)sRightTable.c_str());
+
+			vector <string> vec_rel_names;
+			ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
+
+			AndList * new_AndList = GetJoinsFromAndList(vec_rel_names);
+			pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+
+			QueryPlanNode * pNode = NULL;//new Node_Join();
 			Statistics * pStats = new Statistics(m_Stats);
-			QueryPlanNode * pNode = NULL; 
-			stats_node_pair.first = pStats;
-			stats_node_pair.second = pNode;
 
 			// TODO
 			// -- Find AndList related to these 2 tables
@@ -327,8 +346,11 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			// Use the result of estimate anywhere?
 			// 
 
-            string sName = m_vSortedTables.at(i) + "." + m_vSortedTables.at(j);
-            cout << sName.c_str() << endl;
+
+			// make stats + node pair and push in the map
+			pair <Statistics *, QueryPlanNode *> stats_node_pair;
+			stats_node_pair.first = pStats;
+			stats_node_pair.second = pNode;
 			m_mJoinEstimate[sName] = stats_node_pair;		// Push pStats into this map
             vTempCombos.push_back(sName);
         }
@@ -409,7 +431,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 					m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map 
                     vNewCombo.push_back(sName);
 
-					vector<string> temp_vec;
+					vector <string> temp_vec;
 					ComboToVector(sName, temp_vec);
                 }
             }
@@ -447,6 +469,175 @@ int Optimizer::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
         }
     }
     return -1;
+}
+
+
+AndList* Optimizer::GetSelectionsFromAndList(string alias)
+{
+    AndList* newAndList = NULL;
+    AndList* parseTree = m_pCNF;   //copy to ensure boolean is intact
+    AndList* prvsNode = NULL;   //useful when parseTree is splitted
+    while(parseTree != NULL)
+    {
+        bool skipped = false;
+        OrList* theOrList = parseTree->left;
+        while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
+        {
+            ComparisonOp* theComparisonOp = theOrList->left;
+            if(theComparisonOp == NULL)
+                break;
+            //first push the left value
+            int leftCode = theComparisonOp->left->code;
+            string leftVal = theComparisonOp->left->value;
+
+
+            //and now the right value
+            int rightCode = theComparisonOp->right->code;
+            string rightVal = theComparisonOp->right->value;
+
+
+            //rules: in 1st iteration check for selection
+            // in 2nd iteration check for joins
+            // in any iteration if there is any alias which is not passed, skip the whole AndList i.e. break while and set flag=false
+             /*
+             *1. if both leftCode and rightCode is NAME, skip the AndList
+             */
+            if(leftCode == NAME && rightCode == NAME)   //skip joins
+            {
+                skipped = true;
+                break;
+            }
+            //get alias from left and right
+            //match with alias1 and alias2 passed in the function
+            size_t leftDotIndex = leftVal.find(".");
+            size_t rightDotIndex = rightVal.find(".");
+            if(leftVal.compare(0,leftDotIndex, alias) != 0 || rightVal.compare(0,rightDotIndex, alias) != 0 )
+            {
+                skipped = true;
+                break;
+            }
+
+
+            //move to next orList inside first AND;
+            theOrList = theOrList->rightOr;
+        }
+
+
+        prvsNode = parseTree;
+        parseTree = parseTree->rightAnd;
+        //if lastAndList was not skipped, append it to newAndList which will be returned
+        if(!skipped)
+        {
+//                prvsNode = parseTree->rightAnd;   //skip the node which we are gonna detach
+
+
+            //update head if first node is removed
+            if(prvsNode == m_pCNF)
+                m_pCNF = parseTree;
+
+
+            while(newAndList != NULL)
+                newAndList = newAndList->rightAnd;
+            newAndList = prvsNode;
+            newAndList->rightAnd = NULL;
+
+
+//                parseTree = prvsNode;     //increment parseTree to point to next AndList
+//                prvsNode = NULL;
+        }
+    }
+}
+
+
+AndList* Optimizer::GetJoinsFromAndList(vector<string>& aliases)
+{
+    AndList* newAndList = NULL;
+    AndList* parseTree = m_pCNF;   //copy to ensure boolean is intact
+    AndList* prvsNode = NULL;   //useful when parseTree is splitted
+    while(parseTree != NULL)
+    {
+        bool skipped = false;
+        OrList* theOrList = parseTree->left;
+        while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
+        {
+            ComparisonOp* theComparisonOp = theOrList->left;
+            if(theComparisonOp == NULL)
+                break;
+            //first push the left value
+            int leftCode = theComparisonOp->left->code;
+            string leftVal = theComparisonOp->left->value;
+
+
+            //and now the right value
+            int rightCode = theComparisonOp->right->code;
+            string rightVal = theComparisonOp->right->value;
+
+
+            //accept only joins
+            if(leftCode != NAME || rightCode != NAME)
+            {
+                skipped = true;
+                break;
+            }
+            
+            //get alias from left and right and match with those in vector,
+            //if both match, then only accept the AndList
+            size_t leftDotIndex = leftVal.find(".");
+            size_t rightDotIndex = rightVal.find(".");
+            
+            string leftAlias = leftVal.substr(0, leftDotIndex);
+            string rightAlias = rightVal.substr(0, rightDotIndex);
+
+
+            //skip this AndList if any of left or right alias doesn't match
+            bool leftMatched = false, rightMatched = false; //expecting not to match
+            for(int i = 0; i < aliases.size(); i++)
+            {
+                if(aliases.at(i).compare(leftAlias) == 0)
+                {
+                    leftMatched = true;
+                }
+                if(aliases.at(i).compare(rightAlias) == 0)
+                {
+                    rightMatched = true;
+                }
+            }
+            if(!(leftMatched && rightMatched))
+            {
+                skipped = true;
+                break;
+            }
+
+
+            //move to next orList inside first AND;
+            theOrList = theOrList->rightOr;
+        }
+
+
+        prvsNode = parseTree;
+        parseTree = parseTree->rightAnd;
+        //if lastAndList was not skipped, append it to newAndList which will be returned
+        if(!skipped)
+        {
+//                prvsNode = parseTree->rightAnd;   //skip the node which we are gonna detach
+
+
+            //update head if first node is removed
+            if(prvsNode == m_pCNF)
+                m_pCNF = parseTree;
+
+
+            while(newAndList != NULL)
+                newAndList = newAndList->rightAnd;
+            newAndList = prvsNode;
+            newAndList->rightAnd = NULL;
+
+
+//                parseTree = prvsNode;     //increment parseTree to point to next AndList
+//                prvsNode = NULL;
+        }
+    }
+    return newAndList;
 }
 
 // Break the m_pCNF apart into tokens

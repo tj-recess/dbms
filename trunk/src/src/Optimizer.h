@@ -41,12 +41,13 @@ private:
 	int SortAlias();
 	void TokenizeAndList();
 	void PrintTokenizedAndList();	// TODO: delete this
-	void PopulateTableNames(vector <string> & vec_rels);	// in m_aTableNames char** array
+	void PopulateTableNames(vector<string> & vec_rels);	// in m_aTableNames char** array
 	void ComboToVector(string, vector <string> & vec_rels); // breal A.B.C into vector(A,B,C)
 	void TableComboBaseCase(vector <string> &);
 	int ComboAfterCurrTable(vector<string> &, string);
 	void PrintFuncOpRecur(struct FuncOperator *func_node);
-
+	AndList* GetSelectionsFromAndList(string aTableName);
+	AndList* GetJoinsFromAndList(vector<string>&);
 
 public:
 	Optimizer(struct FuncOperator *finalFunction,
