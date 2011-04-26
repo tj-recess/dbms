@@ -53,6 +53,22 @@ Statistics::Statistics(Statistics &copyMe)
 		// now set <part-num, <rel-names...> >
 		m_mPartitionInfoMap[partInfo_itr->first] = vecRelNames;
 	}
+
+	// copy m_mColToTable map
+	map<string, vector <string> > * mColToTab = copyMe.GetColToTableMap();
+	map<string, vector <string> >::iterator col2tab_itr = mColToTab->begin();
+	for (; col2tab_itr != mColToTab->end(); col2tab_itr++)
+	{
+		vector<string> vecRelNames;
+        vector<string> * pVec = &col2tab_itr->second;
+        for (int i = 0; i < pVec->size(); i++)
+        {
+            vecRelNames.push_back(pVec->at(i));
+        }
+
+		// now set <col-name, <rel-names...> >
+		m_mColToTable[col2tab_itr->first] = vecRelNames;
+	}
 }
 
 Statistics::~Statistics()
