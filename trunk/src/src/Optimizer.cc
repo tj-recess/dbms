@@ -20,7 +20,7 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 		// Print tables
 		PrintTableCombinations(m_nNumTables);
 		// Populate m_aTableNames with real names + alias
-		PopulateTableNames();
+		//PopulateTableNames();
 	}
 
 	// make vector of m_pCNF
@@ -35,6 +35,11 @@ Optimizer::~Optimizer()
 {
 	// some cleanup if needed
 	// m_mJoinEstimate map
+//	if (m_aTableNames)
+//	{
+//		delete [] m_aTableNames;
+//		m_aTableNames = NULL;
+//	}
 }
 
 int Optimizer::SortTables()
@@ -122,7 +127,7 @@ int Optimizer::SortAlias()
 }
 
 // Put all table names and alias in char*[] as needed by estimate
-void Optimizer::PopulateTableNames()
+/*void Optimizer::PopulateTableNames()
 {
 	m_aTableNames = new char*[m_nNumTables*2];
 	struct TableList *p_TblList = m_pTblList;
@@ -153,6 +158,60 @@ void Optimizer::PopulateTableNames()
 
 	cout << "\n--- done ---\n";
 	#endif
+}*/
+
+// Put all table names from vector to m_aTableNames
+// which is a char*[] as needed by estimate
+void Optimizer::PopulateTableNames(vector <string> & rel_vec)
+{
+	if (m_aTableNames)
+	{
+		delete [] m_aTableNames;
+		m_aTableNames = NULL;
+	}
+
+	int size = rel_vec.size();
+    m_aTableNames = new char*[size];
+
+	for (int i = 0; i < size; i++)
+    {
+        // copy name
+        int len = strlen(rel_vec.at(i).c_str());
+        char * name = new char [len + 1];
+        strcpy(name, rel_vec.at(i).c_str());
+        name[len] = '\0';
+        m_aTableNames[i] = name;
+    }
+
+    #ifdef _ESTIMATOR_DEBUG
+    cout << "\n\n---------- names and alias ---------\n";
+    for (int i = 0; i < size; i++)
+        cout << m_aTableNames[i] << " ";
+
+    cout << "\n--- done ---\n";
+    #endif
+}
+
+// break sCombo apart and put table names in the vector
+void Optimizer::ComboToVector(string sCombo, vector <string> & rel_vec)
+{
+	string sTemp = sCombo;
+	int dotPos = sTemp.find(".");
+	while (dotPos != string::npos)
+	{
+		rel_vec.push_back(sTemp.substr(0, dotPos));
+		sTemp = sTemp.substr(dotPos+1);
+		dotPos = sTemp.find(".");
+	}
+	rel_vec.push_back(sTemp);
+
+	#ifdef _ESTIMATOR_DEBUG
+	cout << "\n--- [ComboToVector] ---\nOriginal string: " << sCombo.c_str();
+	cout << "\nVector data: \n";
+	for (int i = 0; i < rel_vec.size(); i++)
+		cout << rel_vec.at(i) << endl;
+    cout << "\n--- done ---\n";
+    #endif
 }
 
 void Optimizer::PrintFuncOperator()
@@ -349,6 +408,9 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                     cout << sName.c_str() << endl;
 					m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map 
                     vNewCombo.push_back(sName);
+
+					vector<string> temp_vec;
+					ComboToVector(sName, temp_vec);
                 }
             }
         }
