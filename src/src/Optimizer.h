@@ -39,7 +39,7 @@ private:
 
 	// functions
 	Optimizer();
-	int SortTables();
+	//int SortTables();
 	int SortAlias();
 	void TokenizeAndList(AndList*);
 	void PrintTokenizedAndList();	// TODO: delete this
