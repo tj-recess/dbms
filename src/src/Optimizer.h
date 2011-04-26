@@ -28,7 +28,7 @@ private:
 	struct AndList * m_pCNF;
 
 	int m_nNumTables, m_nGlobalPipeID;
-	vector <string> m_vSortedTables;
+	//vector <string> m_vSortedTables;
 	vector <string> m_vSortedAlias;
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
@@ -50,9 +50,8 @@ private:
 	//int SortTables();
 	int SortAlias();
 	void TokenizeAndList(AndList*);
-	void PrintTokenizedAndList();	// TODO: delete this
-	void PopulateTableNames(vector<string> & vec_rels);	// in m_aTableNames char** array
-	void ComboToVector(string, vector <string> & vec_rels); // breal A.B.C into vector(A,B,C)
+	void PopulateTableNames(vector<string> & vec_rels);		// in m_aTableNames char** array
+	void ComboToVector(string, vector <string> & vec_rels); // break A.B.C into vector(A,B,C)
 	void TableComboBaseCase(vector <string> &);
 	int ComboAfterCurrTable(vector<string> &, string);
 	void PrintFuncOpRecur(struct FuncOperator *func_node);
@@ -60,13 +59,17 @@ private:
 	AndList* GetJoinsFromAndList(vector<string>&);
     void RemoveAliasFromColumnName(AndList* parseTreeNode);
 	void ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName);
+
+	// Functions for debugging
+	void PrintTokenizedAndList();	// TODO: delete this
 	void print_map();
 
     void PrintOrList(struct OrList *pOr);
     void PrintComparisonOp(struct ComparisonOp *pCom);
     void PrintOperand(struct Operand *pOperand);
     void PrintAndList(struct AndList *pAnd);
-    pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
+    //pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
+    void FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree, pair<string, string> &);
 
 public:
 	Optimizer(struct FuncOperator *finalFunction,

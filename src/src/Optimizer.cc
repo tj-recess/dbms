@@ -42,36 +42,6 @@ Optimizer::~Optimizer()
 //	}
 }
 
-/*int Optimizer::SortTables()
-{
-	if (m_pTblList == NULL)
-		return -1;
-	else
-	{
-	    // Logic:
-    	//    1. Put table names in a map --> will get sorted automagically
-        //	2. Take them out and put in a vector (easier to iterate over)
-    	//
-
-	    // Step 1
-    	struct TableList *p_TblList = m_pTblList;
-	    map <string, int> table_map;
-    	while (p_TblList != NULL)
-	    {
-    	    table_map[p_TblList->tableName] = 1;
-        	p_TblList = p_TblList->next;
-	    }
-	
-    	// Step 2
-	    map <string, int>::iterator map_itr = table_map.begin();
-    	for (; map_itr != table_map.end(); map_itr++)
-	    {
-    	    m_vSortedTables.push_back(map_itr->first);
-	    }
-		return m_vSortedTables.size();
-	}
-}*/
-
 // Sort alias and push them in m_vSortedAlias vector
 int Optimizer::SortAlias()
 {
@@ -164,53 +134,6 @@ int Optimizer::SortAlias()
         return m_vSortedAlias.size();
     }
 }
-
-void Optimizer::print_map()
-{
-        cout << "\n--- map thingie ---\n";
-        map <string, JoinValue >::iterator itr;
-        itr = m_mJoinEstimate.begin();
-        for (; itr != m_mJoinEstimate.end(); itr++)
-        {
-            cout << itr->first << " : ";
-            JoinValue jv = itr->second;
-            cout << jv.stats->GetPartitionNumber() << endl;
-        }
-}
-
-// Put all table names and alias in char*[] as needed by estimate
-/*void Optimizer::PopulateTableNames()
-{
-	m_aTableNames = new char*[m_nNumTables*2];
-	struct TableList *p_TblList = m_pTblList;
-	int len, j = 0;
-	while (p_TblList != NULL)
-    {
-		// copy name
-		len = strlen(p_TblList->tableName);
-		char * name = new char [len + 1];
-		strcpy(name, p_TblList->tableName);
-		name[len] = '\0';
-		m_aTableNames[j++] = name;
-
-		// copy alias
-		len = strlen(p_TblList->aliasAs);
-		char * alias = new char [len + 1];
-		strcpy(alias, p_TblList->aliasAs);
-		alias[len] = '\0';
-		m_aTableNames[j++] = alias;
-
-		p_TblList = p_TblList->next;
-	}
-
-	#ifdef _ESTIMATOR_DEBUG
-	cout << "\n\n---------- names and alias ---------" << j << "\n";
-	for (int i = 0; i < j; i++)
-		cout << m_aTableNames[i] << " "; 
-
-	cout << "\n--- done ---\n";
-	#endif
-}*/
 
 // Put all table names from vector to m_aTableNames
 // which is a char*[] as needed by estimate
@@ -343,6 +266,20 @@ void Optimizer::PrintTableList()
     }
 }
 
+// Only for debugging
+void Optimizer::print_map()
+{
+        cout << "\n--- map thingie ---\n";
+        map <string, JoinValue >::iterator itr;
+        itr = m_mJoinEstimate.begin();
+        for (; itr != m_mJoinEstimate.end(); itr++)
+        {
+            cout << itr->first << " : ";
+            JoinValue jv = itr->second;
+            cout << jv.stats->GetPartitionNumber() << endl;
+        }
+}
+
 
 // handles the base case when we have to find 2 table combos
 // nested for loop over m_vSortedAlias to make combos of 2 tables
@@ -382,6 +319,7 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 
             QueryPlanNode * pNode = NULL;
             Statistics * pStats = NULL;
+			string sOptimalOrder;
             if (new_AndList != NULL)
             {
                     // copy alias as well as table names in a new vector
@@ -394,25 +332,25 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
                     // This function will fill up m_aTableNames
 	            	PopulateTableNames(rel_names);
                     
-                    //get optimal order, call stats  object from the map accordingly, apply on that stats object
-                    pair<string, string> *optimalPair = FindOptimalPairing(vec_rel_names, new_AndList);
-                  
-    #ifdef _DEBUG_OPTIMIZER
-	cout << "\n ------- befor dying --- "<< sName.c_str() << i << j << "\n";
-    print_map();
-    #endif
-					map <string, JoinValue>::iterator itr = m_mJoinEstimate.begin();
-					itr = m_mJoinEstimate.find(optimalPair->second);
-					if (itr == m_mJoinEstimate.end()) 
-						cout << "\n\n" << (optimalPair->second).c_str() << " map entry not found!\n\n";
+                    //get optimal order, call stats object from the map accordingly, apply on that stats object
+					pair<string, string> optimalPair;
+                    FindOptimalPairing(vec_rel_names, new_AndList, optimalPair);
 
-					JoinValue tmp_jv =  m_mJoinEstimate[optimalPair->second];
+					sOptimalOrder = optimalPair.first + "." + optimalPair.second;
+
+					#ifdef _DEBUG_OPTIMIZER
+			        cout << "\n-- Optimal Order found (outside): " << optimalPair.first.c_str() << ", "
+            			 << optimalPair.second.c_str() << endl;
+					#endif
+
+					// Fetch the stats object for the optimal pair, and make a copy of it
+					string sKey(optimalPair.second);
+					JoinValue tmp_jv =  m_mJoinEstimate[sKey];
 					pStats = new Statistics(*tmp_jv.stats);
-                    //pStats = new Statistics(*(m_mJoinEstimate[optimalPair->second].stats));
                     
                     // Make attributes to create Join node
-                    in_pipe_left = m_mJoinEstimate[optimalPair->first].queryPlanNode->m_nOutPipe;
-                    in_pipe_right = m_mJoinEstimate[optimalPair->second].queryPlanNode->m_nOutPipe;
+                    in_pipe_left = m_mJoinEstimate[optimalPair.first].queryPlanNode->m_nOutPipe;
+                    in_pipe_right = m_mJoinEstimate[optimalPair.second].queryPlanNode->m_nOutPipe;
                     out_pipe = m_nGlobalPipeID++;
 
                     Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
@@ -439,19 +377,15 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			// push outPipe --> combo name in the map
 			m_mOutPipeToCombo[out_pipe] = sName;
 
-			// make stats + node pair and push in the map
-//			pair <Statistics *, QueryPlanNode *> stats_node_pair;
-//			stats_node_pair.first = pStats;
-//			stats_node_pair.second = pNode;
-//			m_mJoinEstimate[sName] = stats_node_pair;		// Push pStats into this map
+			// make stats + node + optimal order and push in the map
+			JoinValue * jv = new JoinValue;
+			jv->stats = pStats;
+			jv->queryPlanNode = pNode;
+			jv->joinOrder = sOptimalOrder;
+			//                        jv.schema = ;
 
-                        JoinValue * jv = new JoinValue;
-                        jv->stats = &m_Stats;
-                        jv->queryPlanNode = pNode;
-//                        jv.joinOrder = ;
-//                        jv.schema = ;
-                        m_mJoinEstimate[sName] = *jv;
-            vTempCombos.push_back(sName);
+			m_mJoinEstimate[sName] = *jv;		// Push in the map
+            vTempCombos.push_back(sName);		// Push this combination in the combination-vector
         }
     }
     cout << endl;
@@ -828,9 +762,12 @@ void Optimizer::RemoveAliasFromColumnName(AndList* parseTreeNode)
 }
 
 
-pair<string, string>* Optimizer::FindOptimalPairing(vector<string>& vAliases, AndList* parseTree)
+void Optimizer::FindOptimalPairing(vector<string> & vAliases, AndList* parseTree, 
+								   pair<string, string> & pair_optimal)
 {
-    map<pair<string, string>, double> allEstimates;
+	// Key of this map = <a, b.c> or <b, a.c> or <c, a,b>
+	// value = estimation of join tuples
+    map<string, double> allEstimates;
     //find all possible combis, sort out best one by looking at numTuples from Stats object
     for(int i = 0; i < vAliases.size(); i++)
     {
@@ -853,33 +790,46 @@ pair<string, string>* Optimizer::FindOptimalPairing(vector<string>& vAliases, An
         //get Stats object of second, make a copy, apply estimate
         //put all estimates in a map, find minimum and return corresponding
         Statistics *tempStats = new Statistics(*(m_mJoinEstimate[joinOrder.second].stats));
-        allEstimates[joinOrder] = tempStats->Estimate(parseTree, m_aTableNames, vAliases.size()*2);
+		
+		string sOrderedNames = joinOrder.first + "." + joinOrder.second;
+        allEstimates[sOrderedNames] = tempStats->Estimate(parseTree, m_aTableNames, vAliases.size()*2);
+		cout << "\n*** order: " << sOrderedNames.c_str();
+		cout << "\t Estimate: "<< allEstimates[sOrderedNames];
         //m_aTableNames is expected to be filled by caller
     }
 
-    map<pair<string, string>, double>::iterator it = allEstimates.begin();
-    pair<string, string> *optimalPair ;//= new pair<string, string>();
+    map <string, double>::iterator it = allEstimates.begin();
     double minTuples = -1.0;
-    while(it != allEstimates.end())
+	string sOptimalOrder;
+	for (; it != allEstimates.end(); it++)
     {
-        if(minTuples == -1)
+        if (minTuples == -1.0)
         {
             minTuples = it->second;
-            optimalPair = const_cast<pair<string, string>* >(&(it->first));
+			sOptimalOrder = it->first;
         }
         else
         {
             if(minTuples > it->second)
             {
                 minTuples = it->second;
-                optimalPair = const_cast<pair<string, string>* >(&(it->first));
+				sOptimalOrder = it->first;
             }
         }
-
-        it++;
     }
 
-    return optimalPair;
+	// break the string sOptimalOrder into optimal_pair
+	int dotPos = sOptimalOrder.find(".");
+	cout << "\n\n" << sOptimalOrder.c_str();
+	if (dotPos == string::npos)
+		cerr << "\n\nError in FindOptimalPairs!!\n";
+	else
+	{
+		pair_optimal.first = sOptimalOrder.substr(0, dotPos);
+		pair_optimal.second = sOptimalOrder.substr(dotPos+1);
+		cout << "\n-- Optimal Order found (inside): " << pair_optimal.first << ", " 
+			 << pair_optimal.second << endl;
+	}
 }
 
 void Optimizer::ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName)
