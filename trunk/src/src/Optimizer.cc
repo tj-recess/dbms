@@ -122,22 +122,25 @@ int Optimizer::SortAlias()
             		PrintAndList(new_AndList);
 		            cout << "\n";
             #endif
-			QueryPlanNode * pNode = NULL;
-			if (new_AndList != NULL)
-			{
-				// Apply "select" CNF on it and push the result in map
-				char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
-				vector <string> vec_rels;
-				vec_rels.push_back(sAlias);
-				vec_rels.push_back(m_mAliasToTable[sAlias]);
-				PopulateTableNames(vec_rels);
-				m_Stats.Apply(new_AndList, m_aTableNames, 2);
+            QueryPlanNode * pNode = NULL;
+            if (new_AndList != NULL)
+            {
+                // Apply "select" CNF on it and push the result in map
+                char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
+                vector <string> vec_rels;
+                vec_rels.push_back(sAlias);
+                vec_rels.push_back(m_mAliasToTable[sAlias]);
+                PopulateTableNames(vec_rels);
+                m_Stats.Apply(new_AndList, m_aTableNames, 2);
 
-				pCNF = new CNF();
-				pLit = new Record();
-				// Now create the SelectFile Node
-    	        pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
-			}
+                pCNF = new CNF();
+                pLit = new Record();
+                // Now create the SelectFile Node
+
+                //remove dots from column name in the selected node
+                RemoveAliasFromColumnName(new_AndList);
+                pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
+            }
        	    pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
 			// push outPipe --> combo name in the map
@@ -583,8 +586,8 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-            //remove dots from column name in the selected node
-            RemoveAliasFromColumnName(prvsNode);
+//            //remove dots from column name in the selected node
+//            RemoveAliasFromColumnName(prvsNode);
 
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
@@ -669,8 +672,8 @@ AndList* Optimizer::GetJoinsFromAndList(vector<string>& aliases)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-            //remove dots from column name in the selected node
-            RemoveAliasFromColumnName(prvsNode);
+//            //remove dots from column name in the selected node
+//            RemoveAliasFromColumnName(prvsNode);
             
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
@@ -686,26 +689,31 @@ void Optimizer::RemoveAliasFromColumnName(AndList* parseTreeNode)
 {
     //this is a single node of AndList
     //just remove the part before "." in each of the orLists
-    OrList* theOrList = parseTreeNode->left;
-    while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
+    while(parseTreeNode != NULL)
     {
-        ComparisonOp* theComparisonOp = theOrList->left;
-        if(theComparisonOp == NULL)
-            break;
+        OrList* theOrList = parseTreeNode->left;
+        while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
+        {
+            ComparisonOp* theComparisonOp = theOrList->left;
+            if(theComparisonOp == NULL)
+                break;
 
-        int leftCode = theComparisonOp->left->code;
-        string leftVal = theComparisonOp->left->value;
-        if(leftCode == NAME)
-            strcpy(theComparisonOp->left->value, (char*)leftVal.substr(leftVal.find(".") + 1).c_str());
+            int leftCode = theComparisonOp->left->code;
+            string leftVal = theComparisonOp->left->value;
+            if(leftCode == NAME)
+                strcpy(theComparisonOp->left->value, (char*)leftVal.substr(leftVal.find(".") + 1).c_str());
 
-        //and now the right value
-        int rightCode = theComparisonOp->right->code;
-        string rightVal = theComparisonOp->right->value;
-        if(rightCode == NAME)
-            strcpy(theComparisonOp->right->value, (char*)rightVal.substr(rightVal.find(".") + 1).c_str());
+            //and now the right value
+            int rightCode = theComparisonOp->right->code;
+            string rightVal = theComparisonOp->right->value;
+            if(rightCode == NAME)
+                strcpy(theComparisonOp->right->value, (char*)rightVal.substr(rightVal.find(".") + 1).c_str());
 
-        //move to next orList inside first and only AND;
-        theOrList = theOrList->rightOr;
+            //move to next orList inside first and only AND;
+            theOrList = theOrList->rightOr;
+        }
+        //move to next AndList
+        parseTreeNode = parseTreeNode->rightAnd;
     }
 }
 
