@@ -10,18 +10,17 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 					 struct AndList * boolean,
 					 Statistics & s)
 			: m_pFuncOp(finalFunction), m_pTblList(tables),
-			  m_pCNF(boolean), m_Stats(s), m_nGlobalPipeID(0)
+			  m_pCNF(boolean), m_aTableNames(NULL), m_nNumTables(-1),
+			  m_Stats(s), m_nGlobalPipeID(0)
 {
-	// Store tables in sorted fashion in m_vSortedTables
-	// and the number of tables in m_nNumTables
-	m_nNumTables = SortTables();
+	// Store alias in sorted fashion in m_vSortedAlias
+	// and the number of tables/alias in m_nNumTables
+	//m_nNumTables = SortTables();
 	m_nNumTables = SortAlias();
 	if (m_nNumTables != -1)
 	{	
 		// Print tables
 		PrintTableCombinations(m_nNumTables);
-		// Populate m_aTableNames with real names + alias
-		//PopulateTableNames();
 	}
 
 	// make vector of m_pCNF
@@ -43,16 +42,16 @@ Optimizer::~Optimizer()
 //	}
 }
 
-int Optimizer::SortTables()
+/*int Optimizer::SortTables()
 {
 	if (m_pTblList == NULL)
 		return -1;
 	else
 	{
-	    /* Logic:
-    	    1. Put table names in a map --> will get sorted automagically
-        	2. Take them out and put in a vector (easier to iterate over)
-    	*/
+	    // Logic:
+    	//    1. Put table names in a map --> will get sorted automagically
+        //	2. Take them out and put in a vector (easier to iterate over)
+    	//
 
 	    // Step 1
     	struct TableList *p_TblList = m_pTblList;
@@ -71,7 +70,7 @@ int Optimizer::SortTables()
 	    }
 		return m_vSortedTables.size();
 	}
-}
+}*/
 
 // Sort alias and push them in m_vSortedAlias vector
 int Optimizer::SortAlias()
@@ -122,25 +121,25 @@ int Optimizer::SortAlias()
             		PrintAndList(new_AndList);
 		            cout << "\n";
             #endif
-            QueryPlanNode * pNode = NULL;
-            if (new_AndList != NULL)
-            {
-                // Apply "select" CNF on it and push the result in map
-                char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
-                vector <string> vec_rels;
-                vec_rels.push_back(sAlias);
-                vec_rels.push_back(m_mAliasToTable[sAlias]);
-                PopulateTableNames(vec_rels);
-                m_Stats.Apply(new_AndList, m_aTableNames, 2);
+			QueryPlanNode * pNode = NULL;
+			if (new_AndList != NULL)
+			{
+				// Apply "select" CNF on it and push the result in map
+				char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
+				vector <string> vec_rels;
+				vec_rels.push_back(sAlias);
+				vec_rels.push_back(m_mAliasToTable[sAlias]);
+				PopulateTableNames(vec_rels);
+				m_Stats.Apply(new_AndList, m_aTableNames, 2);
 
-                pCNF = new CNF();
-                pLit = new Record();
-                // Now create the SelectFile Node
+				pCNF = new CNF();
+				pLit = new Record();
 
-                //remove dots from column name in the selected node
+				//remove dots from column name in the selected node
                 RemoveAliasFromColumnName(new_AndList);
-                pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
-            }
+    	        pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
+			}
+			// Now create the SelectFile Node
        	    pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
 			// push outPipe --> combo name in the map
@@ -388,11 +387,13 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
         	    pStats->Apply(new_AndList, m_aTableNames, rel_names.size());
 				// TODO
 				// change distinct values
-	            CNF * pCNF = new CNF();
-	            Record * pLit = new Record();
-				// Then create the Join Node	
+	            pCNF = new CNF();
+	            pLit = new Record();
+				//remove dots from column name in the selected node
+                RemoveAliasFromColumnName(new_AndList);
 				pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
 			}
+			// Then create the Join Node	
 			pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe, pCNF, pLit);
 
 			// push outPipe --> combo name in the map
@@ -460,6 +461,11 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 				int len = vTempCombos.size();
                 for (int j = loc; j < len; j++)
                 {
+                    string sLeftName = m_vSortedAlias.at(i);
+					string sRightName = vTempCombos.at(j);
+					string sName = sLeftName + "." + sRightName;
+                    cout << sName.c_str() << endl;
+
 					pair <Statistics *, QueryPlanNode *> stats_node_pair;
 			        Statistics * pStats = new Statistics(m_Stats); // <-- use m_stats of vTempCombos.at(j) tables
             		QueryPlanNode * pNode = NULL; 
@@ -477,8 +483,6 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
         		    //          --> apply select condition before join condition
 		            // Use the result of estimate anywhere?
 
-                    string sName = m_vSortedAlias.at(i) + "." + vTempCombos.at(j);
-                    cout << sName.c_str() << endl;
 					m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map 
                     vNewCombo.push_back(sName);
 
@@ -586,8 +590,8 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-//            //remove dots from column name in the selected node
-//            RemoveAliasFromColumnName(prvsNode);
+            //remove dots from column name in the selected node
+            //RemoveAliasFromColumnName(prvsNode);
 
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
@@ -672,8 +676,8 @@ AndList* Optimizer::GetJoinsFromAndList(vector<string>& aliases)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-//            //remove dots from column name in the selected node
-//            RemoveAliasFromColumnName(prvsNode);
+            //remove dots from column name in the selected node
+            //RemoveAliasFromColumnName(prvsNode);
             
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;

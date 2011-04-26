@@ -846,6 +846,7 @@ void Statistics::PrepareStatisticsFile(char* fileName)
 
     s.AddAtt(relName[0], "s_suppkey",10000);
     s.AddAtt(relName[0], "s_nationkey",25);
+	s.AddAtt(relName[0], "s_acctbal",9955);
 
     s.AddAtt(relName[1], "ps_suppkey", 10000);
     s.AddAtt(relName[1], "ps_partkey", 200000);
