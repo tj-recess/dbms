@@ -48,6 +48,7 @@ private:
 	void PrintFuncOpRecur(struct FuncOperator *func_node);
 	AndList* GetSelectionsFromAndList(string aTableName);
 	AndList* GetJoinsFromAndList(vector<string>&);
+        void RemoveAliasFromColumnName(AndList* parseTreeNode);
 
         void PrintOrList(struct OrList *pOr);
         void PrintComparisonOp(struct ComparisonOp *pCom);

@@ -116,9 +116,7 @@ int Optimizer::SortAlias()
             AndList * new_AndList = GetSelectionsFromAndList(sAlias);
             #ifdef _DEBUG_OPTIMIZER
             PrintAndList(new_AndList);
-//            TokenizeAndList(new_AndList);
-//            PrintTokenizedAndList();
-            m_vWholeCNF.clear();
+            cout << "\n";
             #endif
             pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
             QueryPlanNode * pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
@@ -562,22 +560,17 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
         //if lastAndList was not skipped, append it to newAndList which will be returned
         if(!skipped)
         {
-//                prvsNode = parseTree->rightAnd;   //skip the node which we are gonna detach
-
-
             //update head if first node is removed
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
+            //remove dots from column name in the selected node
+            RemoveAliasFromColumnName(prvsNode);
 
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
             newAndList = prvsNode;
             newAndList->rightAnd = NULL;
-
-
-//                parseTree = prvsNode;     //increment parseTree to point to next AndList
-//                prvsNode = NULL;
         }
     }
     return newAndList;
@@ -647,32 +640,54 @@ AndList* Optimizer::GetJoinsFromAndList(vector<string>& aliases)
             //move to next orList inside first AND;
             theOrList = theOrList->rightOr;
         }
-
-
+        
         prvsNode = parseTree;
         parseTree = parseTree->rightAnd;
         //if lastAndList was not skipped, append it to newAndList which will be returned
         if(!skipped)
         {
-//                prvsNode = parseTree->rightAnd;   //skip the node which we are gonna detach
-
-
             //update head if first node is removed
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-
+            //remove dots from column name in the selected node
+            RemoveAliasFromColumnName(prvsNode);
+            
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
             newAndList = prvsNode;
             newAndList->rightAnd = NULL;
-
-
-//                parseTree = prvsNode;     //increment parseTree to point to next AndList
-//                prvsNode = NULL;
         }
     }
     return newAndList;
+}
+
+
+void Optimizer::RemoveAliasFromColumnName(AndList* parseTreeNode)
+{
+    //this is a single node of AndList
+    //just remove the part before "." in each of the orLists
+    OrList* theOrList = parseTreeNode->left;
+    while(theOrList != NULL) //to ensure if parse tree contains an OrList and a comparisonOp
+    {
+        ComparisonOp* theComparisonOp = theOrList->left;
+        if(theComparisonOp == NULL)
+            break;
+
+        int leftCode = theComparisonOp->left->code;
+        string leftVal = theComparisonOp->left->value;
+        if(leftCode == NAME)
+            theComparisonOp->left->value = (char*)leftVal.substr(leftVal.find(".") + 1).c_str();
+
+        //and now the right value
+        int rightCode = theComparisonOp->right->code;
+        string rightVal = theComparisonOp->right->value;
+        if(rightCode == NAME)
+            theComparisonOp->right->value = (char*)rightVal.substr(rightVal.find(".") + 1).c_str();
+
+        //move to next orList inside first and only AND;
+        theOrList = theOrList->rightOr;
+    }
 }
 
 // Break the m_pCNF apart into tokens
