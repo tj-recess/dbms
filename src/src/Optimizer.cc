@@ -149,28 +149,33 @@ int Optimizer::SortAlias()
 //            stats_node_pair.first = &m_Stats;
 //            stats_node_pair.second = pNode;
 //            m_mJoinEstimate[sAlias] = stats_node_pair;
-            JoinValue jv;
-            jv.stats = &m_Stats;
-            jv.queryPlanNode = pNode;
-            jv.joinOrder = sAlias;  //default join order for singleton (unjoined) table
+            JoinValue * jv = new JoinValue;
+            jv->stats = &m_Stats;
+            jv->queryPlanNode = pNode;
+            jv->joinOrder = sAlias;  //default join order for singleton (unjoined) table
 //            jv.schema = ;
-            m_mJoinEstimate[sAlias] = jv;
+            m_mJoinEstimate[sAlias] = *jv;
         }
 		
-		#ifdef _ESTIMATOR_DEBUG
-		/*cout << "\n--- map thingie ---\n";
-		map <string, pair <Statistics *, QueryPlanNode*> >::iterator itr;
-		itr = m_mJoinEstimate.begin();
-		for (; itr != m_mJoinEstimate.end(); itr++)
-		{
-			cout << itr->first << " : ";
-			pair <Statistics *, QueryPlanNode*> pp = itr->second;
-			cout << pp.second->m_nOutPipe << endl;
-		}*/
+		#ifdef _DEBUG_OPTIMIZER 
+		print_map();
 		#endif
 
         return m_vSortedAlias.size();
     }
+}
+
+void Optimizer::print_map()
+{
+        cout << "\n--- map thingie ---\n";
+        map <string, JoinValue >::iterator itr;
+        itr = m_mJoinEstimate.begin();
+        for (; itr != m_mJoinEstimate.end(); itr++)
+        {
+            cout << itr->first << " : ";
+            JoinValue jv = itr->second;
+            cout << jv.stats->GetPartitionNumber() << endl;
+        }
 }
 
 // Put all table names and alias in char*[] as needed by estimate
@@ -343,6 +348,10 @@ void Optimizer::PrintTableList()
 // nested for loop over m_vSortedAlias to make combos of 2 tables
 void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 {
+	#ifdef _DEBUG_OPTIMIZER
+	print_map();
+	#endif
+
     cout << "\n\n--- Table combinations ---\n";
     for (int i = 0; i < m_nNumTables; i++)
     {
@@ -359,6 +368,7 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
             int out_pipe;
             CNF * pCNF = NULL;
             Record * pLit = NULL;
+			Schema * pSchema = NULL;
 
             vector <string> vec_rel_names;
             ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
@@ -381,13 +391,24 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
                             rel_names.push_back(vec_rel_names.at(i));
                             rel_names.push_back(m_mAliasToTable[vec_rel_names.at(i)]);
                     }
-                    // This function will fill up m_aTableNamesTableNames
-	            PopulateTableNames(rel_names);
+                    // This function will fill up m_aTableNames
+	            	PopulateTableNames(rel_names);
                     
                     //get optimal order, call stats  object from the map accordingly, apply on that stats object
                     pair<string, string> *optimalPair = FindOptimalPairing(vec_rel_names, new_AndList);
-                    
-                    pStats = new Statistics(*(m_mJoinEstimate[optimalPair->second].stats));
+                  
+    #ifdef _DEBUG_OPTIMIZER
+	cout << "\n ------- befor dying --- "<< sName.c_str() << i << j << "\n";
+    print_map();
+    #endif
+					map <string, JoinValue>::iterator itr = m_mJoinEstimate.begin();
+					itr = m_mJoinEstimate.find(optimalPair->second);
+					if (itr == m_mJoinEstimate.end()) 
+						cout << "\n\n" << (optimalPair->second).c_str() << " map entry not found!\n\n";
+
+					JoinValue tmp_jv =  m_mJoinEstimate[optimalPair->second];
+					pStats = new Statistics(*tmp_jv.stats);
+                    //pStats = new Statistics(*(m_mJoinEstimate[optimalPair->second].stats));
                     
                     // Make attributes to create Join node
                     in_pipe_left = m_mJoinEstimate[optimalPair->first].queryPlanNode->m_nOutPipe;
@@ -403,12 +424,17 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 				// change distinct values
 	            pCNF = new CNF();
 	            pLit = new Record();
-                    //remove dots from column name in the selected node
-                    RemoveAliasFromColumnName(new_AndList);
-                    pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+
+                //remove dots from column name in the selected node
+                RemoveAliasFromColumnName(new_AndList);
+                pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+
+				// Read data from left schema and right schema and write to sName.schema file
+                ConcatSchemas(&LeftSchema, &RightSchema, sName);
+                pSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
             }
 			// Then create the Join Node	
-			pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe, pCNF, pLit);
+			pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe, pCNF, pSchema, pLit);
 
 			// push outPipe --> combo name in the map
 			m_mOutPipeToCombo[out_pipe] = sName;
@@ -419,12 +445,12 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 //			stats_node_pair.second = pNode;
 //			m_mJoinEstimate[sName] = stats_node_pair;		// Push pStats into this map
 
-                        JoinValue jv;
-                        jv.stats = &m_Stats;
-                        jv.queryPlanNode = pNode;
+                        JoinValue * jv = new JoinValue;
+                        jv->stats = &m_Stats;
+                        jv->queryPlanNode = pNode;
 //                        jv.joinOrder = ;
 //                        jv.schema = ;
-                        m_mJoinEstimate[sName] = jv;
+                        m_mJoinEstimate[sName] = *jv;
             vTempCombos.push_back(sName);
         }
     }
@@ -460,6 +486,11 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 // recursive function to find all combinations of table
 vector<string> Optimizer::PrintTableCombinations(int combo_len)
 {
+    #ifdef _DEBUG_OPTIMIZER
+    cout << "\n\n ----------- 4 ----------\n\n";
+    print_map();
+    #endif
+
     vector <string> vTempCombos, vNewCombo;
 
 	// base case: combinations of 2 tables
@@ -492,6 +523,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                     int out_pipe = m_nGlobalPipeID++;
                     CNF * pCNF = NULL;
                     Record * pLit = NULL;
+					Schema * pSchema = NULL;
 
                     Statistics * pStats = new Statistics(*(m_mJoinEstimate[sRightAlias].stats));
                     QueryPlanNode * pNode = NULL;
@@ -529,26 +561,38 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                         pLit = new Record();
 
                         //create left and right Schema
-                        Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
-                        Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
-
+						Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
+						string right_schema_filename = sRightAlias + ".schema";
+                        Schema RightSchema((char*)right_schema_filename.c_str(),
+                                           (char*) sRightAlias.c_str());
 
                         //remove dots from column name in the selected node
                         RemoveAliasFromColumnName(new_AndList);
                         pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+
+		                // Read data from left schema and right schema and write to sName.schema file
+        		        ConcatSchemas(&LeftSchema, &RightSchema, sName);
+                		pSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
                     }
+
+		            // Then create the Join Node    
+        		    pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe, pCNF, pSchema, pLit);
+
+		            // push outPipe --> combo name in the map
+        		    m_mOutPipeToCombo[out_pipe] = sName;
+
                     
 //                    pair <Statistics *, QueryPlanNode *> stats_node_pair;
 //                    stats_node_pair.first = pStats;
 //                    stats_node_pair.second = pNode;
 //                    m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map
 
-                    JoinValue jv;
-                    jv.stats = &m_Stats;
-                    jv.queryPlanNode = pNode;
+                    JoinValue * jv = new JoinValue;
+                    jv->stats = &m_Stats;
+                    jv->queryPlanNode = pNode;
 //                    jv.joinOrder = ;
 //                    jv.schema = ;
-                    m_mJoinEstimate[sName] = jv;
+                    m_mJoinEstimate[sName] = *jv;
                     vNewCombo.push_back(sName);
                 }
             }
@@ -838,6 +882,39 @@ pair<string, string>* Optimizer::FindOptimalPairing(vector<string>& vAliases, An
     return optimalPair;
 }
 
+void Optimizer::ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName)
+{
+    string sFileName = sName + ".schema";
+    FILE *outSchemaFile = fopen (sFileName.c_str(), "w");
+    fprintf(outSchemaFile, "BEGIN\n%s\nwherever", sName.c_str());
+    // go over pRSch and write it to outSchemaFile
+    Attribute * pRAtts = pRSch->GetAtts();
+    for (int i = 0; i < pRSch->GetNumAtts(); i++)
+    {
+        fprintf(outSchemaFile, "\n%s", pRAtts[i].name);
+        if (pRAtts[i].myType == Int)
+            fprintf(outSchemaFile, " Int");
+        else if (pRAtts[i].myType == Double)
+            fprintf(outSchemaFile, " Double");
+        else if (pRAtts[i].myType == String)
+             fprintf(outSchemaFile, " String");
+    }
+    // go over pLSch and write it to outSchemaFile
+    Attribute * pLAtts = pLSch->GetAtts();
+    for (int i = 0; i < pLSch->GetNumAtts(); i++)
+    {
+        fprintf(outSchemaFile, "\n%s", pLAtts[i].name);
+        if (pLAtts[i].myType == Int)
+            fprintf(outSchemaFile, " Int");
+        else if (pLAtts[i].myType == Double)
+            fprintf(outSchemaFile, " Double");
+        else if (pLAtts[i].myType == String)
+             fprintf(outSchemaFile, " String");
+    }
+    // Done
+    fprintf (outSchemaFile, "\nEND\n");
+    fclose(outSchemaFile);
+}
 
 // Break the m_pCNF apart into tokens
 // Format:

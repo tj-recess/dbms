@@ -40,8 +40,8 @@ private:
 //            Schema schema;
         };
 //	map <string, pair <Statistics *, QueryPlanNode*> > m_mJoinEstimate;
-        map <string, JoinValue> m_mJoinEstimate;
-	Statistics m_Stats;				// master copy of the stats object
+    map <string, JoinValue> m_mJoinEstimate;
+	Statistics m_Stats;								// master copy of the stats object
     map <string, string> m_mAliasToTable;           // alias to original table name
 	map <int, string> m_mOutPipeToCombo;			// map of outpipe to combo name
 
@@ -59,6 +59,8 @@ private:
 	AndList* GetSelectionsFromAndList(string aTableName);
 	AndList* GetJoinsFromAndList(vector<string>&);
     void RemoveAliasFromColumnName(AndList* parseTreeNode);
+	void ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName);
+	void print_map();
 
     void PrintOrList(struct OrList *pOr);
     void PrintComparisonOp(struct ComparisonOp *pCom);
