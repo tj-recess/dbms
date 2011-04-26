@@ -90,8 +90,12 @@ int Optimizer::SortAlias()
         map <string, string> table_map;
         while (p_TblList != NULL)
         {
-			// Make a copy of this table name AS alias name
+			// Make a copy of this table name AS alias name in Stats object
 			m_Stats.CopyRel(p_TblList->tableName, p_TblList->aliasAs);
+
+			// make an entry in the map alias --> orig table
+			m_mAliasToTable[p_TblList->aliasAs] = p_TblList->tableName;
+
 			// Push the alias name in map with original table name as value
 			// Reason, we need the original table name to find the .bin file
             table_map[p_TblList->aliasAs] = p_TblList->tableName;
@@ -115,11 +119,14 @@ int Optimizer::SortAlias()
             Schema schema_obj("catalog", (char*)sTableName.c_str());
             AndList * new_AndList = GetSelectionsFromAndList(sAlias);
             #ifdef _DEBUG_OPTIMIZER
-            PrintAndList(new_AndList);
-            cout << "\n";
+            		PrintAndList(new_AndList);
+		            cout << "\n";
             #endif
             pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
             QueryPlanNode * pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
+
+			// push outPipe --> combo name in the map
+            m_mOutPipeToCombo[outPipeId] = sAlias;
 
 			// Apply "select" CNF on it and push the result in map
             Statistics * pStats = new Statistics(m_Stats);
@@ -330,24 +337,21 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
     {
         for (int j = i+1; j < m_nNumTables; j++)
         {
-			string sLeftTable = m_vSortedAlias.at(i);
-			string sRightTable = m_vSortedAlias.at(j);
+			string sLeftAlias = m_vSortedAlias.at(i);
+			string sRightAlias = m_vSortedAlias.at(j);
 
-            string sName = sLeftTable + "." + sRightTable;
+            string sName = sLeftAlias + "." + sRightAlias;
             cout << sName.c_str() << endl;
 
 			// Make attributes to create Join node
-			int in_pipe_left = m_mJoinEstimate[sLeftTable].second->m_nOutPipe;
-			int in_pipe_right = m_mJoinEstimate[sRightTable].second->m_nOutPipe;
+			int in_pipe_left = m_mJoinEstimate[sLeftAlias].second->m_nOutPipe;
+			int in_pipe_right = m_mJoinEstimate[sRightAlias].second->m_nOutPipe;
 			int out_pipe = m_nGlobalPipeID++;
 			CNF * pCNF = new CNF();
             Record * pLit = new Record();
 		
-			#ifdef _ESTIMATOR_DEBUG
-			cout << sLeftTable.c_str() << "---" << sRightTable.c_str();
-			#endif
-			Schema LeftSchema("catalog", (char*)sLeftTable.c_str());
-			Schema RightSchema("catalog", (char*)sRightTable.c_str());
+			Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
+			Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
 
 			vector <string> vec_rel_names;
 			ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
@@ -360,9 +364,15 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			#endif
 			pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
 
-			QueryPlanNode * pNode = NULL;//new Node_Join();
+			QueryPlanNode * pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe,
+												  pCNF, pLit);
+
+			// push outPipe --> combo name in the map
+			m_mOutPipeToCombo[out_pipe] = sName;
+
 			Statistics * pStats = new Statistics(m_Stats);
 
+			
 			// TODO
 			// -- Find AndList related to these 2 tables
 			// new_AndList = find_new_AndList(m_vSortedAlias.at(i), m_vSortedAlias.at(j));
