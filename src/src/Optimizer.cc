@@ -139,7 +139,7 @@ int Optimizer::SortAlias()
         }
 		
 		#ifdef _ESTIMATOR_DEBUG
-		cout << "\n--- map thingie ---\n";
+		/*cout << "\n--- map thingie ---\n";
 		map <string, pair <Statistics *, QueryPlanNode*> >::iterator itr;
 		itr = m_mJoinEstimate.begin();
 		for (; itr != m_mJoinEstimate.end(); itr++)
@@ -147,7 +147,7 @@ int Optimizer::SortAlias()
 			cout << itr->first << " : ";
 			pair <Statistics *, QueryPlanNode*> pp = itr->second;
 			cout << pp.second->m_nOutPipe << endl;
-		}
+		}*/
 		#endif
 
         return m_vSortedAlias.size();
@@ -210,14 +210,6 @@ void Optimizer::PopulateTableNames(vector <string> & rel_vec)
         name[len] = '\0';
         m_aTableNames[i] = name;
     }
-
-    #ifdef _DEBUG_OPTIMIZER
-    cout << "\n\n---------- names and alias ---------\n";
-    for (int i = 0; i < size; i++)
-        cout << m_aTableNames[i] << " ";
-
-    cout << "\n--- done ---\n";
-    #endif
 }
 
 // break sCombo apart and put table names in the vector
@@ -234,11 +226,11 @@ void Optimizer::ComboToVector(string sCombo, vector <string> & rel_vec)
 	rel_vec.push_back(sTemp);
 
 	#ifdef _DEBUG_OPTIMIZER
-	cout << "\n--- [ComboToSet] ---\nOriginal string: " << sCombo.c_str();
+	/*cout << "\n--- [ComboToSet] ---\nOriginal string: " << sCombo.c_str();
 	cout << "\nVector data: \n";
 	for (int i = 0; i < rel_vec.size(); i++)
 		cout << rel_vec.at(i) << endl;
-    cout << "\n--- done ---\n";
+    cout << "\n--- done ---\n";*/
     #endif
 }
 
@@ -372,19 +364,12 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 
 			Statistics * pStats = new Statistics(m_Stats);
 
+           // This function will fill up m_aTableNamesTableNames
+           PopulateTableNames(vec_rel_names);
+           pStats->Apply(new_AndList, m_aTableNames, 2);
 			
 			// TODO
-			// -- Find AndList related to these 2 tables
-			// new_AndList = find_new_AndList(m_vSortedAlias.at(i), m_vSortedAlias.at(j));
-			//
-			// Statistics * pStats = new Statistics(m_Stats);
-			// -- call pStats->Apply(new_AndList, {these 2 table names}, 2);
-			//			--> change distinct values
-			// -- call pStats->Estimate(new_AndList, {these 2 table names}, 2);
-			//			--> apply select condition before join condition
-			// Use the result of estimate anywhere?
-			// 
-
+			// change distinct values
 
 			// make stats + node pair and push in the map
 			pair <Statistics *, QueryPlanNode *> stats_node_pair;
@@ -687,13 +672,13 @@ void Optimizer::RemoveAliasFromColumnName(AndList* parseTreeNode)
         int leftCode = theComparisonOp->left->code;
         string leftVal = theComparisonOp->left->value;
         if(leftCode == NAME)
-            theComparisonOp->left->value = (char*)leftVal.substr(leftVal.find(".") + 1).c_str();
+            strcpy(theComparisonOp->left->value, (char*)leftVal.substr(leftVal.find(".") + 1).c_str());
 
         //and now the right value
         int rightCode = theComparisonOp->right->code;
         string rightVal = theComparisonOp->right->value;
         if(rightCode == NAME)
-            theComparisonOp->right->value = (char*)rightVal.substr(rightVal.find(".") + 1).c_str();
+            strcpy(theComparisonOp->right->value, (char*)rightVal.substr(rightVal.find(".") + 1).c_str());
 
         //move to next orList inside first and only AND;
         theOrList = theOrList->rightOr;
@@ -774,11 +759,11 @@ void Optimizer::PrintComparisonOp(struct ComparisonOp *pCom)
                 PrintOperand(pCom->left);
                 switch(pCom->code)
                 {
-                        case 1:
+                        case 5:
                                 cout<<" < "; break;
-                        case 2:
+                        case 6:
                                 cout<<" > "; break;
-                        case 3:
+                        case 7:
                                 cout<<" = ";
                 }
                 PrintOperand(pCom->right);
