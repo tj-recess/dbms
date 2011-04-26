@@ -15,6 +15,7 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 	// Store tables in sorted fashion in m_vSortedTables
 	// and the number of tables in m_nNumTables
 	m_nNumTables = SortTables();
+        SortAlias();
 	if (m_nNumTables != -1)
 	{	
 		// Print tables
@@ -24,9 +25,9 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 	}
 
 	// make vector of m_pCNF
-	TokenizeAndList();
+	TokenizeAndList(m_pCNF);
 
-	#ifdef _ESTIMATOR_DEBUG
+	#ifdef _DEBUG_OPTIMIZER
 	PrintTokenizedAndList();
 	#endif
 }
@@ -104,14 +105,20 @@ int Optimizer::SortAlias()
 			// Push alias name in the vector
             m_vSortedAlias.push_back(map_itr->first);
 
-			// Make attributes to create select file node
-			string sInFile = map_itr->second + ".bin";
-			int outPipeId = m_nGlobalPipeID++;
-			CNF * pCNF = new CNF();
-			Record * pLit = new Record();
-			Schema schema_obj("catalog", (char*)map_itr->second.c_str());
-			AndList * new_AndList = GetSelectionsFromAndList(map_itr->first);
-			pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
+            // Make attributes to create select file node
+            string sInFile = map_itr->second + ".bin";
+            int outPipeId = m_nGlobalPipeID++;
+            CNF * pCNF = new CNF();
+            Record * pLit = new Record();
+            Schema schema_obj("catalog", (char*)map_itr->second.c_str());
+            AndList * new_AndList = GetSelectionsFromAndList(map_itr->first);
+            #ifdef _DEBUG_OPTIMIZER
+            PrintAndList(new_AndList);
+//            TokenizeAndList(new_AndList);
+//            PrintTokenizedAndList();
+            m_vWholeCNF.clear();
+            #endif
+            pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
             QueryPlanNode * pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
 			// Apply "select" CNF on it and push the result in map
@@ -184,7 +191,7 @@ void Optimizer::PopulateTableNames(vector <string> & rel_vec)
         m_aTableNames[i] = name;
     }
 
-    #ifdef _ESTIMATOR_DEBUG
+    #ifdef _DEBUG_OPTIMIZER
     cout << "\n\n---------- names and alias ---------\n";
     for (int i = 0; i < size; i++)
         cout << m_aTableNames[i] << " ";
@@ -206,7 +213,7 @@ void Optimizer::ComboToVector(string sCombo, vector <string> & rel_vec)
 	}
 	rel_vec.push_back(sTemp);
 
-	#ifdef _ESTIMATOR_DEBUG
+	#ifdef _DEBUG_OPTIMIZER
 	cout << "\n--- [ComboToSet] ---\nOriginal string: " << sCombo.c_str();
 	cout << "\nVector data: \n";
 	for (int i = 0; i < rel_vec.size(); i++)
@@ -329,6 +336,11 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
 
 			AndList * new_AndList = GetJoinsFromAndList(vec_rel_names);
+#ifdef _DEBUG_OPTIMIZER
+                        TokenizeAndList(new_AndList);
+                        PrintTokenizedAndList();
+                        m_vWholeCNF.clear();
+#endif
 			pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
 
 			QueryPlanNode * pNode = NULL;//new Node_Join();
@@ -474,6 +486,9 @@ int Optimizer::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
 {
+#ifdef _DEBUG_OPTIMIZER
+    cout << "\n Selections for \'" << alias << "\' are : ";
+#endif
     AndList* newAndList = NULL;
     AndList* parseTree = m_pCNF;   //copy to ensure boolean is intact
     AndList* prvsNode = NULL;   //useful when parseTree is splitted
@@ -511,7 +526,7 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
             //match with alias1 and alias2 passed in the function
             size_t leftDotIndex = leftVal.find(".");
             size_t rightDotIndex = rightVal.find(".");
-            if(leftVal.compare(0,leftDotIndex, alias) != 0 || rightVal.compare(0,rightDotIndex, alias) != 0 )
+            if(leftVal.compare(0,leftDotIndex, alias) != 0 && rightVal.compare(0,rightDotIndex, alias) != 0 )
             {
                 skipped = true;
                 break;
@@ -546,6 +561,7 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
 //                prvsNode = NULL;
         }
     }
+    return newAndList;
 }
 
 
@@ -646,10 +662,10 @@ AndList* Optimizer::GetJoinsFromAndList(vector<string>& aliases)
 // AND
 // type left_value operator type right_value OR type left_value operator type right_value .
 // NOTE: the "." at the end signifies the end
-void Optimizer::TokenizeAndList()
+void Optimizer::TokenizeAndList(AndList* someParseTree)
 {
     //first create copy of passed AndList
-    AndList* parseTree = m_pCNF;;
+    AndList* parseTree = someParseTree;
 
     while(parseTree != NULL)
     {
@@ -695,4 +711,72 @@ void Optimizer::PrintTokenizedAndList()
 	cout << "\n\n-------- Tokenized AND-list ----------\n";
 	for (int i = 0; i < m_vWholeCNF.size(); i++)
 		cout << m_vWholeCNF.at(i) << "  ";
+}
+
+void Optimizer::PrintOperand(struct Operand *pOperand)
+{
+        if(pOperand!=NULL)
+        {
+                cout<<pOperand->value<<" ";
+        }
+        else
+                return;
+}
+
+void Optimizer::PrintComparisonOp(struct ComparisonOp *pCom)
+{
+        if(pCom!=NULL)
+        {
+                PrintOperand(pCom->left);
+                switch(pCom->code)
+                {
+                        case 1:
+                                cout<<" < "; break;
+                        case 2:
+                                cout<<" > "; break;
+                        case 3:
+                                cout<<" = ";
+                }
+                PrintOperand(pCom->right);
+
+        }
+        else
+        {
+                return;
+        }
+}
+void Optimizer::PrintOrList(struct OrList *pOr)
+{
+        if(pOr !=NULL)
+        {
+                struct ComparisonOp *pCom = pOr->left;
+                PrintComparisonOp(pCom);
+
+                if(pOr->rightOr)
+                {
+                        cout<<" OR ";
+                        PrintOrList(pOr->rightOr);
+                }
+        }
+        else
+        {
+                return;
+        }
+}
+void Optimizer::PrintAndList(struct AndList *pAnd)
+{
+        if(pAnd !=NULL)
+        {
+                struct OrList *pOr = pAnd->left;
+                PrintOrList(pOr);
+                if(pAnd->rightAnd)
+                {
+                        cout<<" AND ";
+                        PrintAndList(pAnd->rightAnd);
+                }
+        }
+        else
+        {
+                return;
+        }
 }

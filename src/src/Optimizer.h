@@ -1,5 +1,5 @@
-#ifndef ESTIMATOR_H_
-#define ESTIMATOR_H_
+#ifndef OPTIMIZER_H_
+#define OPTIMIZER_H_
 
 #include <map>
 #include <utility>
@@ -17,7 +17,7 @@
 using namespace std;
 
 
-#define _ESTIMATOR_DEBUG 1
+#define _DEBUG_OPTIMIZER 1
 
 class Optimizer
 {
@@ -39,7 +39,7 @@ private:
 	Optimizer();
 	int SortTables();
 	int SortAlias();
-	void TokenizeAndList();
+	void TokenizeAndList(AndList*);
 	void PrintTokenizedAndList();	// TODO: delete this
 	void PopulateTableNames(vector<string> & vec_rels);	// in m_aTableNames char** array
 	void ComboToVector(string, vector <string> & vec_rels); // breal A.B.C into vector(A,B,C)
@@ -49,6 +49,10 @@ private:
 	AndList* GetSelectionsFromAndList(string aTableName);
 	AndList* GetJoinsFromAndList(vector<string>&);
 
+        void PrintOrList(struct OrList *pOr);
+        void PrintComparisonOp(struct ComparisonOp *pCom);
+        void PrintOperand(struct Operand *pOperand);
+        void PrintAndList(struct AndList *pAnd);
 public:
 	Optimizer(struct FuncOperator *finalFunction,
 			  struct TableList *tables,
