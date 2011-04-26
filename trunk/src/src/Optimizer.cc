@@ -461,33 +461,68 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 				int len = vTempCombos.size();
                 for (int j = loc; j < len; j++)
                 {
-                    string sLeftName = m_vSortedAlias.at(i);
-					string sRightName = vTempCombos.at(j);
-					string sName = sLeftName + "." + sRightName;
+                    string sLeftAlias = m_vSortedAlias.at(i);
+                    string sRightAlias = vTempCombos.at(j);
+                    string sName = sLeftAlias + "." + sRightAlias;
                     cout << sName.c_str() << endl;
 
-					pair <Statistics *, QueryPlanNode *> stats_node_pair;
-			        Statistics * pStats = new Statistics(m_Stats); // <-- use m_stats of vTempCombos.at(j) tables
-            		QueryPlanNode * pNode = NULL; 
-			        stats_node_pair.first = pStats;
-            		stats_node_pair.second = pNode;
+                    int in_pipe_left = m_mJoinEstimate[sLeftAlias].second->m_nOutPipe;
+                    int in_pipe_right = m_mJoinEstimate[sRightAlias].second->m_nOutPipe;
+                    int out_pipe = m_nGlobalPipeID++;
+                    CNF * pCNF = NULL;
+                    Record * pLit = NULL;
 
-					// TODO
-					// Make char ** with all the table names being used here
-					// Find AndList with all these tables
-					// Statistics * pStats = new Statistics(m_Stats);
-		            // -- call pStats->Apply(new_AndList, {these n table names}, n);
-					//			--> somehow use the stats from the map for 2-table base combos
-        		    //          --> change distinct values
-		            // -- call pStats->Estimate(new_AndList, {these n table names}, n);
-        		    //          --> apply select condition before join condition
-		            // Use the result of estimate anywhere?
+                    Statistics * pStats = new Statistics(m_mJoinEstimate[sRightAlias].first);
+                    QueryPlanNode * pNode = NULL;
 
-					m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map 
+                    // TODO
+                    // Make char ** with all the table names being used here
+                    vector <string> vec_rel_names;
+                    ComboToVector(sName, vec_rel_names);    // breaks sName apart and fills up the vector
+
+                    // Find AndList with all these tables
+                    AndList * new_AndList = GetJoinsFromAndList(vec_rel_names);
+                    #ifdef _DEBUG_OPTIMIZER
+                    TokenizeAndList(new_AndList);
+                    PrintTokenizedAndList();
+                    m_vWholeCNF.clear();
+                    #endif
+
+                    if (new_AndList != NULL)
+                    {
+                        // copy alias as well as table names in a new vector
+                        vector <string> rel_names;
+                        for (int i = 0; i < vec_rel_names.size(); i++)
+                        {
+                                rel_names.push_back(vec_rel_names.at(i));
+                                rel_names.push_back(m_mAliasToTable[vec_rel_names.at(i)]);
+                        }
+                        // This function will fill up m_aTableNamesTableNames
+                        PopulateTableNames(rel_names);
+
+                        // Now call apply
+                        pStats->Apply(new_AndList, m_aTableNames, rel_names.size());
+                        // TODO
+                        // change distinct values
+                        pCNF = new CNF();
+                        pLit = new Record();
+
+                        //create left and right Schema
+                        Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
+                        Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
+
+
+                        //remove dots from column name in the selected node
+                        RemoveAliasFromColumnName(new_AndList);
+                        pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+                    }
+                    
+                    pair <Statistics *, QueryPlanNode *> stats_node_pair;
+                    stats_node_pair.first = pStats;
+                    stats_node_pair.second = pNode;
+
+                    m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map
                     vNewCombo.push_back(sName);
-
-					vector <string> temp_vec;
-					ComboToVector(sName, temp_vec);
                 }
             }
         }
