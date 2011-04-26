@@ -81,6 +81,11 @@ public:
 	{
 		return &m_mPartitionInfoMap; // return pointer to PartitionInfoMap
 	}
+
+	map<string, vector <string> > * GetColToTableMap()
+	{
+		return &m_mColToTable;
+	}
 };
 
 #endif

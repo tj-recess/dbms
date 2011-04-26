@@ -10,12 +10,12 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 					 struct AndList * boolean,
 					 Statistics & s)
 			: m_pFuncOp(finalFunction), m_pTblList(tables),
-			  m_pCNF(boolean), m_Stats(s)
+			  m_pCNF(boolean), m_Stats(s), m_nGlobalPipeID(0)
 {
 	// Store tables in sorted fashion in m_vSortedTables
 	// and the number of tables in m_nNumTables
 	m_nNumTables = SortTables();
-        SortAlias();
+	m_nNumTables = SortAlias();
 	if (m_nNumTables != -1)
 	{	
 		// Print tables
@@ -102,16 +102,18 @@ int Optimizer::SortAlias()
         map <string, string>::iterator map_itr = table_map.begin();
         for (; map_itr != table_map.end(); map_itr++)
         {
+			string sAlias = map_itr->first;
+			string sTableName = map_itr->second;
 			// Push alias name in the vector
-            m_vSortedAlias.push_back(map_itr->first);
+            m_vSortedAlias.push_back(sAlias);
 
             // Make attributes to create select file node
-            string sInFile = map_itr->second + ".bin";
+            string sInFile = sTableName + ".bin";
             int outPipeId = m_nGlobalPipeID++;
             CNF * pCNF = new CNF();
             Record * pLit = new Record();
-            Schema schema_obj("catalog", (char*)map_itr->second.c_str());
-            AndList * new_AndList = GetSelectionsFromAndList(map_itr->first);
+            Schema schema_obj("catalog", (char*)sTableName.c_str());
+            AndList * new_AndList = GetSelectionsFromAndList(sAlias);
             #ifdef _DEBUG_OPTIMIZER
             PrintAndList(new_AndList);
 //            TokenizeAndList(new_AndList);
@@ -128,8 +130,21 @@ int Optimizer::SortAlias()
             pair <Statistics *, QueryPlanNode *> stats_node_pair;			
             stats_node_pair.first = pStats;
             stats_node_pair.second = pNode;
-			m_mJoinEstimate[map_itr->first] = stats_node_pair; 
+			m_mJoinEstimate[sAlias] = stats_node_pair; 
         }
+		
+		#ifdef _ESTIMATOR_DEBUG
+		cout << "\n--- map thingie ---\n";
+		map <string, pair <Statistics *, QueryPlanNode*> >::iterator itr;
+		itr = m_mJoinEstimate.begin();
+		for (; itr != m_mJoinEstimate.end(); itr++)
+		{
+			cout << itr->first << " : ";
+			pair <Statistics *, QueryPlanNode*> pp = itr->second;
+			cout << pp.second->m_nOutPipe << endl;
+		}
+		#endif
+
         return m_vSortedAlias.size();
     }
 }
@@ -309,7 +324,7 @@ void Optimizer::PrintTableList()
 
 
 // handles the base case when we have to find 2 table combos
-// nested for loop over m_vSortedTables to make combos of 2 tables
+// nested for loop over m_vSortedAlias to make combos of 2 tables
 void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 {
     cout << "\n\n--- Table combinations ---\n";
@@ -317,8 +332,8 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
     {
         for (int j = i+1; j < m_nNumTables; j++)
         {
-			string sLeftTable = m_vSortedTables.at(i);
-			string sRightTable = m_vSortedTables.at(j);
+			string sLeftTable = m_vSortedAlias.at(i);
+			string sRightTable = m_vSortedAlias.at(j);
 
             string sName = sLeftTable + "." + sRightTable;
             cout << sName.c_str() << endl;
@@ -329,6 +344,10 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			int out_pipe = m_nGlobalPipeID++;
 			CNF * pCNF = new CNF();
             Record * pLit = new Record();
+		
+			#ifdef _ESTIMATOR_DEBUG
+			cout << sLeftTable.c_str() << "---" << sRightTable.c_str();
+			#endif
 			Schema LeftSchema("catalog", (char*)sLeftTable.c_str());
 			Schema RightSchema("catalog", (char*)sRightTable.c_str());
 
@@ -336,11 +355,11 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			ComboToVector(sName, vec_rel_names);	// breaks sName apart and fills up the vector
 
 			AndList * new_AndList = GetJoinsFromAndList(vec_rel_names);
-#ifdef _DEBUG_OPTIMIZER
+			#ifdef _DEBUG_OPTIMIZER
                         TokenizeAndList(new_AndList);
                         PrintTokenizedAndList();
                         m_vWholeCNF.clear();
-#endif
+			#endif
 			pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
 
 			QueryPlanNode * pNode = NULL;//new Node_Join();
@@ -348,7 +367,7 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 
 			// TODO
 			// -- Find AndList related to these 2 tables
-			// new_AndList = find_new_AndList(m_vSortedTables.at(i), m_vSortedTables.at(j));
+			// new_AndList = find_new_AndList(m_vSortedAlias.at(i), m_vSortedAlias.at(j));
 			//
 			// Statistics * pStats = new Statistics(m_Stats);
 			// -- call pStats->Apply(new_AndList, {these 2 table names}, 2);
@@ -413,7 +432,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
         for (int i = 0; i < m_nNumTables; i++)
         {
 			int loc = -1;
-            loc = ComboAfterCurrTable(vTempCombos, m_vSortedTables.at(i));
+            loc = ComboAfterCurrTable(vTempCombos, m_vSortedAlias.at(i));
             // if lec = -1 --> error
             if (loc != -1)
             {
@@ -438,7 +457,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
         		    //          --> apply select condition before join condition
 		            // Use the result of estimate anywhere?
 
-                    string sName = m_vSortedTables.at(i) + "." + vTempCombos.at(j);
+                    string sName = m_vSortedAlias.at(i) + "." + vTempCombos.at(j);
                     cout << sName.c_str() << endl;
 					m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map 
                     vNewCombo.push_back(sName);
