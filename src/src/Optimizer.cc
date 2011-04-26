@@ -114,26 +114,37 @@ int Optimizer::SortAlias()
             // Make attributes to create select file node
             string sInFile = sTableName + ".bin";
             int outPipeId = m_nGlobalPipeID++;
-            CNF * pCNF = new CNF();
-            Record * pLit = new Record();
+            CNF * pCNF = NULL;
+            Record * pLit = NULL;
             Schema schema_obj("catalog", (char*)sTableName.c_str());
             AndList * new_AndList = GetSelectionsFromAndList(sAlias);
             #ifdef _DEBUG_OPTIMIZER
             		PrintAndList(new_AndList);
 		            cout << "\n";
             #endif
-            pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
-            QueryPlanNode * pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
+			QueryPlanNode * pNode = NULL;
+			if (new_AndList != NULL)
+			{
+				// Apply "select" CNF on it and push the result in map
+				char* relNames[] = { const_cast<char*>(sAlias.c_str()) };
+				vector <string> vec_rels;
+				vec_rels.push_back(sAlias);
+				vec_rels.push_back(m_mAliasToTable[sAlias]);
+				PopulateTableNames(vec_rels);
+				m_Stats.Apply(new_AndList, m_aTableNames, 2);
+
+				pCNF = new CNF();
+				pLit = new Record();
+				// Now create the SelectFile Node
+    	        pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
+			}
+       	    pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
 			// push outPipe --> combo name in the map
             m_mOutPipeToCombo[outPipeId] = sAlias;
 
-			// Apply "select" CNF on it and push the result in map
-            Statistics * pStats = new Statistics(m_Stats);
-			// pStats->Apply(new_AndList, {this alias name as char *[]}, 1)
-
             pair <Statistics *, QueryPlanNode *> stats_node_pair;			
-            stats_node_pair.first = pStats;
+            stats_node_pair.first = &m_Stats;
             stats_node_pair.second = pNode;
 			m_mJoinEstimate[sAlias] = stats_node_pair; 
         }
@@ -339,8 +350,8 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			int in_pipe_left = m_mJoinEstimate[sLeftAlias].second->m_nOutPipe;
 			int in_pipe_right = m_mJoinEstimate[sRightAlias].second->m_nOutPipe;
 			int out_pipe = m_nGlobalPipeID++;
-			CNF * pCNF = new CNF();
-            Record * pLit = new Record();
+			CNF * pCNF = NULL;
+            Record * pLit = NULL;
 		
 			Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
 			Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
@@ -354,22 +365,35 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
                         PrintTokenizedAndList();
                         m_vWholeCNF.clear();
 			#endif
-			pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
 
-			QueryPlanNode * pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe,
-												  pCNF, pLit);
+			QueryPlanNode * pNode = NULL;
+			Statistics * pStats = NULL;
+			pStats = new Statistics(m_Stats);
+            if (new_AndList != NULL)
+            {
+				// copy alias as well as table names in a new vector
+				vector <string> rel_names;
+				for (int i = 0; i < vec_rel_names.size(); i++)
+				{
+					rel_names.push_back(vec_rel_names.at(i));
+					rel_names.push_back(m_mAliasToTable[vec_rel_names.at(i)]);
+				}
+				// This function will fill up m_aTableNamesTableNames
+	            PopulateTableNames(rel_names);
+
+				// Now call apply
+        	    pStats->Apply(new_AndList, m_aTableNames, rel_names.size());
+				// TODO
+				// change distinct values
+	            CNF * pCNF = new CNF();
+	            Record * pLit = new Record();
+				// Then create the Join Node	
+				pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
+			}
+			pNode = new Node_Join(in_pipe_left, in_pipe_right, out_pipe, pCNF, pLit);
 
 			// push outPipe --> combo name in the map
 			m_mOutPipeToCombo[out_pipe] = sName;
-
-			Statistics * pStats = new Statistics(m_Stats);
-
-           // This function will fill up m_aTableNamesTableNames
-           PopulateTableNames(vec_rel_names);
-           pStats->Apply(new_AndList, m_aTableNames, 2);
-			
-			// TODO
-			// change distinct values
 
 			// make stats + node pair and push in the map
 			pair <Statistics *, QueryPlanNode *> stats_node_pair;
