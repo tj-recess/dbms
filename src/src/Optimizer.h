@@ -33,7 +33,9 @@ private:
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
 	map <string, pair <Statistics *, QueryPlanNode*> > m_mJoinEstimate;
-	Statistics m_Stats;
+	Statistics m_Stats;				// master copy of the stats object
+    map <string, string> m_mAliasToTable;           // alias to original table name
+	map <int, string> m_mOutPipeToCombo;			// map of outpipe to combo name
 
 	// functions
 	Optimizer();
@@ -48,12 +50,13 @@ private:
 	void PrintFuncOpRecur(struct FuncOperator *func_node);
 	AndList* GetSelectionsFromAndList(string aTableName);
 	AndList* GetJoinsFromAndList(vector<string>&);
-        void RemoveAliasFromColumnName(AndList* parseTreeNode);
+    void RemoveAliasFromColumnName(AndList* parseTreeNode);
 
-        void PrintOrList(struct OrList *pOr);
-        void PrintComparisonOp(struct ComparisonOp *pCom);
-        void PrintOperand(struct Operand *pOperand);
-        void PrintAndList(struct AndList *pAnd);
+    void PrintOrList(struct OrList *pOr);
+    void PrintComparisonOp(struct ComparisonOp *pCom);
+    void PrintOperand(struct Operand *pOperand);
+    void PrintAndList(struct AndList *pAnd);
+
 public:
 	Optimizer(struct FuncOperator *finalFunction,
 			  struct TableList *tables,
