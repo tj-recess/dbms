@@ -35,6 +35,7 @@ private:
 	//vector <string> m_vSortedTables;
 	vector <string> m_vSortedAlias;
 	vector <string> m_vTabCombos;
+        QueryPlanNode *m_pFinalJoin;
 
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
@@ -50,6 +51,8 @@ private:
 	Statistics m_Stats;								// master copy of the stats object
     map <string, string> m_mAliasToTable;           // alias to original table name
 	map <int, string> m_mOutPipeToCombo;			// map of outpipe to combo name
+        map <string, AndList*> m_mAliasToAndList;   //map of alias and their corresponding AndList
+        map <AndList*, bool> m_mAndListToUsage; //map of AndList* to track if they have been used already or not
 
 	// functions
 	Optimizer();
@@ -77,6 +80,9 @@ private:
     //pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
     void FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree, pair<string, string> &);
 
+    void PrintAndListToUsageMap();
+    void PrintAliasToAndListMap();
+
 public:
 	Optimizer(struct FuncOperator *finalFunction,
 			  struct TableList *tables,
@@ -90,6 +96,7 @@ public:
 	void PrintFuncOperator();
 	void PrintTableList();
 	void MakeQueryPlan();
+        void ExecuteQuery();
 	vector<string> PrintTableCombinations(int combo_len);
 	
 };

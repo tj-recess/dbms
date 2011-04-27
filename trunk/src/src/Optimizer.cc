@@ -326,6 +326,24 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
             m_vWholeCNF.clear();
             #endif
 
+            if(new_AndList != NULL)
+            {
+                //store this new_AndList against alias in m_mAliasToAndList map
+                m_mAliasToAndList[sName] = new_AndList;
+                #ifdef _DEBUG_OPTIMIZER
+                cout << "\nInserted into map -- \n" << sName << " : ";
+                PrintAndList(new_AndList);
+                #endif
+
+                //store this AndList in a map and mark as unused
+                m_mAndListToUsage[new_AndList] = false;
+                #ifdef _DEBUG_OPTIMIZER
+                cout << "\nInserted into map -- \n";
+                PrintAndList(new_AndList);
+                cout << " : " << false;
+                #endif
+            }
+
             QueryPlanNode * pNode = NULL;
             Statistics * pStats = NULL;
 			string sOptimalOrder;
@@ -659,7 +677,7 @@ void Optimizer::MakeQueryPlan()
 		string min_join_left = min_order.substr(0, min_order.find(".")); 
 		string min_join_right = min_order.substr(min_order.find(".")+1); 
 
-		QueryPlanNode * pFinalNode = NULL;
+		m_pFinalJoin = NULL;
 		Schema * pFinalSchema = NULL;
 
 		// Only two tables to join
@@ -668,12 +686,12 @@ void Optimizer::MakeQueryPlan()
 			int ip1 = m_mJoinEstimate[min_join_left].queryPlanNode->m_nOutPipe;
 			int ip2 = m_mJoinEstimate[min_join_right].queryPlanNode->m_nOutPipe;
 			int op = m_nGlobalPipeID++;
-			QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+			m_pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */,
 									   NULL /*schema*/, NULL /*record literal */);
 			
-			pFinalJoin = m_mJoinEstimate[min_order].queryPlanNode;
-			pFinalJoin->left = m_mJoinEstimate[min_join_left].queryPlanNode;
-			pFinalJoin->right = m_mJoinEstimate[min_join_right].queryPlanNode;
+			m_pFinalJoin = m_mJoinEstimate[min_order].queryPlanNode;
+			m_pFinalJoin->left = m_mJoinEstimate[min_join_left].queryPlanNode;
+			m_pFinalJoin->right = m_mJoinEstimate[min_join_right].queryPlanNode;
 
 			// make the schema
 			Schema LeftSchema("catalog", (char*) m_mAliasToTable[min_join_left].c_str());
@@ -682,7 +700,7 @@ void Optimizer::MakeQueryPlan()
 			// Read data from left schema and right schema and write to sName.schema file
             ConcatSchemas(&LeftSchema, &RightSchema, sName);
             pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
-			pFinalNode = pFinalJoin;
+//			pFinalNode = m_pFinalJoin;
 		}
 		else if (m_nNumTables == 3)
 		{
@@ -690,16 +708,16 @@ void Optimizer::MakeQueryPlan()
 			int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
 			int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
 			int op = m_nGlobalPipeID++;
-			QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+			m_pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */,
 									   NULL /*schema*/, NULL /*record literal */);
 
 			// set left pointer of Final Join Node
-    	    pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;
-        	m_mJoinEstimate[min_order].queryPlanNode->parent = pFinalJoin;
+    	    m_pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;
+        	m_mJoinEstimate[min_order].queryPlanNode->parent = m_pFinalJoin;
 
 			// set right pointer of Final Join Node
-			pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;
-			m_mJoinEstimate[min_third].queryPlanNode->parent = pFinalJoin;
+			m_pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;
+			m_mJoinEstimate[min_third].queryPlanNode->parent = m_pFinalJoin;
 
 			// set pointers of min_order (intermediate order node)
 			QueryPlanNode * pIntermediate = m_mJoinEstimate[min_third].queryPlanNode;
@@ -710,8 +728,65 @@ void Optimizer::MakeQueryPlan()
 			pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;
 			m_mJoinEstimate[min_join_right].queryPlanNode->parent = pIntermediate;
 
-			pFinalNode = pFinalJoin;
-		}
+                        #ifdef _DEBUG_OPTIMIZER
+                        //print both the maps
+                        //1. m_mAndList to boolean
+                        PrintAndListToUsageMap();
+
+                        //2. m_mAliasToAndList
+                        PrintAliasToAndListMap();
+                        #endif
+
+                        //min_order -> optimal combi for join of 3
+                        //find value for this key in m_mAliasToAndList map and supply that to m_mAndListToUsage map and mark it as true
+        //                cout << "\nmin_order = " << min_order << endl;
+                        m_mAndListToUsage[m_mAliasToAndList[min_order]] = true;
+
+                        //now scan rest of the map m_mAndListToUsage, concatenate all unused AndLists
+                        //and place them against join of 3 in m_mAliasToAndList map
+                        map<AndList*, bool>::iterator listToUsageIt = m_mAndListToUsage.begin();
+                        AndList* bigAndList = NULL;
+                        while(listToUsageIt != m_mAndListToUsage.end())
+                        {
+                            if(listToUsageIt->second == false)  //i.e. unused
+                            {
+                                if(bigAndList == NULL)
+                                    bigAndList = listToUsageIt->first;
+                                else
+                                {
+                                    //append to end of bigAndList
+                                    AndList* temp = bigAndList;
+                                    while(temp->rightAnd != NULL)
+                                        temp = temp->rightAnd;
+                                    temp->rightAnd = listToUsageIt->first;
+                                }
+
+                                //also mark this used AndList and used in Usage map
+                                m_mAndListToUsage[listToUsageIt->first] = true;
+                            }
+                            listToUsageIt++;
+                        }
+                        //now place bigAndList against join of 3 in m_mAliasToAndList map
+                        m_mAliasToAndList[min_order + "." + min_third] = bigAndList;
+                        //also place bigAndList in m_mAndListToUsage and mark as false (for future)
+        //                m_mAndListToUsage[bigAndList] = false;
+
+                        #ifdef _DEBUG_OPTIMIZER
+                        //print both the maps
+                        //1. m_mAndList to boolean
+                        PrintAndListToUsageMap();
+
+                        //2. m_mAliasToAndList
+                        PrintAliasToAndListMap();
+                        #endif
+
+                        }
+                        /*
+//=======
+
+			pFinalNode = m_pFinalJoin;
+//>>>>>>> .r194
+		
 
 		// group by
 		if (m_pGroupingAtts)
@@ -719,18 +794,30 @@ void Optimizer::MakeQueryPlan()
 			OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
 			int in = pFinalNode->m_nOutPipe;
 			int out = m_nGlobalPipeID++;
-			QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, NULL /* Function */, pGrpOrder);
+			QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, NULL //Function
+                        , pGrpOrder);
 			pGrpNode->left = pFinalNode;	// make join the left child of group-by
 			pFinalNode = pGrpNode;			// now final node is group by (its on top!)
 		}
 		// sum
 		// project
-
-		if (pFinalNode!= NULL)
-			pFinalNode->PrintNode();
+*/
+		if (m_pFinalJoin != NULL)
+			m_pFinalJoin->PrintNode();
 		else
 			cout << "\nERROR! No Query Plan possible!\n\n";
 	}
+}
+
+void Optimizer::ExecuteQuery()
+{
+    /* Logic:
+     * start with parent node, perform a post-order traversal
+     * execute every node encountered and join it's input and output pipe
+     * according to the order mentioned in nodes
+     */
+//    m_pFinalJoin->()
+
 }
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
@@ -1157,3 +1244,28 @@ void Optimizer::PrintAndList(struct AndList *pAnd)
         }
 }
 //
+
+void Optimizer::PrintAndListToUsageMap()
+{
+    cout << "\n--------m_mAndListToBoolean--------\n";
+    map<AndList*, bool>::iterator listToUsageIt = m_mAndListToUsage.begin();
+    while(listToUsageIt != m_mAndListToUsage.end())
+    {
+        PrintAndList(listToUsageIt->first);
+        cout << " : " << listToUsageIt->second << "\n";
+        listToUsageIt++;
+    }
+}
+
+void Optimizer::PrintAliasToAndListMap()
+{
+    cout << "\n--------m_mAliasToAndList--------\n";
+    map<string, AndList*>::iterator aliasToAndListIt = m_mAliasToAndList.begin();
+    while(aliasToAndListIt != m_mAliasToAndList.end())
+    {
+        cout << aliasToAndListIt->first << " : " ;
+        PrintAndList(aliasToAndListIt->second);
+        cout << "\n";
+        aliasToAndListIt++;
+    }
+}

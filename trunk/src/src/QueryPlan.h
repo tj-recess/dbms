@@ -5,6 +5,8 @@
 #include "Schema.h"
 #include "Comparison.h"
 #include "Function.h"
+#include "DBFile.h"
+#include "RelOp.h"
 #include <string>
 #include <iostream>
 
@@ -16,6 +18,7 @@ public:
 	// common members
 	int m_nInPipe, m_nOutPipe;
 	string m_sInFileName, m_sOutFileName;
+        map<int, Pipe*> m_mPipes;
 
 	// left and right children (tree structure)
 	QueryPlanNode * left;
@@ -27,6 +30,7 @@ public:
 	{}
 
 	virtual void PrintNode() {}
+        virtual void ExecutePostOrder() {}
 	virtual ~QueryPlanNode() {}	
 };
 
@@ -78,8 +82,9 @@ public:
     {
 		m_sInFileName = inFile;
 		m_nOutPipe = out;
-		//m_pCNF = pCNF;
+		m_pCNF = pCNF;
 		m_pLiteral = pLit;
+                m_mPipes[out] = new Pipe(1000);
 	}
 
     void PrintNode()
@@ -103,6 +108,23 @@ public:
 		//delete m_pCNF; m_pCNF = NULL;
 		delete m_pLiteral; m_pLiteral = NULL;
 	}
+
+        void ExecutePostOrder()
+        {
+            this->left->ExecutePostOrder();
+            this->right->ExecutePostOrder();
+            this->ExecuteNode();
+        }
+
+        void ExecuteNode()
+        {
+            //create a DBFile from input file path provided
+            DBFile inFile;
+            inFile.Open(const_cast<char*>(m_sInFileName.c_str()));
+
+            SelectFile sf;
+            sf.Run(inFile, *(m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
+        }
 };
 
 class Node_Project : public QueryPlanNode
@@ -157,6 +179,17 @@ public:
 		//m_pCNF = pCNF;
 		m_pSchema = pSch;
 		m_pLiteral = pLit;
+	}
+
+        Node_Join(int ip1, int ip2, int op, Schema * pSch, AndList* parseTree)
+        {
+		m_nInPipe = ip1;
+		m_nRightInPipe = ip2;
+		m_nOutPipe = op;
+		//m_pCNF = pCNF;
+		m_pSchema = pSch;
+//		m_pLiteral = pLit;
+                
 	}
 
     void PrintNode()
