@@ -26,7 +26,17 @@ public:
 					left(NULL), right(NULL), parent(NULL)
 	{}
 
-	virtual void PrintNode() {}
+	virtual void PrintNode() 
+        {
+            //inorder traversal of QueryPlanNode tree
+            if(this != NULL)
+            {
+                this->left->PrintNode();
+                this->PrintNode();
+                this->right->PrintNode();
+            }
+        }
+
 	virtual ~QueryPlanNode() {}	
 };
 
