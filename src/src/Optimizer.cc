@@ -20,7 +20,7 @@ Optimizer::Optimizer(struct FuncOperator *finalFunction,
 	if (m_nNumTables != -1)
 	{	
 		// Print tables
-		PrintTableCombinations(m_nNumTables);
+		m_vTabCombos = PrintTableCombinations(m_nNumTables);
 	}
 
 	// make vector of m_pCNF
@@ -128,7 +128,7 @@ int Optimizer::SortAlias()
         }
 		
 		#ifdef _DEBUG_OPTIMIZER 
-		print_map();
+		//print_map();
 		#endif
 
         return m_vSortedAlias.size();
@@ -276,7 +276,10 @@ void Optimizer::print_map()
         {
             cout << itr->first << " : ";
             JoinValue jv = itr->second;
-            cout << jv.stats->GetPartitionNumber() << endl;
+			if (jv.stats != NULL)
+	            cout << jv.stats->GetPartitionNumber() << endl;
+			else
+				cout << "No Join!\n";
         }
 }
 
@@ -286,7 +289,7 @@ void Optimizer::print_map()
 void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 {
 	#ifdef _DEBUG_OPTIMIZER
-	print_map();
+	//print_map();
 	#endif
 
     cout << "\n\n--- Table combinations ---\n";
@@ -339,8 +342,8 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 					sOptimalOrder = optimalPair.first + "." + optimalPair.second;
 
 					#ifdef _DEBUG_OPTIMIZER
-			        cout << "\n-- Optimal Order found (outside): " << optimalPair.first.c_str() << ", "
-            			 << optimalPair.second.c_str() << endl;
+			        //cout << "\n-- Optimal Order found (outside): " << optimalPair.first.c_str() << ", "
+            		//	 << optimalPair.second.c_str() << endl;
 					#endif
 
 					// Fetch the stats object for the optimal pair, and make a copy of it
@@ -420,11 +423,6 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 // recursive function to find all combinations of table
 vector<string> Optimizer::PrintTableCombinations(int combo_len)
 {
-    #ifdef _DEBUG_OPTIMIZER
-    cout << "\n\n ----------- 4 ----------\n\n";
-    print_map();
-    #endif
-
     vector <string> vTempCombos, vNewCombo;
 
 	// base case: combinations of 2 tables
@@ -436,6 +434,11 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
     else
     {
         vTempCombos = PrintTableCombinations(combo_len-1);
+
+		// Malvika: Hack for 3 tables
+		if (m_nNumTables == 3)
+			return vTempCombos;
+		
         for (int i = 0; i < m_nNumTables; i++)
         {
 			int loc = -1;
@@ -516,11 +519,6 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
         		    m_mOutPipeToCombo[out_pipe] = sName;
 
                     
-//                    pair <Statistics *, QueryPlanNode *> stats_node_pair;
-//                    stats_node_pair.first = pStats;
-//                    stats_node_pair.second = pNode;
-//                    m_mJoinEstimate[sName] = stats_node_pair;    	// Push pStats into this map
-
                     JoinValue * jv = new JoinValue;
                     jv->stats = &m_Stats;
                     jv->queryPlanNode = pNode;
@@ -566,6 +564,78 @@ int Optimizer::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
     return -1;
 }
 
+void Optimizer::MakeQueryPlan()
+{
+		if (m_nNumTables > 3)
+		{
+				cout << "\n Cannot handle yet!\n";
+				return;
+		}
+
+		print_map();
+		/* LOGIC:
+		   Scan the m_mJoinEstimate map and find X.Y pairs for min estimate
+		   The remaining table is Z in ...  Z join (x.Y)
+		   Start backtracking
+		 */
+		vector <string> two_tab_combos;
+		for (int i = 0; i < m_vTabCombos.size(); i++)
+		{
+				// push only the combinations that join "." in it
+				// meaning: a.b or a.c or b.c 
+				if (m_vTabCombos.at(i).find(".") != string::npos)
+						two_tab_combos.push_back(m_vTabCombos.at(i));
+		}
+
+		// go over two_tab_combos and find the combo with min estimate
+		double min_est = -1;
+		string min_order, min_first, min_second;
+		for (int i = 0; i < two_tab_combos.size(); i++)
+		{
+				cout << endl << two_tab_combos.at(i);
+				string sCombo = two_tab_combos.at(i);
+				int dotPos = sCombo.find(".");
+				string sFirst = sCombo.substr(0, dotPos);
+				Statistics * pStats = m_mJoinEstimate[sCombo].stats;
+				if (pStats != NULL)
+				{
+						map<string, TableInfo> relStatsMap = (*pStats->GetRelStats());
+						double est = relStatsMap[sFirst].numTuples;
+						if (min_est = -1)
+						{
+								min_est = est;
+								min_order = sCombo;
+								min_first = sFirst;
+								min_second = sCombo.substr(dotPos+1);
+						}
+						else if (min_est > est)
+						{
+								min_est = est;
+								min_order = sCombo;
+								min_first = sFirst;
+								min_second = sCombo.substr(dotPos+1);
+						}
+				}
+		}
+
+		// now min est = min_est and min_combo are known
+		cout << "\n\n*** " << min_est << " *** " << min_order.c_str()<<endl;
+		cout << "\n\n*** " << min_first.c_str() << " *** " << min_second.c_str()<<endl;
+		// Find the 3rd table
+		string min_third;
+		for (int i = 0; i < m_vSortedAlias.size(); i++)
+		{
+				if (m_vSortedAlias.at(i).compare(min_first) != 0 &&
+								m_vSortedAlias.at(i).compare(min_second) != 0)
+				{
+						min_third = m_vSortedAlias.at(i);
+						break;
+				}
+		}
+		cout << "\n\n*** " << min_first.c_str() << " *** " << min_second.c_str()
+ 			 << " *** " << min_third.c_str() << endl;
+
+}
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
 {
@@ -793,8 +863,8 @@ void Optimizer::FindOptimalPairing(vector<string> & vAliases, AndList* parseTree
 		
 		string sOrderedNames = joinOrder.first + "." + joinOrder.second;
         allEstimates[sOrderedNames] = tempStats->Estimate(parseTree, m_aTableNames, vAliases.size()*2);
-		cout << "\n*** order: " << sOrderedNames.c_str();
-		cout << "\t Estimate: "<< allEstimates[sOrderedNames];
+		//cout << "\n*** order: " << sOrderedNames.c_str();
+		//cout << "\t Estimate: "<< allEstimates[sOrderedNames];
         //m_aTableNames is expected to be filled by caller
     }
 
@@ -827,8 +897,8 @@ void Optimizer::FindOptimalPairing(vector<string> & vAliases, AndList* parseTree
 	{
 		pair_optimal.first = sOptimalOrder.substr(0, dotPos);
 		pair_optimal.second = sOptimalOrder.substr(dotPos+1);
-		cout << "\n-- Optimal Order found (inside): " << pair_optimal.first << ", " 
-			 << pair_optimal.second << endl;
+		//cout << "\n-- Optimal Order found (inside): " << pair_optimal.first << ", " 
+		//	 << pair_optimal.second << endl;
 	}
 }
 

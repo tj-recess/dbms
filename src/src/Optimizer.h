@@ -30,6 +30,8 @@ private:
 	int m_nNumTables, m_nGlobalPipeID;
 	//vector <string> m_vSortedTables;
 	vector <string> m_vSortedAlias;
+	vector <string> m_vTabCombos;
+
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
         struct JoinValue
@@ -80,6 +82,7 @@ public:
 
 	void PrintFuncOperator();
 	void PrintTableList();
+	void MakeQueryPlan();
 	vector<string> PrintTableCombinations(int combo_len);
 	
 };

@@ -27,6 +27,7 @@ int main ()
 	Optimizer Oz(finalFunction, tables, boolean, s);
 	//Oz.PrintFuncOperator();
 	//Oz.PrintTableList();
+	Oz.MakeQueryPlan();
 
 }
 
