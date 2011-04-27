@@ -26,6 +26,10 @@ private:
 	struct FuncOperator * m_pFuncOp;
 	struct TableList * m_pTblList;
 	struct AndList * m_pCNF;
+	struct NameList * m_pGroupingAtts; // grouping atts (NULL if no grouping)
+	struct NameList * m_pAttsToSelect; // the set of attributes in the SELECT (NULL if no such atts)
+	int m_nDistinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
+	int m_nDistinctFunc; 
 
 	int m_nNumTables, m_nGlobalPipeID;
 	//vector <string> m_vSortedTables;
@@ -77,6 +81,9 @@ public:
 	Optimizer(struct FuncOperator *finalFunction,
 			  struct TableList *tables,
 			  struct AndList * boolean,
+			  struct NameList * pGrpAtts,
+              struct NameList * pAttsToSelect,
+              int distinct_atts, int distinct_func,
 			  Statistics & s);
 	~Optimizer();
 

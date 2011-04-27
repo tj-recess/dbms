@@ -2,16 +2,22 @@
 using namespace std;
 
 Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
-						 m_aTableNames(NULL), m_nNumTables(-1), m_nGlobalPipeID(0)
+						 m_pGroupingAtts(NULL), m_pAttsToSelect(NULL),
+						 m_nDistinctAtts(0), m_nDistinctFunc(0),
+						 m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL)
 {}
 
 Optimizer::Optimizer(struct FuncOperator *finalFunction,
 					 struct TableList *tables,
 					 struct AndList * boolean,
+					 struct NameList * pGrpAtts,
+					 struct NameList * pAttsToSelect,
+					 int distinct_atts, int distinct_func,
 					 Statistics & s)
-			: m_pFuncOp(finalFunction), m_pTblList(tables),
-			  m_pCNF(boolean), m_aTableNames(NULL), m_nNumTables(-1),
-			  m_Stats(s), m_nGlobalPipeID(0)
+			: m_pFuncOp(finalFunction), m_pTblList(tables), m_pCNF(boolean), 
+			  m_pGroupingAtts(pGrpAtts), m_pAttsToSelect(pAttsToSelect), 
+			  m_nDistinctAtts(distinct_atts), m_nDistinctFunc(distinct_func),
+			  m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL), m_Stats(s)
 {
 	// Store alias in sorted fashion in m_vSortedAlias
 	// and the number of tables/alias in m_nNumTables
@@ -653,7 +659,8 @@ void Optimizer::MakeQueryPlan()
 		string min_join_left = min_order.substr(0, min_order.find(".")); 
 		string min_join_right = min_order.substr(min_order.find(".")+1); 
 
-		QueryPlanNode * pFinalJoin = NULL;
+		QueryPlanNode * pFinalNode = NULL;
+		Schema * pFinalSchema = NULL;
 
 		// Only two tables to join
 		if (m_nNumTables == 2)
@@ -661,12 +668,21 @@ void Optimizer::MakeQueryPlan()
 			int ip1 = m_mJoinEstimate[min_join_left].queryPlanNode->m_nOutPipe;
 			int ip2 = m_mJoinEstimate[min_join_right].queryPlanNode->m_nOutPipe;
 			int op = m_nGlobalPipeID++;
-			pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+			QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
 									   NULL /*schema*/, NULL /*record literal */);
 			
 			pFinalJoin = m_mJoinEstimate[min_order].queryPlanNode;
 			pFinalJoin->left = m_mJoinEstimate[min_join_left].queryPlanNode;
 			pFinalJoin->right = m_mJoinEstimate[min_join_right].queryPlanNode;
+
+			// make the schema
+			Schema LeftSchema("catalog", (char*) m_mAliasToTable[min_join_left].c_str());
+            Schema RightSchema("catalog", (char*) m_mAliasToTable[min_join_right].c_str());
+			string sName = min_order;
+			// Read data from left schema and right schema and write to sName.schema file
+            ConcatSchemas(&LeftSchema, &RightSchema, sName);
+            pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
+			pFinalNode = pFinalJoin;
 		}
 		else if (m_nNumTables == 3)
 		{
@@ -674,7 +690,7 @@ void Optimizer::MakeQueryPlan()
 			int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
 			int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
 			int op = m_nGlobalPipeID++;
-			pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+			QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
 									   NULL /*schema*/, NULL /*record literal */);
 
 			// set left pointer of Final Join Node
@@ -693,10 +709,25 @@ void Optimizer::MakeQueryPlan()
 			// right
 			pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;
 			m_mJoinEstimate[min_join_right].queryPlanNode->parent = pIntermediate;
+
+			pFinalNode = pFinalJoin;
 		}
 
-		if (pFinalJoin != NULL)
-			pFinalJoin->PrintNode();
+		// group by
+		if (m_pGroupingAtts)
+		{
+			OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
+			int in = pFinalNode->m_nOutPipe;
+			int out = m_nGlobalPipeID++;
+			QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, NULL /* Function */, pGrpOrder);
+			pGrpNode->left = pFinalNode;	// make join the left child of group-by
+			pFinalNode = pGrpNode;			// now final node is group by (its on top!)
+		}
+		// sum
+		// project
+
+		if (pFinalNode!= NULL)
+			pFinalNode->PrintNode();
 		else
 			cout << "\nERROR! No Query Plan possible!\n\n";
 	}
