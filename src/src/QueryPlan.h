@@ -26,17 +26,7 @@ public:
 					left(NULL), right(NULL), parent(NULL)
 	{}
 
-	virtual void PrintNode() 
-        {
-            //inorder traversal of QueryPlanNode tree
-            if(this != NULL)
-            {
-                this->left->PrintNode();
-                this->PrintNode();
-                this->right->PrintNode();
-            }
-        }
-
+	virtual void PrintNode() {}
 	virtual ~QueryPlanNode() {}	
 };
 
@@ -50,23 +40,30 @@ public:
 	{
 		m_nInPipe = in;
 		m_nOutPipe = out;
-		m_pCNF = pCNF;
+		//m_pCNF = pCNF;
 		m_pLiteral = pLit;
 	}
  
 	void PrintNode()
 	{
+        if (this->left != NULL)
+            this->left->PrintNode();
+
 		cout << "\n*** Select Pipe Operation ***";
 		cout << "\nInput pipe ID: " << m_nInPipe;
 		cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nSelect CNF : ";
-		m_pCNF->Print();
+		//m_pCNF->Print();
 //		cout << "\nRecord Literal: " << m_pLiteral->print(); 
+		cout << endl << endl;
+
+        if (this->right != NULL)
+            this->right->PrintNode();
 	}
 
 	~Node_SelectPipe()
     {
-        delete m_pCNF; m_pCNF = NULL;
+        //delete m_pCNF; m_pCNF = NULL;
         delete m_pLiteral; m_pLiteral = NULL;
     }
 };
@@ -81,23 +78,29 @@ public:
     {
 		m_sInFileName = inFile;
 		m_nOutPipe = out;
-		m_pCNF = pCNF;
+		//m_pCNF = pCNF;
 		m_pLiteral = pLit;
 	}
 
     void PrintNode()
     {
+        if (this->left != NULL)
+            this->left->PrintNode();
+
         cout << "\n*** Select File Operation ***";
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nInput filename: " << m_sInFileName.c_str();
         cout << "\nSelect CNF : ";
-		m_pCNF->Print();
+		//m_pCNF->Print();
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
+		cout << endl << endl;
+        if (this->right != NULL)
+            this->right->PrintNode();
     }
 
 	~Node_SelectFile()
 	{
-		delete m_pCNF; m_pCNF = NULL;
+		//delete m_pCNF; m_pCNF = NULL;
 		delete m_pLiteral; m_pLiteral = NULL;
 	}
 };
@@ -119,11 +122,17 @@ public:
 		
     void PrintNode()
     {
+        if (this->left != NULL)
+            this->left->PrintNode();
+
         cout << "\n*** Select Pipe Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nNum atts to Keep: " << m_nAttsToKeep;
 		cout << "\nNum total atts: " << m_nTotalAtts;
+		cout << endl << endl;
+        if (this->right != NULL)
+            this->right->PrintNode();
     }
 	
 	~Node_Project()
@@ -145,25 +154,30 @@ public:
 		m_nInPipe = ip1;
 		m_nRightInPipe = ip2;
 		m_nOutPipe = op;
-		m_pCNF = pCNF;
+		//m_pCNF = pCNF;
 		m_pSchema = pSch;
 		m_pLiteral = pLit;
 	}
 
     void PrintNode()
     {
+		if (this->left != NULL)
+			this->left->PrintNode();
         cout << "\n*** Join Operation ***";
         cout << "\nInput pipe-1 ID: " << m_nInPipe;
         cout << "\nInput pipe-2 ID: " << m_nRightInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
         cout << "\nSelect CNF : ";
-		m_pCNF->Print();
+		//m_pCNF->Print();
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
+		cout << endl << endl;
+		if (this->right != NULL)
+			this->right->PrintNode();
     }
 	
 	~Node_Join()
     {
-        delete m_pCNF; m_pCNF = NULL;
+        //delete m_pCNF; m_pCNF = NULL;
         delete m_pSchema; m_pSchema = NULL;
         delete m_pLiteral; m_pLiteral = NULL;
     }
@@ -183,11 +197,18 @@ public:
 
 	void PrintNode()
 	{
+        if (this->left != NULL)
+            this->left->PrintNode();
+
 		cout << "\n*** Sum Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nFunction: ";
 		m_pFunc->Print();
+		cout << endl << endl;
+
+        if (this->right != NULL)
+            this->right->PrintNode();
 	}
 
 	~Node_Sum()
@@ -212,6 +233,9 @@ public:
 
 	void PrintNode()
 	{
+        if (this->left != NULL)
+            this->left->PrintNode();
+
 		cout << "\n*** Group-by Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
@@ -219,6 +243,10 @@ public:
 		m_pFunc->Print();
 		cout << "\nOrderMaker: ";
 		m_pOM->Print();
+		cout << endl << endl;
+
+        if (this->right != NULL)
+            this->right->PrintNode();
     }
 
 	~Node_GroupBy()
@@ -242,10 +270,17 @@ public:
 
     void PrintNode()
     {
+        if (this->left != NULL)
+            this->left->PrintNode();
+
         cout << "\n*** WriteOut Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput file: " << m_sOutFileName;
 //        cout << "\nSchema: " << m_pSchema->Print();
+		cout << endl << endl;
+
+        if (this->right != NULL)
+            this->right->PrintNode();
     }
 
 	~Node_WriteOut()
