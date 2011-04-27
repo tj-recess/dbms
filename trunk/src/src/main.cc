@@ -13,6 +13,10 @@ extern "C" {
 extern struct FuncOperator *finalFunction;
 extern struct TableList *tables;
 extern struct AndList *boolean;
+extern struct NameList *groupingAtts; // grouping atts (NULL if no grouping)
+extern struct NameList *attsToSelect; // the set of attributes in the SELECT (NULL if no such atts)
+extern int distinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
+extern int distinctFunc;  // 1 if there is a DISTINCT in an aggregate query
 
 int main () 
 {
@@ -24,7 +28,8 @@ int main ()
     s.Read(fileName);
 
 	// Start estimator after Stats object is ready
-	Optimizer Oz(finalFunction, tables, boolean, s);
+	Optimizer Oz(finalFunction, tables, boolean, groupingAtts, 
+				 attsToSelect, distinctAtts, distinctFunc, s);
 	//Oz.PrintFuncOperator();
 	//Oz.PrintTableList();
 	Oz.MakeQueryPlan();
