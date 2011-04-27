@@ -847,9 +847,17 @@ void Statistics::PrepareStatisticsFile(char* fileName)
     s.AddAtt(relName[0], "s_suppkey",10000);
     s.AddAtt(relName[0], "s_nationkey",25);
 	s.AddAtt(relName[0], "s_acctbal",9955);
+	s.AddAtt(relName[0], "s_name",100000);
+	s.AddAtt(relName[0], "s_address",100000);
+	s.AddAtt(relName[0], "s_phone",100000);
+	s.AddAtt(relName[0], "s_comment",10000);
+
 
     s.AddAtt(relName[1], "ps_suppkey", 10000);
     s.AddAtt(relName[1], "ps_partkey", 200000);
+    s.AddAtt(relName[1], "ps_availqty", 9999);
+    s.AddAtt(relName[1], "ps_supplycost", 99865);
+    s.AddAtt(relName[1], "ps_comment", 799123);
 
 
     s.AddAtt(relName[2], "l_returnflag",3);
@@ -857,27 +865,58 @@ void Statistics::PrepareStatisticsFile(char* fileName)
     s.AddAtt(relName[2], "l_shipmode",7);
     s.AddAtt(relName[2], "l_orderkey",1500000);
     s.AddAtt(relName[2], "l_receiptdate",0);
+    s.AddAtt(relName[2], "l_partkey",200000);
+    s.AddAtt(relName[2], "l_suppkey",10000);
+    s.AddAtt(relName[2], "l_linenumbe",7);
+    s.AddAtt(relName[2], "l_quantity",50);
+    s.AddAtt(relName[2], "l_extendedprice",933900);
+    s.AddAtt(relName[2], "l_tax",9);
+    s.AddAtt(relName[2], "l_linestatus",2);
+    s.AddAtt(relName[2], "l_shipdate",2526);
+    s.AddAtt(relName[2], "l_commitdate",2466);
+    s.AddAtt(relName[2], "l_shipinstruct",4);
+    s.AddAtt(relName[2], "l_comment",4501941);
 
 
     s.AddAtt(relName[3], "o_custkey",150000);
     s.AddAtt(relName[3], "o_orderkey",1500000);
-    s.AddAtt(relName[3], "o_orderdate",0);
+    s.AddAtt(relName[3], "o_orderdate",2406);
+    s.AddAtt(relName[3], "o_totalprice",1464556);
+    s.AddAtt(relName[3], "o_orderstatus", 3);
+    s.AddAtt(relName[3], "o_orderpriority", 5);
+    s.AddAtt(relName[3], "o_clerk", 1000);
+    s.AddAtt(relName[3], "o_shippriority", 1);
+    s.AddAtt(relName[3], "o_comment", 1478684);
 
 
     s.AddAtt(relName[4], "c_custkey",150000);
     s.AddAtt(relName[4], "c_nationkey",25);
     s.AddAtt(relName[4], "c_mktsegment",5);
+    s.AddAtt(relName[4], "c_name", 150000);
+    s.AddAtt(relName[4], "c_address", 150000);
+    s.AddAtt(relName[4], "c_phone", 150000);
+    s.AddAtt(relName[4], "c_acctbal", 140187);
+    s.AddAtt(relName[4], "c_comment", 149965);
 
     s.AddAtt(relName[5], "n_nationkey",25);
     s.AddAtt(relName[5], "n_regionkey",5);
     s.AddAtt(relName[5], "n_name",25);
+    s.AddAtt(relName[5], "n_comment",25);
 
     s.AddAtt(relName[6], "p_partkey",200000);
     s.AddAtt(relName[6], "p_size",50);
     s.AddAtt(relName[6], "p_container",40);
+    s.AddAtt(relName[6], "p_name", 199996);
+	s.AddAtt(relName[6], "p_mfgr", 5);
+	s.AddAtt(relName[6], "p_brand", 25);
+	s.AddAtt(relName[6], "p_type", 150);
+	s.AddAtt(relName[6], "p_retailprice", 20899);
+	s.AddAtt(relName[6], "p_comment", 127459);
+
 
     s.AddAtt(relName[7], "r_regionkey",5);
     s.AddAtt(relName[7], "r_name",5);
+    s.AddAtt(relName[7], "r_comment",5);
 
     s.Write(fileName);
 }

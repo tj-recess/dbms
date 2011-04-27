@@ -635,6 +635,35 @@ void Optimizer::MakeQueryPlan()
 		cout << "\n\n*** " << min_first.c_str() << " *** " << min_second.c_str()
  			 << " *** " << min_third.c_str() << endl;
 
+		// ------ optimal join : left deep --------
+		int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
+		int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
+		int op = m_nGlobalPipeID++;
+		QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+												   NULL /*schema*/, NULL /*record literal */);
+
+		// set left pointer
+        pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;
+        m_mJoinEstimate[min_order].queryPlanNode->parent = pFinalJoin;
+
+		// set right pointer
+		pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;
+		m_mJoinEstimate[min_third].queryPlanNode->parent = pFinalJoin;
+
+		string min_join_order = m_mJoinEstimate[min_order].joinOrder;
+		string min_join_left = min_order.substr(0, min_order.find(".")); 
+		string min_join_right = min_order.substr(min_order.find(".")+1); 
+
+		// set pointers of min_order (intermediate order node)
+		QueryPlanNode * pIntermediate = m_mJoinEstimate[min_third].queryPlanNode;
+		// left
+		pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;
+		m_mJoinEstimate[min_join_left].queryPlanNode->parent = pIntermediate;
+		// right
+		pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;
+		m_mJoinEstimate[min_join_right].queryPlanNode->parent = pIntermediate;
+
+		pFinalJoin->PrintNode();
 }
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
