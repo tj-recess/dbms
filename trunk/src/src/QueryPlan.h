@@ -44,7 +44,7 @@ public:
 	{
 		m_nInPipe = in;
 		m_nOutPipe = out;
-		//m_pCNF = pCNF;
+		m_pCNF = pCNF;
 		m_pLiteral = pLit;
 	}
  
@@ -57,7 +57,10 @@ public:
 		cout << "\nInput pipe ID: " << m_nInPipe;
 		cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nSelect CNF : ";
-		//m_pCNF->Print();
+		if (m_pCNF != NULL)
+			m_pCNF->Print();
+		else
+			cout << "NULL";
 //		cout << "\nRecord Literal: " << m_pLiteral->print(); 
 		cout << endl << endl;
 
@@ -67,8 +70,14 @@ public:
 
 	~Node_SelectPipe()
     {
-        //delete m_pCNF; m_pCNF = NULL;
-        delete m_pLiteral; m_pLiteral = NULL;
+		if (m_pCNF)
+		{
+        	delete m_pCNF; m_pCNF = NULL;
+		}
+		if (m_pLiteral)
+		{
+        	delete m_pLiteral; m_pLiteral = NULL;
+		}
     }
 };
 
@@ -96,7 +105,10 @@ public:
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nInput filename: " << m_sInFileName.c_str();
         cout << "\nSelect CNF : ";
-		//m_pCNF->Print();
+        if (m_pCNF != NULL)
+            m_pCNF->Print();
+        else
+            cout << "NULL";
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
 		cout << endl << endl;
         if (this->right != NULL)
@@ -105,8 +117,14 @@ public:
 
 	~Node_SelectFile()
 	{
-		//delete m_pCNF; m_pCNF = NULL;
-		delete m_pLiteral; m_pLiteral = NULL;
+        if (m_pCNF)
+        {
+            delete m_pCNF; m_pCNF = NULL;
+        }
+        if (m_pLiteral)
+        {
+            delete m_pLiteral; m_pLiteral = NULL;
+        }
 	}
 
         void ExecutePostOrder()
@@ -176,7 +194,7 @@ public:
 		m_nInPipe = ip1;
 		m_nRightInPipe = ip2;
 		m_nOutPipe = op;
-		//m_pCNF = pCNF;
+		m_pCNF = pCNF;
 		m_pSchema = pSch;
 		m_pLiteral = pLit;
 	}
@@ -201,7 +219,10 @@ public:
         cout << "\nInput pipe-2 ID: " << m_nRightInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
         cout << "\nSelect CNF : ";
-		//m_pCNF->Print();
+        if (m_pCNF != NULL)
+            m_pCNF->Print();
+        else
+            cout << "NULL";
 //        cout << "\nRecord Literal: " << m_pLiteral->print();
 		cout << endl << endl;
 		if (this->right != NULL)
@@ -210,9 +231,18 @@ public:
 	
 	~Node_Join()
     {
-        //delete m_pCNF; m_pCNF = NULL;
-        delete m_pSchema; m_pSchema = NULL;
-        delete m_pLiteral; m_pLiteral = NULL;
+        if (m_pCNF)
+        {
+            delete m_pCNF; m_pCNF = NULL;
+        }
+        if (m_pLiteral)
+        {
+            delete m_pLiteral; m_pLiteral = NULL;
+        }
+		if (m_pSchema)
+		{
+    	    delete m_pSchema; m_pSchema = NULL;
+		}
     }
 };
 
@@ -273,9 +303,16 @@ public:
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nFunction: ";
-		m_pFunc->Print();
+		if (m_pFunc)
+			m_pFunc->Print();
+		else
+			cout << "NULL\n";
 		cout << "\nOrderMaker: ";
-		m_pOM->Print();
+		if (m_pOM)
+			m_pOM->Print();
+        else
+            cout << "NULL\n";
+		
 		cout << endl << endl;
 
         if (this->right != NULL)
