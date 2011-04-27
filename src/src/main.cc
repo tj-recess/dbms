@@ -34,6 +34,8 @@ int main ()
 	//Oz.PrintTableList();
 	Oz.MakeQueryPlan();
 
+        Oz.ExecuteQuery();
+
 }
 
 
