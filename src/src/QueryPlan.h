@@ -170,6 +170,12 @@ public:
         cout << "\nOutput pipe ID: " << m_nOutPipe;
 		cout << "\nNum atts to Keep: " << m_nAttsToKeep;
 		cout << "\nNum total atts: " << m_nTotalAtts;
+		if (atts_list != NULL)
+		{
+			cout << "\nAttributes to keep: ";
+			for (int i = 0; i < m_nAttsToKeep; i++)
+				cout << atts_list[i] << "  ";
+		}
 		cout << endl << endl;
         if (this->right != NULL)
             this->right->PrintNode();

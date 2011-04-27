@@ -601,7 +601,22 @@ void Optimizer::MakeQueryPlan()
 		cout << "\n Cannot handle yet!\n";
 		return;
 	}
-	if (m_nNumTables == 2 || m_nNumTables == 3)
+
+	QueryPlanNode * pFinalNode = NULL;
+	Schema * pFinalSchema = NULL;
+
+	if (m_nNumTables == 1)		// join is not possible
+	{
+		pFinalNode = m_mJoinEstimate[m_vSortedAlias.at(0)].queryPlanNode;
+		if (pFinalNode == NULL)
+		{
+			cerr << "\nERROR: Single table doesn't have a query plan node!\n";
+			return;
+		}
+	}
+
+	// take care of joins
+	else if (m_nNumTables == 2 || m_nNumTables == 3)
 	{
 		print_map();
 		/* LOGIC:
@@ -677,8 +692,6 @@ void Optimizer::MakeQueryPlan()
 		string min_join_left = min_order.substr(0, min_order.find(".")); 
 		string min_join_right = min_order.substr(min_order.find(".")+1); 
 
-		QueryPlanNode * pFinalNode = NULL;
-		Schema * pFinalSchema = NULL;
 
 		// Only two tables to join
 		if (m_nNumTables == 2)
@@ -798,25 +811,93 @@ void Optimizer::MakeQueryPlan()
 			#endif
 
 		}
-
-        // group by
-        if (m_pGroupingAtts)
-        {
+	}
+    // group by
+    if (m_pGroupingAtts)
+    {
             OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
             int in = pFinalNode->m_nOutPipe;
             int out = m_nGlobalPipeID++;
             QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, NULL /* Function */, pGrpOrder);
             pGrpNode->left = pFinalNode;    // make join the left child of group-by
             pFinalNode = pGrpNode;          // now final node is group by (its on top!)
-        }
-        // sum
-        // project
+    }
+    // sum
+    // project
+	if (m_pAttsToSelect)
+	{
+		int in = pFinalNode->m_nOutPipe;
+		int out = m_nGlobalPipeID++;
+		int numAttsToSelect = 0, numTotAtts = 0;
+		vector <int> vec_AttsToKeepNum;
+		vector <string> vec_AttsToKeepName;
 
-        if (pFinalNode!= NULL)
-            pFinalNode->PrintNode();
-		else
-			cout << "\nERROR! No Query Plan possible!\n\n";
+		// Find num atts to keep and store names in vec_AttsToKeepName
+		NameList * temp = m_pAttsToSelect;
+		while (temp != NULL)
+		{
+			numAttsToSelect++;
+			vec_AttsToKeepName.push_back(temp->name);
+			temp = temp->next;
+		}
+		
+		Schema * pTempSchema = NULL;	
+		// Find total atts: sum of total atts in each table
+		for (int i = 0; i < m_vSortedAlias.size(); i++)
+		{
+			pTempSchema = new Schema("catalog", (char*) m_mAliasToTable[m_vSortedAlias.at(i)].c_str());
+
+			if (pTempSchema == NULL)
+			{
+				cerr << "\n\nERRPR! Schema for " << m_vSortedAlias.at(i) << " not found!\n\n";
+				break;
+			}
+
+			// iterate over att-to-keep vector and see if that attribute belongs to this table
+			// if it does, save its number (offsetted number)
+			for (int j = 0; j < vec_AttsToKeepName.size(); j++)
+			{
+				// remove alias name from the column name
+				string sFullName = vec_AttsToKeepName.at(j), sColName;
+				int dotPos = sFullName.find(".");
+				if (dotPos == string::npos)
+					sColName = sFullName;
+				else
+					sColName = sFullName.substr(dotPos+1);
+
+				// find column name in this schema
+				int found_pos = pTempSchema->Find((char*)sColName.c_str());
+				if (found_pos != -1)
+					vec_AttsToKeepNum.push_back(numTotAtts + found_pos);
+			}
+
+			// increment num of atts count
+			numTotAtts += pTempSchema->GetNumAtts();
+
+			delete pTempSchema;			
+		}
+
+		// convert vector vec_AttsToKeepNum to int*[]
+		int size = vec_AttsToKeepNum.size();
+		int *attsToKeep = NULL;
+		if (size != 0)
+			attsToKeep = new int[size];
+
+		for (int j = 0; j < size; j++)
+			attsToKeep[j] = vec_AttsToKeepNum.at(j);
+
+		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, numAttsToSelect, numTotAtts);	
+	
+		pProjection->left = pFinalNode;
+		// Make this node top most
+		pFinalNode = pProjection;
 	}
+
+	// Print the final query plan
+    if (pFinalNode!= NULL)
+        pFinalNode->PrintNode();
+	else
+		cout << "\nERROR! No Query Plan possible!\n\n";
 }
 
 void Optimizer::ExecuteQuery()
