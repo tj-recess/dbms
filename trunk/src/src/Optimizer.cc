@@ -425,8 +425,14 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 {
     vector <string> vTempCombos, vNewCombo;
 
+	// if there is only one table
+	if (combo_len == 1)
+	{
+		vTempCombos.push_back(m_vSortedAlias.at(0));
+		return vTempCombos;
+	}
 	// base case: combinations of 2 tables
-    if (combo_len == 2)
+    else if (combo_len == 2)
     {
         TableComboBaseCase(vTempCombos);
         return vTempCombos;
@@ -566,12 +572,13 @@ int Optimizer::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
 
 void Optimizer::MakeQueryPlan()
 {
-		if (m_nNumTables > 3)
-		{
-				cout << "\n Cannot handle yet!\n";
-				return;
-		}
-
+	if (m_nNumTables > 3)
+	{
+		cout << "\n Cannot handle yet!\n";
+		return;
+	}
+	if (m_nNumTables == 2 || m_nNumTables == 3)
+	{
 		print_map();
 		/* LOGIC:
 		   Scan the m_mJoinEstimate map and find X.Y pairs for min estimate
@@ -618,9 +625,12 @@ void Optimizer::MakeQueryPlan()
 				}
 		}
 
+		#ifdef _DEBUG_OPTIMIZER
 		// now min est = min_est and min_combo are known
 		cout << "\n\n*** " << min_est << " *** " << min_order.c_str()<<endl;
 		cout << "\n\n*** " << min_first.c_str() << " *** " << min_second.c_str()<<endl;
+		#endif
+
 		// Find the 3rd table
 		string min_third;
 		for (int i = 0; i < m_vSortedAlias.size(); i++)
@@ -632,38 +642,64 @@ void Optimizer::MakeQueryPlan()
 						break;
 				}
 		}
+	
+		#ifdef _DEBUG_OPTIMIZER
 		cout << "\n\n*** " << min_first.c_str() << " *** " << min_second.c_str()
  			 << " *** " << min_third.c_str() << endl;
+		#endif
 
-		// ------ optimal join : left deep --------
-		int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
-		int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
-		int op = m_nGlobalPipeID++;
-		QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
-												   NULL /*schema*/, NULL /*record literal */);
-
-		// set left pointer
-        pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;
-        m_mJoinEstimate[min_order].queryPlanNode->parent = pFinalJoin;
-
-		// set right pointer
-		pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;
-		m_mJoinEstimate[min_third].queryPlanNode->parent = pFinalJoin;
-
+		// break min_order apart into min_join_left and min_join_right
 		string min_join_order = m_mJoinEstimate[min_order].joinOrder;
 		string min_join_left = min_order.substr(0, min_order.find(".")); 
 		string min_join_right = min_order.substr(min_order.find(".")+1); 
 
-		// set pointers of min_order (intermediate order node)
-		QueryPlanNode * pIntermediate = m_mJoinEstimate[min_third].queryPlanNode;
-		// left
-		pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;
-		m_mJoinEstimate[min_join_left].queryPlanNode->parent = pIntermediate;
-		// right
-		pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;
-		m_mJoinEstimate[min_join_right].queryPlanNode->parent = pIntermediate;
+		QueryPlanNode * pFinalJoin = NULL;
 
-		pFinalJoin->PrintNode();
+		// Only two tables to join
+		if (m_nNumTables == 2)
+		{
+			int ip1 = m_mJoinEstimate[min_join_left].queryPlanNode->m_nOutPipe;
+			int ip2 = m_mJoinEstimate[min_join_right].queryPlanNode->m_nOutPipe;
+			int op = m_nGlobalPipeID++;
+			pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+									   NULL /*schema*/, NULL /*record literal */);
+			
+			pFinalJoin = m_mJoinEstimate[min_order].queryPlanNode;
+			pFinalJoin->left = m_mJoinEstimate[min_join_left].queryPlanNode;
+			pFinalJoin->right = m_mJoinEstimate[min_join_right].queryPlanNode;
+		}
+		else if (m_nNumTables == 3)
+		{
+			// ------ optimal join : left deep --------
+			int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
+			int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
+			int op = m_nGlobalPipeID++;
+			pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */, 
+									   NULL /*schema*/, NULL /*record literal */);
+
+			// set left pointer of Final Join Node
+    	    pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;
+        	m_mJoinEstimate[min_order].queryPlanNode->parent = pFinalJoin;
+
+			// set right pointer of Final Join Node
+			pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;
+			m_mJoinEstimate[min_third].queryPlanNode->parent = pFinalJoin;
+
+			// set pointers of min_order (intermediate order node)
+			QueryPlanNode * pIntermediate = m_mJoinEstimate[min_third].queryPlanNode;
+			// left
+			pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;
+			m_mJoinEstimate[min_join_left].queryPlanNode->parent = pIntermediate;
+			// right
+			pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;
+			m_mJoinEstimate[min_join_right].queryPlanNode->parent = pIntermediate;
+		}
+
+		if (pFinalJoin != NULL)
+			pFinalJoin->PrintNode();
+		else
+			cout << "\nERROR! No Query Plan possible!\n\n";
+	}
 }
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
