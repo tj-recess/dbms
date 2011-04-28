@@ -3,7 +3,7 @@
 
 using namespace std;
 
-void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec, 
+int DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec, 
 						  bool bSortedTable, vector<string> * pSortColAttsVec)
 {
 	// assign values to member variable
@@ -12,10 +12,7 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	DBFile DbFileObj;
 
 	if (check_existing_table(sTabName))
-	{
-		cerr << "Table " << sTabName.c_str() << " already exists in the database!\n";
-		return;
-	}
+		return RET_TABLE_ALREADY_EXISTS;
 
 	// Write this schema in the catalog file
 	FILE * out = fopen ("catalog", "a");
@@ -54,10 +51,7 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 			int found = 0;
 			found = pSchema->Find(sortedCol);
 			if (found == -1)
-			{
-				cerr << "\nERROR! Sorted column doesn't match table column\n";
-				return;
-			}
+				return RET_CREATE_TABLE_SORTED_COLS_DONOT_MATCH;
 			else
 			{
 				pOrderMaker->whichAtts[i] = found;	// number of this col in the schema
@@ -89,9 +83,10 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	pSchema = NULL;
 
 	cout << "\nTable " << sTabName.c_str() << " has been created successfully!\n";
+	return RET_SUCCESS;
 }
 
-void DDL_DML::LoadTable(string sTabName, string sFileName)
+int DDL_DML::LoadTable(string sTabName, string sFileName)
 {
 	// Find current directory for the raw file
 	char tbl_path[256];	// big enough to hold path
@@ -102,7 +97,9 @@ void DDL_DML::LoadTable(string sTabName, string sFileName)
 
 	// Open the file and then load it
 	DBFile DbFileObj;
-	DbFileObj.Open((char*)sBinFile.c_str());
+	int ret = DbFileObj.Open((char*)sBinFile.c_str());
+	if (ret == 0)
+		return RET_COULDNT_OPEN_FILE_TO_LOAD;
 
 	//Fetch schema and load the file
 	Schema file_schema("catalog", (char*)sTabName.c_str());
@@ -111,10 +108,11 @@ void DDL_DML::LoadTable(string sTabName, string sFileName)
 
 	cout << "\nTable " << sTabName.c_str() << " has been loaded and  " 
 		 << sBinFile.c_str() << " has been created successfully!\n";
+	return RET_SUCCESS;
 }
 
 
-void DDL_DML::DropTable(string sTabName)
+int DDL_DML::DropTable(string sTabName)
 {
 	// Read catalog file and put everything in a vector
 	// But when you see table name as "sTabName", do not push in the vector
@@ -127,10 +125,7 @@ void DDL_DML::DropTable(string sTabName)
 
 	input_file.open("catalog");
     if (!input_file)
-    {
-        cout<<"\nCouldn't open catalog file for reading\n";
-        return;
-	}      
+        return RET_COULDNT_OPEN_CATALOG_FILE;
 
 	// read catalog file line by line
 	bool bTableFound = false;
@@ -166,10 +161,7 @@ void DDL_DML::DropTable(string sTabName)
 	input_file.close();
 
 	if (bTableFound == false)
-	{
-		cerr << "\nTable " << sTabName.c_str() << " not found in the database!\n";
-		return;
-	}
+		return RET_TABLE_NOT_IN_DATABASE;
 
 	// delete catalog file now
 	remove("catalog");
@@ -192,6 +184,7 @@ void DDL_DML::DropTable(string sTabName)
 	remove(sBinFile.c_str());
 
 	cout << "\nTable " << sTabName.c_str() << " has been dropped successfully!\n";
+	return RET_SUCCESS;
 }
 
 

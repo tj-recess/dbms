@@ -1,3 +1,9 @@
+/*
+
+Name: main.cc
+Purpose: The interface for the database
+
+*/
 
 #include <iostream>
 #include "ParseTree.h"
@@ -14,27 +20,30 @@ extern "C" {
 extern struct FuncOperator *finalFunction;
 extern struct TableList *tables;
 extern struct AndList *boolean;
-extern struct NameList *groupingAtts; // grouping atts (NULL if no grouping)
-extern struct NameList *attsToSelect; // the set of attributes in the SELECT (NULL if no such atts)
-extern int distinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
-extern int distinctFunc;  // 1 if there is a DISTINCT in an aggregate query
+extern struct NameList *groupingAtts; 	// grouping atts (NULL if no grouping)
+extern struct NameList *attsToSelect; 	// the set of attributes in the SELECT (NULL if no such atts)
+extern int distinctAtts; 				// 1 if there is a DISTINCT in a non-aggregate query 
+extern int distinctFunc;  				// 1 if there is a DISTINCT in an aggregate query
 
-extern struct NameList *sortingAtts;   // sort the file on these attributes (NULL if no grouping atts)
-extern struct NameList *table_name;    // create table name
-extern struct NameList *file_name;     // input file to load into table
-extern struct AttsList *col_atts;
-extern int selectFromTable;// 1 if the SQL is select from table
-extern int createTable;    // 1 if the SQL is create table
-extern int sortedTable;    // 0 = create table as heap, 1 = create table as sorted (use sortingAtts)
-extern int insertTable;    // 1 if the command is Insert into table
-extern int dropTable;      // 1 is the command is Drop table
-extern int printPlanOnScreen;  // 1 if true
-extern int executePlan;        // 1 if true
-extern struct NameList *outputFileName;    // Name of the file where plan should be printed
+extern struct NameList *sortingAtts;   	// sort the file on these attributes (NULL if no grouping atts)
+extern struct NameList *table_name;    	// create table name
+extern struct NameList *file_name;     	// input file to load into table
+extern struct AttsList *col_atts;		// Column name and type in create table
+extern int selectFromTable;				// 1 if the SQL is select from table
+extern int createTable;    				// 1 if the SQL is create table
+extern int sortedTable;    				// 0 = create table as heap, 1 = create table as sorted (use sortingAtts)
+extern int insertTable;    				// 1 if the command is Insert into table
+extern int dropTable;      				// 1 is the command is Drop table
+extern int printPlanOnScreen;  			// 1 if true
+extern int executePlan;        			// 1 if true
+extern struct NameList *outputFileName; // Name of the file where plan should be printed
 
 
 int main () 
 {
+	cout << "\n\n *****************************************************\n"
+		 << "The database is ready. Please enter a valid SQL statement: \n\n";
+
     yyparse();
 
 	// --------- SELECT query -------------
@@ -42,15 +51,22 @@ int main ()
 	{
 	    char *fileName = "Statistics.txt";
     	Statistics::PrepareStatisticsFile(fileName);
-	    Statistics s;
-	    s.Read(fileName);
+	    Statistics StatsObj;
+	    StatsObj.Read(fileName);
+
 		// Start estimator after Stats object is ready
-		Optimizer Oz(finalFunction, tables, boolean, groupingAtts, 
-					 attsToSelect, distinctAtts, distinctFunc, s);
+		// And pass all the relevant attributes to the optimizer
+		Optimizer Oz(StatsObj, finalFunction, tables, boolean, groupingAtts, 
+					 	attsToSelect, distinctAtts, distinctFunc, 
+						printPlanOnScreen, outputFileName);
+						
 		//Oz.PrintFuncOperator();
 		//Oz.PrintTableList();
 		Oz.MakeQueryPlan();
-    	Oz.ExecuteQuery();
+	
+		// Execute the query according to the plan only if asked
+		if (executePlan)
+	    	Oz.ExecuteQuery();
 	}
 
 	// ----------- project 5 ----------
@@ -59,7 +75,7 @@ int main ()
 	// --------- CREATE TABLE query -------------
 	if (createTable == 1)
 	{
-		cout << "\nCreate table statement\n";
+		cout << "\nExecuting... Create table statement\n";
 		vector <Attribute> ColAttsVec;
 		string sTableName;
 
@@ -90,6 +106,7 @@ int main ()
 			temp = temp->next;
 		}
 
+		// SORTED table
 		if (sortedTable == 1)
 		{
 			cout << "\tCreate table as sorted\n";
@@ -107,16 +124,25 @@ int main ()
 					sort_cols_vec.push_back(temp->name);
 					temp = temp->next;
 				}
-				ddObj.CreateTable(sTableName, ColAttsVec, true, &sort_cols_vec);
+				int ret = ddObj.CreateTable(sTableName, ColAttsVec, true, &sort_cols_vec);
+				if (ret == RET_TABLE_ALREADY_EXISTS)
+					cerr << "Table " << sTableName.c_str() << " already exists in the database!\n";
+				else if (ret == RET_CREATE_TABLE_SORTED_COLS_DONOT_MATCH)
+					cerr << "\nERROR! Sorted column doesn't match table column\n";
+				
 			}
 		}
-		else
-			ddObj.CreateTable(sTableName, ColAttsVec);
+		else	// HEAP table
+		{
+			int ret = ddObj.CreateTable(sTableName, ColAttsVec);
+			if (ret == RET_TABLE_ALREADY_EXISTS)
+                    cerr << "Table " << sTableName.c_str() << " already exists in the database!\n";
+		}
 	}
     // --------- INSERT INTO TABLE query -------------
 	else if (insertTable == 1)
 	{
-		cout << "\nInsert into table command\n";
+		cout << "\nExecuting... Insert into table command\n";
 		if (table_name== NULL || file_name == NULL)
 		{
 			cerr << "\nERROR! No table-name or file-name specified to load!\n";
@@ -126,19 +152,26 @@ int main ()
 		{
 			string sTableName = table_name->name;
 			string sFileName = file_name->name;
-			ddObj.LoadTable(sTableName, sFileName);
+			int ret = ddObj.LoadTable(sTableName, sFileName);
+			if (ret == RET_COULDNT_OPEN_FILE_TO_LOAD)
+				cerr << "\nERROR! Could not locate metadata for table " << sTableName.c_str()
+					 << endl;
 		}
 	}
     // --------- DROP TABLE query -------------
 	else if (dropTable == 1)
     {
-        cout << "\nDrop table command\n";
+        cout << "\nExecuting... Drop table command\n";
         if (table_name == NULL)
             cout << "\nTable name is NULL!\n";
 		else
 		{
 			string sTableName = table_name->name;
-			ddObj.DropTable(sTableName);
+			int ret = ddObj.DropTable(sTableName);
+			if (ret == RET_COULDNT_OPEN_CATALOG_FILE)
+				cerr << "\nCouldn't open catalog file for reading\n";
+			else if (ret == RET_TABLE_NOT_IN_DATABASE)
+				cerr << "\nTable " << sTableName.c_str() << " not found in the database!\n";
 		}
     }
 }

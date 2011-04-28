@@ -7,17 +7,20 @@ Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
 						 m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL)
 {}
 
-Optimizer::Optimizer(struct FuncOperator *finalFunction,
+Optimizer::Optimizer(Statistics & s,
+					 struct FuncOperator *finalFunction,
 					 struct TableList *tables,
 					 struct AndList * boolean,
 					 struct NameList * pGrpAtts,
 					 struct NameList * pAttsToSelect,
 					 int distinct_atts, int distinct_func,
-					 Statistics & s)
-			: m_pFuncOp(finalFunction), m_pTblList(tables), m_pCNF(boolean), 
+					 int print_on_screen, struct NameList * outFileName)
+
+			: m_Stats(s), m_pFuncOp(finalFunction), m_pTblList(tables), m_pCNF(boolean), 
 			  m_pGroupingAtts(pGrpAtts), m_pAttsToSelect(pAttsToSelect), 
 			  m_nDistinctAtts(distinct_atts), m_nDistinctFunc(distinct_func),
-			  m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL), m_Stats(s)
+			  m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL), 
+			  m_nPrintPlanOnScreen(print_on_screen), m_pPrintPlanFile(outFileName)
 {
 	// Store alias in sorted fashion in m_vSortedAlias
 	// and the number of tables/alias in m_nNumTables

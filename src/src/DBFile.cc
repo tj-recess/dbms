@@ -45,7 +45,7 @@ int DBFile::Open (char *name)
 	    iStatus = stat(metadataFileName.c_str(), &fileStat);
     	if (iStatus != 0)   // file doesn't exists
 	    {
-			cout << "DBFile::Open: File " << metadataFileName << "does not exist.\n";
+			cout << "DBFile::Open: File " << metadataFileName << " does not exist.\n";
         	return RET_FILE_NOT_FOUND;
 	    }
 

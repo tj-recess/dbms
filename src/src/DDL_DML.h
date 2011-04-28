@@ -1,3 +1,10 @@
+/* 
+
+Name: DDL_DML.h
+Purpose: Create table, load data into table, drop table
+
+*/
+
 #ifndef DDL_DML_H
 #define DDL_DML_H
 
@@ -14,10 +21,10 @@ class DDL_DML
 public:
 	DDL_DML() {}
 	~DDL_DML() {}
-	void CreateTable(string sTabName, vector<Attribute> & col_atts_vec, 
+	int CreateTable(string sTabName, vector<Attribute> & col_atts_vec, 
 					 bool sorted_table = false, vector<string> * sort_col_vec = NULL);
-	void LoadTable(string sTabName, string sFileName);
-	void DropTable(string sTabName);
+	int LoadTable(string sTabName, string sFileName);
+	int DropTable(string sTabName);
 };
 
 #endif

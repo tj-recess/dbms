@@ -22,20 +22,22 @@ using namespace std;
 class Optimizer
 {
 private:
-	// members
+	// -------- members, coming from yyparse
 	struct FuncOperator * m_pFuncOp;
 	struct TableList * m_pTblList;
 	struct AndList * m_pCNF;
 	struct NameList * m_pGroupingAtts; // grouping atts (NULL if no grouping)
 	struct NameList * m_pAttsToSelect; // the set of attributes in the SELECT (NULL if no such atts)
-	int m_nDistinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
-	int m_nDistinctFunc; 
+	int m_nDistinctAtts; 			   // 1 if there is a DISTINCT in a non-aggregate query 
+	int m_nDistinctFunc; 			   // 
+	int m_nPrintPlanOnScreen;		   // 1 means print the plan on screen
+	struct NameList * m_pPrintPlanFile;// Name of the file where plan should be printed
 
+	// --------- internal members
 	int m_nNumTables, m_nGlobalPipeID;
-	//vector <string> m_vSortedTables;
 	vector <string> m_vSortedAlias;
 	vector <string> m_vTabCombos;
-        QueryPlanNode *m_pFinalJoin;
+    QueryPlanNode *m_pFinalJoin;
 
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
@@ -51,12 +53,11 @@ private:
 	Statistics m_Stats;								// master copy of the stats object
     map <string, string> m_mAliasToTable;           // alias to original table name
 	map <int, string> m_mOutPipeToCombo;			// map of outpipe to combo name
-        map <string, AndList*> m_mAliasToAndList;   //map of alias and their corresponding AndList
-        map <AndList*, bool> m_mAndListToUsage; //map of AndList* to track if they have been used already or not
+    map <string, AndList*> m_mAliasToAndList;       //map of alias and their corresponding AndList
+    map <AndList*, bool> m_mAndListToUsage;         //map of AndList* to track if they have been used already or not
 
-	// functions
+	// -------------- Member functions
 	Optimizer();
-	//int SortTables();
 	int SortAlias();
 	void TokenizeAndList(AndList*);
 	void PopulateTableNames(vector<string> & vec_rels);		// in m_aTableNames char** array
@@ -84,13 +85,14 @@ private:
     void PrintAliasToAndListMap();
 
 public:
-	Optimizer(struct FuncOperator *finalFunction,
+	Optimizer(Statistics & s,
+			  struct FuncOperator *finalFunction,
 			  struct TableList *tables,
 			  struct AndList * boolean,
 			  struct NameList * pGrpAtts,
               struct NameList * pAttsToSelect,
               int distinct_atts, int distinct_func,
-			  Statistics & s);
+			  int print_on_screen, struct NameList * outFileName);
 	~Optimizer();
 
 	void PrintFuncOperator();
