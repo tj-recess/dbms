@@ -54,21 +54,12 @@ int main ()
 	}
 
 	// ----------- project 5 ----------
-/*	Attribute try_atts[3];
-	string sTabName = "mal_test";
-	string sTabType = "HEAP";
-	char *col_names[3] = {"mal_col1","mal_col2","mal_col3"};
-	try_atts[0].name = col_names[0];	try_atts[0].myType = Int;
-	try_atts[1].name = col_names[1];	try_atts[1].myType = String;
-	try_atts[2].name = col_names[2];	try_atts[2].myType = Double;
-	ddObj.CreateTable(sTabName, try_atts, 3, sTabType); */
-	
 	DDL_DML ddObj;
 
 	// --------- CREATE TABLE query -------------
 	if (createTable == 1)
 	{
-		cout << "\n Create table statement\n";
+		cout << "\nCreate table statement\n";
 		vector <Attribute> ColAttsVec;
 		string sTableName;
 
@@ -101,7 +92,7 @@ int main ()
 
 		if (sortedTable == 1)
 		{
-			cout << "\n Create table as sorted\n";
+			cout << "\tCreate table as sorted\n";
 			if (sortingAtts == NULL)
 			{
 				cerr << "\nERROR! Sorted table needs columns on which it is sorted!\n";
@@ -125,7 +116,7 @@ int main ()
     // --------- INSERT INTO TABLE query -------------
 	else if (insertTable == 1)
 	{
-		cout << "\n Insert into table command\n";
+		cout << "\nInsert into table command\n";
 		if (table_name== NULL || file_name == NULL)
 		{
 			cerr << "\nERROR! No table-name or file-name specified to load!\n";
@@ -141,11 +132,14 @@ int main ()
     // --------- DROP TABLE query -------------
 	else if (dropTable == 1)
     {
-        cout << "\n Drop table command\n";
-        if (table_name != NULL)
-            cout << "\nTable name exists!\n";
-        else
+        cout << "\nDrop table command\n";
+        if (table_name == NULL)
             cout << "\nTable name is NULL!\n";
+		else
+		{
+			string sTableName = table_name->name;
+			ddObj.DropTable(sTableName);
+		}
     }
 }
 
