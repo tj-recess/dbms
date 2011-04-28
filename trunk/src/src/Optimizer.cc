@@ -742,7 +742,7 @@ void Optimizer::MakeQueryPlan()
             pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode; 	// right ptr
 
             // set child pointers of min_order (intermediate order node)
-            QueryPlanNode * pIntermediate = m_mJoinEstimate[min_third].queryPlanNode;
+            QueryPlanNode * pIntermediate = m_mJoinEstimate[min_order].queryPlanNode;
             pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;		// left ptr
             pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;	// right ptr
 
