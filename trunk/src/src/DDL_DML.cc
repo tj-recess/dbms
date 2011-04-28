@@ -11,8 +11,13 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	Schema * pSchema = NULL;
 	DBFile DbFileObj;
 
-	// Write this schema in the catalog file
+	if (check_existing_table(sTabName))
+	{
+		cerr << "Table " << sTabName.c_str() << " already exists in the database!\n";
+		return;
+	}
 
+	// Write this schema in the catalog file
 	FILE * out = fopen ("catalog", "a");
 	fprintf (out, "\nBEGIN\n%s\n%s.tbl", sTabName.c_str(), sTabName.c_str());
 	for (int i = 0; i < nNumAtts; i++)
@@ -65,6 +70,10 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 		sort_info_struct.runLength = 50;
 
 		DbFileObj.Create((char*)sBinOutput.c_str(), sorted, (void*)&sort_info_struct);	
+
+		// delete order maker now
+		delete pOrderMaker; 
+		pOrderMaker = NULL;
 	}
 	else
 	{
@@ -74,6 +83,12 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	
 	// Close the DB file
 	DbFileObj.Close();
+
+	// delete schema object
+	delete pSchema;
+	pSchema = NULL;
+
+	cout << "\nTable " << sTabName.c_str() << " has been created successfully!\n";
 }
 
 void DDL_DML::LoadTable(string sTabName, string sFileName)
@@ -93,11 +108,127 @@ void DDL_DML::LoadTable(string sTabName, string sFileName)
 	Schema file_schema("catalog", (char*)sTabName.c_str());
 	DbFileObj.Load(file_schema, (char*)sRawFile.c_str());
 	DbFileObj.Close();
+
+	cout << "\nTable " << sTabName.c_str() << " has been loaded and  " 
+		 << sBinFile.c_str() << " has been created successfully!\n";
 }
-/*
-void DDL_DML::DropTable()
+
+
+void DDL_DML::DropTable(string sTabName)
 {
-	delete related data from catalog
-	remove .bin file
+	// Read catalog file and put everything in a vector
+	// But when you see table name as "sTabName", do not push in the vector
+	// Then, delete catalog file and write the vector data into it
+	// remove (sTabName.bin) file
+
+	ifstream input_file;
+    string line, line2;
+	vector <string> vec_whole_file;
+
+	input_file.open("catalog");
+    if (!input_file)
+    {
+        cout<<"\nCouldn't open catalog file for reading\n";
+        return;
+	}      
+
+	// read catalog file line by line
+	bool bTableFound = false;
+	bool bSkipLines = false;
+	while (!input_file.eof())
+    {
+		getline(input_file, line);
+	
+		// BEGIN of a table found
+		if (bSkipLines == false)
+		{
+			if (line.compare("BEGIN") == 0)
+			{
+				getline(input_file, line2);
+				// see if we read the start of the table we want to delete
+				if (line2.compare(sTabName) == 0)
+				{
+					bSkipLines = true;
+					bTableFound = true;
+				}
+				else
+				{
+					vec_whole_file.push_back(line);
+					vec_whole_file.push_back(line2);
+				}
+			}
+			else
+				vec_whole_file.push_back(line);
+		}
+		if (bSkipLines == true && line.compare("END") == 0)
+				bSkipLines = false;
+	}
+	input_file.close();
+
+	if (bTableFound == false)
+	{
+		cerr << "\nTable " << sTabName.c_str() << " not found in the database!\n";
+		return;
+	}
+
+	// delete catalog file now
+	remove("catalog");
+
+	// remake catalog file
+	ofstream output_file;
+	output_file.open("catalog");
+	for (int i = 0; i < vec_whole_file.size(); i++)
+	{
+		output_file << vec_whole_file.at(i).c_str() << endl;
+	}
+	output_file.close();
+
+	// delete the binary file
+	string sBinFile = sTabName + ".bin";
+	remove(sBinFile.c_str());
+	
+	// delete meta.data file
+	sBinFile = sBinFile + ".meta.data";
+	remove(sBinFile.c_str());
+
+	cout << "\nTable " << sTabName.c_str() << " has been dropped successfully!\n";
 }
-*/
+
+
+bool DDL_DML::check_existing_table(string sTabName)
+{
+    ifstream input_file;
+    string line, line2;
+
+    input_file.open("catalog");
+    if (!input_file)
+    {
+        cout<<"\nCouldn't open catalog file for reading\n";
+        return false;
+    }
+
+    // read catalog file line by line
+    bool bTableFound = false;
+    while (!input_file.eof())
+    {
+        getline(input_file, line);
+
+        // BEGIN of a table found
+        if (line.compare("BEGIN") == 0)
+        {
+            getline(input_file, line2);
+            // see if we read the start of the table we want to delete
+            if (line2.compare(sTabName) == 0)
+                bTableFound = true;
+        }
+	}
+	input_file.close();
+
+	// Table found in the catalog file
+	if (bTableFound)
+		return true;
+
+	return false;
+}
+
+
