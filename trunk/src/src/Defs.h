@@ -15,6 +15,12 @@
 #define RET_UNSUPPORTED_FILE_TYPE 4
 #define RET_READING_PAST_EOF 0
 #define RET_FETCHING_REC_FAIL 0
+#define RET_TABLE_ALREADY_EXISTS 5
+#define RET_CREATE_TABLE_SORTED_COLS_DONOT_MATCH 6
+#define RET_COULDNT_OPEN_FILE_TO_LOAD 7
+#define RET_COULDNT_OPEN_CATALOG_FILE 8
+#define RET_TABLE_NOT_IN_DATABASE 9
+
 
 enum Target {Left, Right, Literal};
 enum CompOperator {LessThan, GreaterThan, Equals};
