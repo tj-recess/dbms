@@ -54,6 +54,15 @@ struct NameList {
 	struct NameList *next;
 };
 
+// Stores Attributes and their types
+// Example: ("abc" string) --> (1 int) --> (2.3 double) 
+struct AttsList
+{
+	char * name;
+	int code;	// 1: double 2: int 4: string
+	struct AttsList *next;
+};
+
 // used in boolean expressions... there's no reason to have both this
 // and FuncOperand, but both are here for legacy reasons!!
 struct Operand {

@@ -10,8 +10,8 @@ ifdef linux
 tag = -n
 endif
 
-main: y.tab.o lex.yy.o main.o Statistics.o Optimizer.o Record.o Schema.o Function.o Comparison.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o ComparisonEngine.o
-	$(CC) -o main y.tab.o lex.yy.o Statistics.o Optimizer.o main.o Record.o Schema.o Function.o Comparison.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o ComparisonEngine.o  -lfl -lpthread
+main: y.tab.o lex.yy.o main.o Statistics.o Optimizer.o Record.o Schema.o Function.o Comparison.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o ComparisonEngine.o DDL_DML.o
+	$(CC) -o main y.tab.o lex.yy.o Statistics.o Optimizer.o main.o Record.o Schema.o Function.o Comparison.o File.o EventLogger.o FileUtil.o Heap.o Sorted.o DBFile.o Pipe.o BigQ.o RelOp.o ComparisonEngine.o DDL_DML.o  -lfl -lpthread
     
 main.o : main.cc
 	$(CC) -g -c main.cc
@@ -51,6 +51,9 @@ Statistics.o: Statistics.cc
 
 Optimizer.o: Optimizer.cc
 	$(CC) -g -c Optimizer.cc
+
+DDL_DML.o: DDL_DML.cc
+	$(CC) -g -c DDL_DML.cc
 
 Heap.o: Heap.cc
 	$(CC) -g -c Heap.cc

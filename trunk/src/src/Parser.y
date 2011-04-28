@@ -20,6 +20,16 @@
 	int distinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
 	int distinctFunc;  // 1 if there is a DISTINCT in an aggregate query
 
+	struct NameList *sortingAtts;  	// sort the file on these attributes (NULL if no grouping atts)
+	struct NameList *table_name;	// create table name
+	struct NameList *file_name;		// input file to load into table
+	struct AttsList *col_atts;
+	int selectFromTable;// 1 if the SQL is select from table
+	int createTable;	// 1 if the SQL is create table
+	int sortedTable;	// 0 = create table as heap, 1 = create table as sorted (use sortingAtts)
+	int insertTable;	// 1 if the command is Insert into table
+	int dropTable;		// 1 is the command is Drop table
+
 %}
 
 // this stores all of the types returned by production rules
@@ -32,6 +42,7 @@
 	struct OrList *myOrList;
 	struct AndList *myAndList;
 	struct NameList *myNames;
+	struct AttsList *myAtts;
 	char *actualChars;
 	char whichOne;
 }
@@ -50,6 +61,17 @@
 %token AS
 %token AND
 %token OR
+%token CREATE
+%token TABLE
+%token INTEGER
+%token DBL
+%token STR
+%token HEAP
+%token SORTED
+%token ON
+%token INSERT
+%token INTO
+%token DROP
 
 %type <myOrList> OrList
 %type <myAndList> AndList
@@ -61,6 +83,9 @@
 %type <myTables> Tables
 %type <myBoolOperand> Literal
 %type <myNames> Atts
+%type <myAtts> AttsAndType
+%type <myNames> TableName
+%type <myNames> FileName
 
 %start SQL
 
@@ -79,6 +104,10 @@ SQL: SELECT WhatIWant FROM Tables WHERE AndList
 	tables = $4;
 	boolean = $6;	
 	groupingAtts = NULL;
+	selectFromTable = 1;
+	createTable = 0;
+	insertTable = 0;
+	dropTable = 0;
 }
 
 | SELECT WhatIWant FROM Tables WHERE AndList GROUP BY Atts
@@ -86,6 +115,52 @@ SQL: SELECT WhatIWant FROM Tables WHERE AndList
 	tables = $4;
 	boolean = $6;	
 	groupingAtts = $9;
+    selectFromTable = 1;
+    createTable = 0;
+    insertTable = 0;
+    dropTable = 0;
+}
+
+| CREATE TABLE TableName '(' AttsAndType ')' AS HEAP
+{
+    selectFromTable = 0;
+    createTable = 1;
+    insertTable = 0;
+    dropTable = 0;
+	sortedTable = 0;	
+	table_name = $3;
+	col_atts = $5;
+}
+
+| CREATE TABLE TableName '(' AttsAndType ')' AS SORTED ON Atts
+{
+    selectFromTable = 0;
+    createTable = 1;
+    insertTable = 0;
+    dropTable = 0;
+	sortedTable = 1;
+	sortingAtts = $10;
+	table_name = $3;
+	col_atts = $5;
+}
+
+| INSERT FileName INTO TableName
+{
+    selectFromTable = 0;
+    createTable = 0;
+    insertTable = 1;
+    dropTable = 0;
+	file_name = $2;
+	table_name = $4;
+}
+
+| DROP TABLE TableName
+{
+    selectFromTable = 0;
+    createTable = 0;
+    insertTable = 0;
+    dropTable = 1;
+	table_name = $3;
 };
 
 WhatIWant: Function ',' Atts 
@@ -156,7 +231,62 @@ Tables: Name AS Name
 	$$->next = $1;
 }
 
+AttsAndType: Name INTEGER
+{
+	$$ = (struct AttsList*) malloc (sizeof (struct AttsList));
+	$$->name = $1;
+	$$->code = INT;
+	$$->next = NULL;
+}
+| AttsAndType ',' Name INTEGER
+{
+    $$ = (struct AttsList*) malloc (sizeof (struct AttsList));
+    $$->name = $3;
+    $$->code = INT;
+    $$->next = $1;
+}
+| Name DBL
+{
+    $$ = (struct AttsList*) malloc (sizeof (struct AttsList));
+    $$->name = $1;
+    $$->code = DOUBLE;
+    $$->next = NULL;
+}
+| AttsAndType ',' Name DBL 
+{
+    $$ = (struct AttsList*) malloc (sizeof (struct AttsList));
+    $$->name = $3;
+    $$->code = DOUBLE;
+    $$->next = $1;
+}
+| Name STR
+{
+    $$ = (struct AttsList*) malloc (sizeof (struct AttsList));
+    $$->name = $1;
+    $$->code = STRING;
+    $$->next = NULL;
+}
+| AttsAndType ',' Name STR
+{
+    $$ = (struct AttsList*) malloc (sizeof (struct AttsList));
+    $$->name = $3;
+    $$->code = STRING;
+    $$->next = $1;
+};
 
+TableName: Name
+{
+    $$ = (struct NameList *) malloc (sizeof (struct NameList));
+    $$->name = $1;
+    $$->next = NULL;	
+};
+
+FileName: String
+{
+    $$ = (struct NameList *) malloc (sizeof (struct NameList));
+    $$->name = $1;
+    $$->next = NULL;	
+};
 
 CompoundExp: SimpleExp Op CompoundExp
 {
