@@ -3,65 +3,61 @@
 
 using namespace std;
 
-DDL_DML::DDL_DML() : m_sTabName(), m_sTabType(), m_nNumAtts(0), m_aSortCols(NULL),
-					 m_nSortAtts(0), m_pOrderMaker(NULL)
+DDL_DML::DDL_DML() : m_sTabName(), m_bSorted(false), m_nNumAtts(0), 
+					 m_nSortAtts(0), m_pSchema(NULL), m_pOrderMaker(NULL)
 {}
 
-void DDL_DML::CreateTable(string sTabName, Attribute* col_atts, 
-						  int num_atts, string sTabType, 
-						  char** sort_cols, int num_sort_atts)
+void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec, 
+						  bool sorted_table, vector<string> * pSortColAttsVec)
 {
+	// assign values to member variable
+	m_sTabName = sTabName;
+	m_bSorted = sorted_table;
+	m_nNumAtts = col_atts_vec.size();
+
+
 	FILE * out = fopen ("catalog", "a");
 	fprintf (out, "\nBEGIN\n%s\n%s.tbl", sTabName.c_str(), sTabName.c_str());
-	for (int i = 0; i < num_atts; i++)
+	for (int i = 0; i < m_nNumAtts; i++)
 	{
-		fprintf (out, "\n%s ", col_atts[i].name);
-		if (col_atts[i].myType == Int)
+		fprintf (out, "\n%s ", col_atts_vec[i].name);
+		if (col_atts_vec[i].myType == Int)
 			fprintf (out, "Int");
-		if (col_atts[i].myType == Double)
+		if (col_atts_vec[i].myType == Double)
 			fprintf (out, "Double");
-		if (col_atts[i].myType == String)
+		if (col_atts_vec[i].myType == String)
 			fprintf (out, "String");
 	}
 	fprintf (out, "\nEND\n");
 	fclose(out);
 
-	// assign values to member variable
-	m_sTabName = sTabName;
-	m_sTabType = sTabType;
-	m_nNumAtts = num_atts;
-	m_aSortCols = sort_cols;
+	m_pSchema = new Schema("catalog", (char*)sTabName.c_str());
 
 	// Sorted file
-	if (sTabType.compare("SORTED") == 0)
+	if (m_bSorted)
 	{
-		if (sort_cols == NULL)
-		{	
-			cerr << "\nERROR! Sorted table needs columns on which it is sorted!\n";
-			return;
-		}
-		
+		m_nSortAtts = pSortColAttsVec->size();
+        // Make an OrderMaker and store it
+        m_pOrderMaker = new OrderMaker();
+        m_pOrderMaker->numAtts = m_nSortAtts;
+	
 		// Error check: make sure these column names are valid
-		for (int i = 0; i < num_sort_atts; i++)
+		for (int i = 0; i < m_nSortAtts; i++)
 		{
-			bool found = false;
-			for (int j = 0; j < num_atts; j++)
-			{
-				if (strcmp(sort_cols[i], col_atts[j].name) == 0)
-				{
-					found = true;
-					break;
-				}	
-			}
-			if (found == false)
+			char * sortedCol = (char*)pSortColAttsVec->at(i).c_str();
+			int found = 0;
+			found = m_pSchema->Find(sortedCol);
+			if (found == -1)
 			{
 				cerr << "\nERROR! Sorted column doesn't match table column\n";
 				return;
 			}
+			else
+			{
+				m_pOrderMaker->whichAtts[i] = found;	// number of this col in the schema
+				m_pOrderMaker->whichTypes[i] = m_pSchema->FindType(sortedCol);
+			}
 		}
-
-		// Then make an OrderMaker and store it
-		// Use : get_sort_order() ?
 	}
 }
 

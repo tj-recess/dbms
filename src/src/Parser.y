@@ -29,6 +29,9 @@
 	int sortedTable;	// 0 = create table as heap, 1 = create table as sorted (use sortingAtts)
 	int insertTable;	// 1 if the command is Insert into table
 	int dropTable;		// 1 is the command is Drop table
+	int printPlanOnScreen;	// 1 if true
+	int executePlan;		// 1 if true
+	struct NameList *outputFileName;	// Name of the file where plan should be printed
 
 %}
 
@@ -72,6 +75,10 @@
 %token INSERT
 %token INTO
 %token DROP
+%token SET
+%token OUTPUT
+%token STDOUT
+%token NONE
 
 %type <myOrList> OrList
 %type <myAndList> AndList
@@ -161,7 +168,23 @@ SQL: SELECT WhatIWant FROM Tables WHERE AndList
     insertTable = 0;
     dropTable = 1;
 	table_name = $3;
-};
+}
+
+| SET OUTPUT STDOUT
+{
+	printPlanOnScreen = 1;
+	executePlan = 1;
+}
+| SET OUTPUT NONE
+{
+	printPlanOnScreen = 1;
+	executePlan = 0;
+}
+| SET OUTPUT String
+{
+	printPlanOnScreen = 0;
+	executePlan = 1;
+}
 
 WhatIWant: Function ',' Atts 
 {

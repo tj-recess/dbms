@@ -4,23 +4,23 @@
 #include "Schema.h"
 #include <string>
 #include <iostream>
+#include <vector>
 
 class DDL_DML
 {
 private:
 	string m_sTabName;
-	string m_sTabType;
+	bool m_bSorted;
 	int m_nNumAtts;
-	char ** m_aSortCols;
 	int m_nSortAtts;
-	OrderMaker * m_pOrderMaker;
+	Schema * m_pSchema;			// schema of this table
+	OrderMaker * m_pOrderMaker;	// order maker for sorted file
 	
 public:
 	DDL_DML();
 	~DDL_DML() {}
-	void CreateTable(string sTabName, Attribute* col_atts, 
-					int num_atts, string sTabType, 
-					char ** sort_cols = NULL, int num_sort_atts = 0);
+	void CreateTable(string sTabName, vector<Attribute> & col_atts_vec, 
+					 bool sorted_table = false, vector<string> * sort_col_vec = NULL);
 };
 
 #endif

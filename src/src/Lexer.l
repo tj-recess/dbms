@@ -97,6 +97,14 @@ void yyerror(char*s);
 
 "DROP"				return(DROP);
 
+"SET"				return(SET);
+
+"OUTPUT"			return(OUTPUT);
+
+"STDOUT"			return(STDOUT);
+
+"NONE"				return(NONE);
+
 -?[0-9]+ 	       {yylval.actualChars = strdup(yytext);
   			return(Int); 
 		        }
