@@ -23,7 +23,6 @@ Sorted::~Sorted()
 
 int Sorted::Create(char *f_path, void *sortInfo)
 {
-    //ignore parameter sortInfo - not required for this file type
     m_pFile->Create(f_path);
 
 	if (sortInfo == NULL)
