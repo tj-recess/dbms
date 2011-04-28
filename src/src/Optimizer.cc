@@ -737,22 +737,14 @@ void Optimizer::MakeQueryPlan()
             QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */,
                                                        pFinalSchema, NULL /*record literal */);
 
-            // set left pointer of Final Join Node
-            pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;
-            m_mJoinEstimate[min_order].queryPlanNode->parent = pFinalJoin;
+            // set child pointers of Final Join Node
+            pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode; 	// left ptr
+            pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode; 	// right ptr
 
-            // set right pointer of Final Join Node
-            pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;
-            m_mJoinEstimate[min_third].queryPlanNode->parent = pFinalJoin;
-
-            // set pointers of min_order (intermediate order node)
+            // set child pointers of min_order (intermediate order node)
             QueryPlanNode * pIntermediate = m_mJoinEstimate[min_third].queryPlanNode;
-            // left
-            pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;
-            m_mJoinEstimate[min_join_left].queryPlanNode->parent = pIntermediate;
-            // right
-            pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;
-            m_mJoinEstimate[min_join_right].queryPlanNode->parent = pIntermediate;
+            pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;		// left ptr
+            pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;	// right ptr
 
 			// Set this join node as the top-most node
             pFinalNode = pFinalJoin;
