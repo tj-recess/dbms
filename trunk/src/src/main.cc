@@ -28,6 +28,10 @@ extern int createTable;    // 1 if the SQL is create table
 extern int sortedTable;    // 0 = create table as heap, 1 = create table as sorted (use sortingAtts)
 extern int insertTable;    // 1 if the command is Insert into table
 extern int dropTable;      // 1 is the command is Drop table
+extern int printPlanOnScreen;  // 1 if true
+extern int executePlan;        // 1 if true
+extern struct NameList *outputFileName;    // Name of the file where plan should be printed
+
 
 int main () 
 {
@@ -50,31 +54,68 @@ int main ()
 	}
 
 	// ----------- project 5 ----------
-	Attribute try_atts[3];
+/*	Attribute try_atts[3];
 	string sTabName = "mal_test";
 	string sTabType = "HEAP";
 	char *col_names[3] = {"mal_col1","mal_col2","mal_col3"};
 	try_atts[0].name = col_names[0];	try_atts[0].myType = Int;
 	try_atts[1].name = col_names[1];	try_atts[1].myType = String;
 	try_atts[2].name = col_names[2];	try_atts[2].myType = Double;
+	ddObj.CreateTable(sTabName, try_atts, 3, sTabType); */
 	
 	DDL_DML ddObj;
-	ddObj.CreateTable(sTabName, try_atts, 3, sTabType);
 
 	// --------- CREATE TABLE query -------------
 	if (createTable == 1)
 	{
 		cout << "\n Create table statement\n";
+		vector <Attribute> ColAttsVec;
+		string sTableName;
+
+		// Fetch table name to create
+		if (table_name != NULL)
+			sTableName = table_name->name;
+
+		// Fetch column attributes
+		AttsList * temp = col_atts;
+		while (temp != NULL)
+		{
+			Attribute Atts;
+			Atts.name = temp->name;
+			if (temp->code == 1)
+				Atts.myType = Double;
+			else if (temp->code == 2)
+				Atts.myType = Int;
+			else if (temp->code == 4)
+				Atts.myType = String;
+		
+			ColAttsVec.push_back(Atts);
+
+			temp = temp->next;
+		}
+
 		if (sortedTable == 1)
 		{
 			cout << "\n Create table as sorted\n";
 			if (sortingAtts == NULL)
-				cout << "\n But sorting atts are NULL!!\n";
+			{
+				cerr << "\nERROR! Sorted table needs columns on which it is sorted!\n";
+				return 1;
+			}
 			else
-				cout << "\n Sorting atts exist!\n";
+			{
+				vector <string> sort_cols_vec;
+				NameList * temp = sortingAtts;
+				while (temp != NULL)
+				{
+					sort_cols_vec.push_back(temp->name);
+					temp = temp->next;
+				}
+				ddObj.CreateTable(sTableName, ColAttsVec, true, &sort_cols_vec);
+			}
 		}
 		else
-			cout << "\n Create table as heap\n";
+			ddObj.CreateTable(sTableName, ColAttsVec);
 	}
     // --------- INSERT INTO TABLE query -------------
 	else if (insertTable == 1)
