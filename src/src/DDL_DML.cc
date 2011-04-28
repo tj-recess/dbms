@@ -61,34 +61,47 @@ void DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	}
 }
 
-/*
-void DDL_DML::LoadTable()
+void DDL_DML::LoadTable(string sTabName, string sFileName)
 {
-	set file type - heap or sorted
+	/* 
+	---- TODO ----
+	Metadata file
+		write heap/sorted
+		write sort-atts or order maker
+	OrderMaker
+		rebuild from a file
+	*/
 
-	if heap:
-	--------
+	bool bSorted;
     DBFile dbfile;
-    cout << " DBFile will be created at " << rel->path () << endl;
-    dbfile.Create (rel->path(), heap, NULL);
 
-    char tbl_path[100]; // construct path of the tpch flat text file
-    sprintf (tbl_path, "%s%s.tbl", tpch_dir, rel->name());
+    // Make these paths
+    string load_from_path, bin_file_path;
+    char tbl_path[100]; // construct path of the flat text file
+    // get current directory
+    // append sFileName to it
     cout << " tpch file will be loaded from " << tbl_path << endl;
+    cout << " DBFile will be created at " << bin_file_path.c_str() << endl;
 
-    dbfile.Load (*(rel->schema ()), tbl_path);
-    dbfile.Close ();
+	if (bSorted == false)	// HEAP file
+	{	
+		dbfile.Create((char*)bin_file_path.c_str(), heap, NULL);
+	}
+	else
+	{
+	    // read order maker from a file
+        // set run len = 50;
+		SortInfo startup;
+		startup.myOrder = new OrderMaker;
+		startup.runLength = 50;
+        dbfile.Create ((char*)bin_file_path.c_str(), sorted, (void*)&startup);
+	}
 
-	if sorted:
-	---------
-    struct {OrderMaker *o; int l;} startup = {&o, runlen};
-
-    DBFile dbfile;
-    cout << "\n output to dbfile : " << rel->path () << endl;
-    dbfile.Create (rel->path(), sorted, &startup);
+	Schema fileSchema("catalog", (char*)sTabName.c_str());
+    dbfile.Load (fileSchema, (char*)load_from_path.c_str());
     dbfile.Close ();
 }
-
+/*
 void DDL_DML::DropTable()
 {
 	delete related data from catalog

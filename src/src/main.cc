@@ -75,6 +75,11 @@ int main ()
 		// Fetch table name to create
 		if (table_name != NULL)
 			sTableName = table_name->name;
+		else
+		{
+			cerr << "\nERROR! No table name specified!\n";
+			return 1;
+		}
 
 		// Fetch column attributes
 		AttsList * temp = col_atts;
@@ -121,10 +126,17 @@ int main ()
 	else if (insertTable == 1)
 	{
 		cout << "\n Insert into table command\n";
-		if (table_name != NULL && file_name != NULL)
-			cout << "\nTable and File names exist!\n";
+		if (table_name== NULL || file_name == NULL)
+		{
+			cerr << "\nERROR! No table-name or file-name specified to load!\n";
+			return 1;
+		}
 		else
-			cout << "\nEither table or file names is NULL!\n";
+		{
+			string sTableName = table_name->name;
+			string sFileName = file_name->name;
+			ddObj.LoadTable(sTableName, sFileName);
+		}
 	}
     // --------- DROP TABLE query -------------
 	else if (dropTable == 1)
