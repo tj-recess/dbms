@@ -2,6 +2,10 @@
 
 using namespace std;
 
+// Initialize static map
+
+map<int, Pipe*> QueryPlanNode::m_mPipes;
+
 // -------------------------------------- select pipe ------------------
 void Node_SelectPipe::PrintNode()
 {
@@ -16,7 +20,6 @@ void Node_SelectPipe::PrintNode()
 		m_pCNF->Print();
 	else
 		cout << "NULL";
-//      cout << "\nRecord Literal: " << m_pLiteral->print(); 
 	cout << endl << endl;
 
 	if (this->right != NULL)
@@ -52,7 +55,6 @@ void Node_SelectFile::PrintNode()
         m_pCNF->Print();
     else
         cout << "NULL";
-//        cout << "\nRecord Literal: " << m_pLiteral->print();
     cout << endl << endl;
     if (this->right != NULL)
         this->right->PrintNode();
@@ -74,25 +76,26 @@ void Node_SelectFile::ExecuteNode()
         inFile.Open(const_cast<char*>(m_sInFileName.c_str()));
 
         cout << "\n IN selectFile for " << m_sInFileName.c_str() << endl;
-        SelectFile sf;
-        sf.Use_n_Pages(QUERY_USE_PAGES);
+        SelectFile * pSF = new SelectFile;
+        pSF->Use_n_Pages(QUERY_USE_PAGES);
         if (m_pCNF != NULL && m_pLiteral != NULL)
         {
-            sf.Run(inFile, *(m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
+            pSF->Run(inFile, *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
 
             //sf.WaitUntilDone();
-
+/*
             int dotPos = m_sInFileName.find(".");
             string sTabName = m_sInFileName.substr(0, dotPos);
             Schema Sch("catalog", (char*)sTabName.c_str());
             Record rec;
             int count = 0;
-            while (m_mPipes[m_nOutPipe]->Remove (&rec))
+            while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
             {
                 //rec.Print(&Sch);
                 count++;
             }
             cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+*/
         }
         else
             cout << "\nInsufficient parameters!\n";
@@ -138,14 +141,14 @@ void Node_Project::ExecuteNode()
         if (atts_list != NULL)
         {
             cout << "\nhere1\n";
-            P.Run(*(m_mPipes[m_nInPipe]), *(m_mPipes[m_nOutPipe]),
+            P.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]),
                   atts_list, m_nTotalAtts, m_nAttsToKeep);
 
             P.WaitUntilDone();
             cout << "\nhere2\n";
             Record rec;
             int count = 0;
-            while (m_mPipes[m_nOutPipe]->Remove(&rec))
+            while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
             {
                 cout << "\nhere3\n";
                 count++;
@@ -190,19 +193,19 @@ void Node_Join::ExecuteNode()
 {
         cout << "\n IN Join Node with outpipe " << m_nOutPipe << endl;
 
-/*          Join J; 
+        Join J; 
         J.Use_n_Pages(QUERY_USE_PAGES);
         if (m_pCNF != NULL && m_pLiteral != NULL)
         {
-            J.Run(*(m_mPipes[m_nInPipe]), *(m_mPipes[m_nRightInPipe]), 
-                   *(m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
+            J.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nRightInPipe]), 
+                   *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
 
             //J.WaitUntilDone ();
-            if (m_nOutPipe == 5)
+            if (m_nOutPipe == 4)
             {
                 Record rec;
                 int count = 0;
-                while (m_mPipes[m_nOutPipe]->Remove (&rec))
+                while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
                 {
                     count++;
                 }
@@ -210,7 +213,7 @@ void Node_Join::ExecuteNode()
             }
         }
         else
-            cout << "\nInsufficient parameters!\n";*/
+            cout << "\nInsufficient parameters!\n";
 }
 
 // -------------------------------------- group by  ------------------
