@@ -11,6 +11,7 @@
 #include <iostream>
 
 #define QUERY_PIPE_SIZE 1000
+#define QUERY_USE_PAGES 100
 
 using namespace std;
 
@@ -25,10 +26,9 @@ public:
 	// left and right children (tree structure)
 	QueryPlanNode * left;
 	QueryPlanNode * right;
-	QueryPlanNode * parent;
 
 	QueryPlanNode() : m_nInPipe(-1), m_nOutPipe(-1), m_sInFileName(), m_sOutFileName(),
-					left(NULL), right(NULL), parent(NULL)
+					left(NULL), right(NULL)
 	{}
 
 	virtual void PrintNode() {}
@@ -49,6 +49,7 @@ public:
 		m_nOutPipe = out;
 		m_pCNF = pCNF;
 		m_pLiteral = pLit;
+		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
  
 	void PrintNode()
@@ -111,7 +112,7 @@ public:
 		m_nOutPipe = out;
 		m_pCNF = pCNF;
 		m_pLiteral = pLit;
-        m_mPipes[out] = new Pipe(QUERY_PIPE_SIZE);
+        m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
     void PrintNode()
@@ -162,11 +163,13 @@ public:
 		
 		cout << "\n IN selectFile for " << m_sInFileName.c_str() << endl;
         SelectFile sf;
+		sf.Use_n_Pages(QUERY_USE_PAGES);
 		if (m_pCNF != NULL && m_pLiteral != NULL)
 		{
 	        sf.Run(inFile, *(m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
 
-
+			//sf.WaitUntilDone();
+			
 			int dotPos = m_sInFileName.find(".");
 			string sTabName = m_sInFileName.substr(0, dotPos);
 			Schema Sch("catalog", (char*)sTabName.c_str());
@@ -197,6 +200,7 @@ public:
 		atts_list = atk;
 		m_nAttsToKeep = nKeep;
 		m_nTotalAtts = nTot;
+		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 		
     void PrintNode()
@@ -222,7 +226,11 @@ public:
 	
 	~Node_Project()
 	{
-		delete [] atts_list; atts_list = NULL;
+		if (atts_list)
+		{
+			delete [] atts_list; 
+			atts_list = NULL;
+		}
 	}
 
     void ExecutePostOrder()
@@ -237,6 +245,27 @@ public:
     void ExecuteNode()
     {
         cout << "\nExecuteNode of Node_Project\n";
+	    Project P;
+        P.Use_n_Pages(QUERY_USE_PAGES);
+		if (atts_list != NULL)
+		{
+			cout << "\nhere1\n";
+			P.Run(*(m_mPipes[m_nInPipe]), *(m_mPipes[m_nOutPipe]), 
+				  atts_list, m_nTotalAtts, m_nAttsToKeep);
+
+			P.WaitUntilDone();
+			cout << "\nhere2\n";
+            Record rec;
+            int count = 0;
+            while (m_mPipes[m_nOutPipe]->Remove(&rec))
+            {
+				cout << "\nhere3\n";
+                count++;
+            }
+            cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+		}
+        else
+            cout << "\nInsufficient parameters!\n";
     }
 };
 
@@ -256,17 +285,7 @@ public:
 		m_pCNF = pCNF;
 		m_pSchema = pSch;
 		m_pLiteral = pLit;
-	}
-
-        Node_Join(int ip1, int ip2, int op, Schema * pSch, AndList* parseTree)
-        {
-		m_nInPipe = ip1;
-		m_nRightInPipe = ip2;
-		m_nOutPipe = op;
-		//m_pCNF = pCNF;
-		m_pSchema = pSch;
-//		m_pLiteral = pLit;
-                
+		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);		
 	}
 
     void PrintNode()
@@ -315,7 +334,29 @@ public:
 
     void ExecuteNode()
     {
-        cout << "\nExecuteNode of Node_Join\n";
+        cout << "\n IN Join Node with outpipe " << m_nOutPipe << endl;
+
+/*       	Join J; 
+        J.Use_n_Pages(QUERY_USE_PAGES);
+        if (m_pCNF != NULL && m_pLiteral != NULL)
+        {
+            J.Run(*(m_mPipes[m_nInPipe]), *(m_mPipes[m_nRightInPipe]), 
+				   *(m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
+
+			//J.WaitUntilDone ();
+			if (m_nOutPipe == 5)
+			{
+	            Record rec;
+    	        int count = 0;
+        	    while (m_mPipes[m_nOutPipe]->Remove (&rec))
+            	{
+                	count++;
+	            }
+    	        cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+			}
+        }
+        else
+            cout << "\nInsufficient parameters!\n";*/
     }
 };
 
@@ -329,6 +370,7 @@ public:
 		m_nInPipe = ip;
 		m_nOutPipe = op;
 		m_pFunc = pF;
+		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
 	void PrintNode()
@@ -379,6 +421,7 @@ public:
 		m_nOutPipe = op;
 		m_pFunc = pF;
 		m_pOM = pOM;
+		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
 	void PrintNode()

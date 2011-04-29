@@ -2,7 +2,6 @@
  * ErrorLogger.h
  *
  *  Created on: Jan 19, 2011
- *      Author: arpit
  */
 
 #ifndef EVENTLOGGER_H_
