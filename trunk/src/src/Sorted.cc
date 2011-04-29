@@ -42,7 +42,6 @@ int Sorted::Open(char *fname)
 {
     //read metadata here
     ifstream meta_in;
-    cout<<fname;
     meta_in.open((string(fname) + m_sMetaSuffix).c_str());
     string fileType;
     string type;

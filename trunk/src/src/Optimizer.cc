@@ -4,7 +4,8 @@ using namespace std;
 Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
 						 m_pGroupingAtts(NULL), m_pAttsToSelect(NULL),
 						 m_nDistinctAtts(0), m_nDistinctFunc(0),
-						 m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL)
+						 m_nNumTables(-1), m_nGlobalPipeID(0), m_pFinalNode(NULL),
+						 m_aTableNames(NULL), m_nPrintPlanOnScreen(0), m_pPrintPlanFile(NULL)
 {}
 
 Optimizer::Optimizer(Statistics & s,
@@ -19,7 +20,7 @@ Optimizer::Optimizer(Statistics & s,
 			: m_Stats(s), m_pFuncOp(finalFunction), m_pTblList(tables), m_pCNF(boolean), 
 			  m_pGroupingAtts(pGrpAtts), m_pAttsToSelect(pAttsToSelect), 
 			  m_nDistinctAtts(distinct_atts), m_nDistinctFunc(distinct_func),
-			  m_nNumTables(-1), m_nGlobalPipeID(0), m_aTableNames(NULL), 
+			  m_nNumTables(-1), m_nGlobalPipeID(0), m_pFinalNode(NULL), m_aTableNames(NULL), 
 			  m_nPrintPlanOnScreen(print_on_screen), m_pPrintPlanFile(outFileName)
 {
 	// Store alias in sorted fashion in m_vSortedAlias
@@ -91,7 +92,7 @@ int Optimizer::SortAlias()
 
             // Make attributes to create select file node
             string sInFile = sTableName + ".bin";
-            int outPipeId = m_nGlobalPipeID++;
+            int outPipeId = m_nGlobalPipeID++; 
             CNF * pCNF = NULL;
             Record * pLit = NULL;
             Schema schema_obj("catalog", (char*)sTableName.c_str());
@@ -118,6 +119,37 @@ int Optimizer::SortAlias()
                 RemoveAliasFromColumnName(new_AndList);
     	        pCNF->GrowFromParseTree(new_AndList, &schema_obj, *pLit);
             }
+			else
+			{
+				// AndList is NULL
+				// But we need CNF & Literal such that all the rows from this file are returned
+				// Possible CNF: col1 = col1
+
+				string sAttName;
+				FindFirstAttInTable(schema_obj, sAttName);
+				Operand op_struct;
+				op_struct.code = NAME;
+				op_struct.value = (char*)sAttName.c_str();
+				
+				ComparisonOp comp_struct;
+				comp_struct.code = EQUALS;
+				comp_struct.left = &op_struct;
+				comp_struct.right = &op_struct;
+
+				OrList or_struct;
+				or_struct.left = &comp_struct;
+				or_struct.rightOr = NULL;
+				
+				AndList and_struct;
+				and_struct.left = &or_struct;
+				and_struct.rightAnd = NULL;
+
+                pCNF = new CNF();
+                pLit = new Record();
+
+                pCNF->GrowFromParseTree(&and_struct, &schema_obj, *pLit);
+			}
+
             // Now create the SelectFile Node
        	    pNode = new Node_SelectFile(sInFile, outPipeId, pCNF, pLit);
 
@@ -381,7 +413,7 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
                     // Make attributes to create Join node
                     in_pipe_left = m_mJoinEstimate[optimalPair.first].queryPlanNode->m_nOutPipe;
                     in_pipe_right = m_mJoinEstimate[optimalPair.second].queryPlanNode->m_nOutPipe;
-                    out_pipe = m_nGlobalPipeID++;
+                    out_pipe = m_nGlobalPipeID++; 
 
                     Schema LeftSchema("catalog", (char*) m_mAliasToTable[sLeftAlias].c_str());
                     Schema RightSchema("catalog", (char*) m_mAliasToTable[sRightAlias].c_str());
@@ -490,7 +522,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 
                     int in_pipe_left = m_mJoinEstimate[sLeftAlias].queryPlanNode->m_nOutPipe;
                     int in_pipe_right = m_mJoinEstimate[sRightAlias].queryPlanNode->m_nOutPipe;
-                    int out_pipe = m_nGlobalPipeID++;
+                    int out_pipe = m_nGlobalPipeID++; 
                     CNF * pCNF = NULL;
                     Record * pLit = NULL;
 					Schema * pSchema = NULL;
@@ -597,6 +629,7 @@ int Optimizer::ComboAfterCurrTable(vector<string> & vTempCombos, string sTableTo
     return -1;
 }
 
+// Make the optimal query plan and print on screen/file 
 void Optimizer::MakeQueryPlan()
 {
 	if (m_nNumTables > 3)
@@ -701,7 +734,7 @@ void Optimizer::MakeQueryPlan()
 		{
             int ip1 = m_mJoinEstimate[min_join_left].queryPlanNode->m_nOutPipe;
             int ip2 = m_mJoinEstimate[min_join_right].queryPlanNode->m_nOutPipe;
-            int op = m_nGlobalPipeID++;
+            int op = m_nGlobalPipeID++; 
             // make the schema
             Schema LeftSchema("catalog", (char*) m_mAliasToTable[min_join_left].c_str());
             Schema RightSchema("catalog", (char*) m_mAliasToTable[min_join_right].c_str());
@@ -725,7 +758,7 @@ void Optimizer::MakeQueryPlan()
 			// ------ optimal join : left deep --------
 			int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
 			int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
-			int op = m_nGlobalPipeID++;
+			int op = m_nGlobalPipeID++; 
 
             // Make the schema
             Schema LeftSchema("catalog", (char*) m_mAliasToTable[min_third].c_str());
@@ -812,7 +845,7 @@ void Optimizer::MakeQueryPlan()
     {
             OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
             int in = pFinalNode->m_nOutPipe;
-            int out = m_nGlobalPipeID++;
+            int out = m_nGlobalPipeID++; 
             QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, NULL /* Function */, pGrpOrder);
             pGrpNode->left = pFinalNode;    // make join the left child of group-by
             pFinalNode = pGrpNode;          // now final node is group by (its on top!)
@@ -822,7 +855,7 @@ void Optimizer::MakeQueryPlan()
 	if (m_pAttsToSelect)
 	{
 		int in = pFinalNode->m_nOutPipe;
-		int out = m_nGlobalPipeID++;
+		int out = m_nGlobalPipeID++; 
 		int numAttsToSelect = 0, numTotAtts = 0;
 		vector <int> vec_AttsToKeepNum;
 		vector <string> vec_AttsToKeepName;
@@ -889,8 +922,12 @@ void Optimizer::MakeQueryPlan()
 	}
 
 	// Print the final query plan
-    if (pFinalNode!= NULL)
-        pFinalNode->PrintNode();
+    if (pFinalNode != NULL)
+	{
+		m_pFinalNode = pFinalNode;
+		if (m_nPrintPlanOnScreen == 1)		// Check if user wants the plan printed on screen
+        	m_pFinalNode->PrintNode();
+	}
 	else
 		cout << "\nERROR! No Query Plan possible!\n\n";
 }
@@ -902,8 +939,11 @@ void Optimizer::ExecuteQuery()
      * execute every node encountered and join it's input and output pipe
      * according to the order mentioned in nodes
      */
-//    m_pFinalJoin->()
 
+	if (m_pFinalNode == NULL)
+		return;
+
+	m_pFinalNode->ExecutePostOrder();		
 }
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
@@ -1204,6 +1244,13 @@ void Optimizer::ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName)
     fprintf (outSchemaFile, "\nEND\n");
     fclose(outSchemaFile);
 }
+
+void Optimizer::FindFirstAttInTable(Schema &sch, string &sAttName)
+{
+	Attribute * Atts_list = sch.GetAtts();
+	sAttName = Atts_list[0].name;
+}
+
 
 // Break the m_pCNF apart into tokens
 // Format:

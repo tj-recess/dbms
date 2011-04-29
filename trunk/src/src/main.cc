@@ -46,6 +46,10 @@ int main ()
 
     yyparse();
 
+	// Hard code some things for now
+	printPlanOnScreen = 1;
+	executePlan = 1;
+
 	// --------- SELECT query -------------
 	if (selectFromTable == 1)
 	{
@@ -67,6 +71,8 @@ int main ()
 		// Execute the query according to the plan only if asked
 		if (executePlan)
 	    	Oz.ExecuteQuery();
+	
+		return 0;
 	}
 
 	// ----------- project 5 ----------
@@ -174,6 +180,8 @@ int main ()
 				cerr << "\nTable " << sTableName.c_str() << " not found in the database!\n";
 		}
     }
+
+	return 0;
 }
 
 
