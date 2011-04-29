@@ -38,17 +38,24 @@ extern int printPlanOnScreen;  			// 1 if true
 extern int executePlan;        			// 1 if true
 extern struct NameList *outputFileName; // Name of the file where plan should be printed
 
+struct CurrSession
+{
+	int nOnScreen, nExecute;
+	string sFileName;
+};
+
+void ReadSession(struct CurrSession & cs);
 
 int main () 
 {
-	cout << "\n\n *****************************************************\n"
+	CurrSession cs;
+	ReadSession(cs);
+
+	cout << "\n\n----------------------------------------------------------\n"
 		 << "The database is ready. Please enter a valid SQL statement: \n\n";
 
+	// Get SQL query from the user
     yyparse();
-
-	// Hard code some things for now
-	printPlanOnScreen = 1;
-	executePlan = 1;
 
 	// --------- SELECT query -------------
 	if (selectFromTable == 1)
@@ -62,25 +69,23 @@ int main ()
 		// And pass all the relevant attributes to the optimizer
 		Optimizer Oz(StatsObj, finalFunction, tables, boolean, groupingAtts, 
 					 	attsToSelect, distinctAtts, distinctFunc, 
-						printPlanOnScreen, outputFileName);
+						cs.nOnScreen, cs.sFileName);
 						
 		//Oz.PrintFuncOperator();
 		//Oz.PrintTableList();
 		Oz.MakeQueryPlan();
 	
 		// Execute the query according to the plan only if asked
-		if (executePlan)
+		if (cs.nExecute == 1)
 	    	Oz.ExecuteQuery();
 	
 		return 0;
 	}
 
-	// ----------- project 5 ----------
-	DDL_DML ddObj;
-
 	// --------- CREATE TABLE query -------------
-	if (createTable == 1)
+	else if (createTable == 1)
 	{
+		DDL_DML ddObj;
 		cout << "\nExecuting... Create table statement\n";
 		vector <Attribute> ColAttsVec;
 		string sTableName;
@@ -145,9 +150,11 @@ int main ()
                     cerr << "Table " << sTableName.c_str() << " already exists in the database!\n";
 		}
 	}
+
     // --------- INSERT INTO TABLE query -------------
 	else if (insertTable == 1)
 	{
+		DDL_DML ddObj;
 		cout << "\nExecuting... Insert into table command\n";
 		if (table_name== NULL || file_name == NULL)
 		{
@@ -164,9 +171,11 @@ int main ()
 					 << endl;
 		}
 	}
+
     // --------- DROP TABLE query -------------
 	else if (dropTable == 1)
     {
+		DDL_DML ddObj;
         cout << "\nExecuting... Drop table command\n";
         if (table_name == NULL)
             cout << "\nTable name is NULL!\n";
@@ -180,8 +189,62 @@ int main ()
 				cerr << "\nTable " << sTableName.c_str() << " not found in the database!\n";
 		}
     }
+	
+	// ----------- session variable --------------
+	else
+	{
+		if (printPlanOnScreen == 0 && executePlan == 0 && outputFileName == NULL)
+			return 0;		// Can't have all this, probably syntax error?
+
+		ofstream session;
+		session.open("Session.conf");
+		session << printPlanOnScreen << endl;
+		session << executePlan << endl;
+		if (outputFileName != NULL)
+			session << outputFileName->name << endl;
+		else
+			session << "NONE" << endl;
+		session.close();
+		cout << "\nNew session variables have been stored.\n";
+	}
 
 	return 0;
 }
 
+void ReadSession(struct CurrSession & cs)
+{
+	ifstream session;
+	session.open("Session.conf");
+	if (!session)
+		cerr << "\nERROR! Session.conf not found!\n\n";
+	else
+	{
+		int print_on_screen, execute_plan;
+		string file_name;
+		session >> print_on_screen;
+		session >> execute_plan;
+		session >> file_name;
+		//getline(session, file_name);
+		cout << "\n\n-------------------------\n"
+			 << "Current Session settings:\n"
+			 << "-------------------------\n";
 
+		if (print_on_screen == 1)
+			cout << "Print query plan on screen : true\n";
+		else
+			cout << "Print query plan on screen : false\n";
+	
+		if (execute_plan == 1)
+			cout << "Execute query plan : true\n";
+        else
+            cout << "Execute query plan : false\n";
+
+		cout << "Write query plan in file: " << file_name.c_str() << endl;
+
+		cs.nOnScreen = print_on_screen;
+		cs.nExecute = execute_plan;
+		cs.sFileName = file_name;
+
+		session.close();
+	}
+}

@@ -5,7 +5,7 @@ Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
 						 m_pGroupingAtts(NULL), m_pAttsToSelect(NULL),
 						 m_nDistinctAtts(0), m_nDistinctFunc(0),
 						 m_nNumTables(-1), m_nGlobalPipeID(0), m_pFinalNode(NULL),
-						 m_aTableNames(NULL), m_nPrintPlanOnScreen(0), m_pPrintPlanFile(NULL)
+						 m_aTableNames(NULL), m_nPrintPlanOnScreen(0), m_sPrintPlanFile()
 {}
 
 Optimizer::Optimizer(Statistics & s,
@@ -15,13 +15,13 @@ Optimizer::Optimizer(Statistics & s,
 					 struct NameList * pGrpAtts,
 					 struct NameList * pAttsToSelect,
 					 int distinct_atts, int distinct_func,
-					 int print_on_screen, struct NameList * outFileName)
+					 int print_on_screen, string sOutFile)
 
 			: m_Stats(s), m_pFuncOp(finalFunction), m_pTblList(tables), m_pCNF(boolean), 
 			  m_pGroupingAtts(pGrpAtts), m_pAttsToSelect(pAttsToSelect), 
 			  m_nDistinctAtts(distinct_atts), m_nDistinctFunc(distinct_func),
 			  m_nNumTables(-1), m_nGlobalPipeID(0), m_pFinalNode(NULL), m_aTableNames(NULL), 
-			  m_nPrintPlanOnScreen(print_on_screen), m_pPrintPlanFile(outFileName)
+			  m_nPrintPlanOnScreen(print_on_screen), m_sPrintPlanFile(sOutFile)
 {
 	// Store alias in sorted fashion in m_vSortedAlias
 	// and the number of tables/alias in m_nNumTables
