@@ -854,15 +854,31 @@ void Optimizer::MakeQueryPlan()
     // group by and sum
     if (m_pGroupingAtts && m_pFuncOp)
     {
-		// Remove aliases
-		RemoveAliasFromColumnName(m_pFuncOp);
+        // Remove aliases
+        RemoveAliasFromColumnName(m_pFuncOp);
 
-		// Make function		
-		Function * pFunc = new Function();
-		pFunc->GrowFromParseTree (m_pFuncOp, *pFinalSchema);
+        // Make function
+        Function * pFunc = new Function();
+        pFunc->GrowFromParseTree (m_pFuncOp, *pFinalSchema);
 
-		// Make order maker
-        OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
+        // Make order maker
+        //find the column name in schema, create OrderMaker manually
+        OrderMaker *pGrpOrder = new OrderMaker();   //pGrpOrder->numAtts = 0 (initially)
+        NameList* pTempGroupingAtts = m_pGroupingAtts;
+        while(pTempGroupingAtts != NULL)
+        {
+            //remove "." from gropuing attribute's name first
+            string attName = string(pTempGroupingAtts->name);
+            char* trueName = const_cast<char*>(attName.substr(attName.find(".") + 1).c_str());
+            int attIndex = pFinalSchema->Find(trueName);
+            if(attIndex != -1)
+            {
+                pGrpOrder->whichAtts[pGrpOrder->numAtts] = attIndex;
+                pGrpOrder->whichTypes[pGrpOrder->numAtts] = pFinalSchema->FindType(trueName);
+                pGrpOrder->numAtts++;
+            }
+            pTempGroupingAtts = pTempGroupingAtts->next;
+        }
         int in = pFinalNode->m_nOutPipe;
         int out = m_nGlobalPipeID++; 
 
