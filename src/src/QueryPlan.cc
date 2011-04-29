@@ -72,15 +72,15 @@ void Node_SelectFile::ExecutePostOrder()
 void Node_SelectFile::ExecuteNode()
 {
         //create a DBFile from input file path provided
-        DBFile inFile;
-        inFile.Open(const_cast<char*>(m_sInFileName.c_str()));
+        DBFile * pFile = new DBFile;
+        pFile->Open(const_cast<char*>(m_sInFileName.c_str()));
 
         cout << "\n IN selectFile for " << m_sInFileName.c_str() << endl;
         SelectFile * pSF = new SelectFile;
         pSF->Use_n_Pages(QUERY_USE_PAGES);
         if (m_pCNF != NULL && m_pLiteral != NULL)
         {
-            pSF->Run(inFile, *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
+            pSF->Run(*pFile, *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
 
             //sf.WaitUntilDone();
 /*
@@ -201,7 +201,7 @@ void Node_Join::ExecuteNode()
                    *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
 
             //J.WaitUntilDone ();
-            if (m_nOutPipe == 4)
+            //if (m_nOutPipe == 4)
             {
                 Record rec;
                 int count = 0;
