@@ -22,7 +22,7 @@ public:
 	// common members
 	int m_nInPipe, m_nOutPipe;
 	string m_sInFileName, m_sOutFileName;
-    map<int, Pipe*> m_mPipes;
+    static map<int, Pipe*> m_mPipes;
 
 	// left and right children (tree structure)
 	QueryPlanNode * left;
@@ -50,7 +50,7 @@ public:
 		m_nOutPipe = out;
 		m_pCNF = pCNF;
 		m_pLiteral = pLit;
-		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
+		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
  
 	~Node_SelectPipe()
@@ -83,19 +83,19 @@ public:
 		m_nOutPipe = out;
 		m_pCNF = pCNF;
 		m_pLiteral = pLit;
-        m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
+        QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
 	~Node_SelectFile()
 	{
-        if (m_pCNF)
+/*        if (m_pCNF)
         {
             delete m_pCNF; m_pCNF = NULL;
         }
         if (m_pLiteral)
         {
             delete m_pLiteral; m_pLiteral = NULL;
-        }
+        }*/
 	}
 
     void PrintNode();
@@ -116,16 +116,16 @@ public:
 		atts_list = atk;
 		m_nAttsToKeep = nKeep;
 		m_nTotalAtts = nTot;
-		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
+		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 		
 	~Node_Project()
 	{
-		if (atts_list)
+/*		if (atts_list)
 		{
 			delete [] atts_list; 
 			atts_list = NULL;
-		}
+		}*/
 	}
 
     void PrintNode();
@@ -149,12 +149,12 @@ public:
 		m_pCNF = pCNF;
 		m_pSchema = pSch;
 		m_pLiteral = pLit;
-		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);		
+		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);		
 	}
 	
 	~Node_Join()
     {
-        if (m_pCNF)
+/*        if (m_pCNF)
         {
             delete m_pCNF; m_pCNF = NULL;
         }
@@ -165,7 +165,7 @@ public:
 		if (m_pSchema)
 		{
     	    delete m_pSchema; m_pSchema = NULL;
-		}
+		}*/
     }
 
     void PrintNode();
@@ -183,7 +183,7 @@ public:
 		m_nInPipe = ip;
 		m_nOutPipe = op;
 		m_pFunc = pF;
-		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
+		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
 	~Node_Sum()
@@ -211,19 +211,19 @@ public:
 		m_nOutPipe = op;
 		m_pFunc = pF;
 		m_pOM = pOM;
-		m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
+		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
 	~Node_GroupBy()
 	{
-		if (m_pFunc)
+/*		if (m_pFunc)
 		{
 			delete m_pFunc; m_pFunc = NULL;
 		}
 		if (m_pOM)
 		{
 			delete m_pOM; m_pOM = NULL;
-		}
+		}*/
 	}
 
     void PrintNode();

@@ -200,8 +200,13 @@ void Function :: GrowFromParseTree (struct FuncOperator *parseTree, Schema &mySc
 
 }
 
-void Function :: Print () {
-
+void Function :: Print () 
+{
+	cout << "Number of Operations : " << numOps << endl;
+	if (returnsInt == 1)
+		cout << "Function returns INT value\n";
+	else
+		cout << "Function returns DOUBLE value\n";
 }
 
 Type Function :: Apply (Record &toMe, int &intResult, double &doubleResult) {
