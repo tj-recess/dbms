@@ -68,6 +68,7 @@ private:
 	AndList* GetSelectionsFromAndList(string aTableName);
 	AndList* GetJoinsFromAndList(vector<string>&);
     void RemoveAliasFromColumnName(AndList* parseTreeNode);
+    void RemoveAliasFromColumnName(FuncOperator * func_node);
 	void ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName);
 	void FindFirstAttInTable(Schema &sch, string &);
     //pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
