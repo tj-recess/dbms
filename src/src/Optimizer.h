@@ -31,7 +31,7 @@ private:
 	int m_nDistinctAtts; 			   // 1 if there is a DISTINCT in a non-aggregate query 
 	int m_nDistinctFunc; 			   // 
 	int m_nPrintPlanOnScreen;		   // 1 means print the plan on screen
-	struct NameList * m_pPrintPlanFile;// Name of the file where plan should be printed
+	string m_sPrintPlanFile;		   // Name of the file where plan should be printed
 
 	// --------- internal members
 	int m_nNumTables, m_nGlobalPipeID;
@@ -93,7 +93,7 @@ public:
 			  struct NameList * pGrpAtts,
               struct NameList * pAttsToSelect,
               int distinct_atts, int distinct_func,
-			  int print_on_screen, struct NameList * outFileName);
+			  int print_on_screen, string sOutFileName);
 	~Optimizer();
 
 	void PrintFuncOperator();

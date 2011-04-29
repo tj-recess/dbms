@@ -174,16 +174,19 @@ SQL: SELECT WhatIWant FROM Tables WHERE AndList
 {
 	printPlanOnScreen = 1;
 	executePlan = 1;
+	outputFileName = NULL;
 }
 | SET OUTPUT NONE
 {
 	printPlanOnScreen = 1;
 	executePlan = 0;
+	outputFileName = NULL;
 }
-| SET OUTPUT String
+| SET OUTPUT FileName 
 {
 	printPlanOnScreen = 0;
 	executePlan = 1;
+	outputFileName = $3;
 }
 
 WhatIWant: Function ',' Atts 
