@@ -17,7 +17,9 @@ int DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	// Write this schema in the catalog file
 	FILE * out = fopen ("catalog", "a");
 	fprintf (out, "\nBEGIN\n%s\n%s.tbl", sTabName.c_str(), sTabName.c_str());
-	for (int i = 0; i < nNumAtts; i++)
+	// The loop needs to be in the reverse order as the attributes coming from 
+	// the parser in "col_atts" are in reverse order.
+	for (int i = nNumAtts-1; i >= 0; i--)
 	{
 		fprintf (out, "\n%s ", col_atts_vec[i].name);
 		if (col_atts_vec[i].myType == Int)

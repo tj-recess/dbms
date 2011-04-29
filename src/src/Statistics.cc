@@ -832,7 +832,7 @@ bool Statistics::checkParseTreeForErrors(struct AndList *someParseTree, char *re
 void Statistics::PrepareStatisticsFile(char* fileName)
 {
     Statistics s;
-    char *relName[] = {"supplier","partsupp", "lineitem", "orders","customer","nation", "part", "region"};
+    char *relName[] = {"supplier","partsupp", "lineitem", "orders","customer","nation", "part", "region", "mal_test"};
 
     s.AddRel(relName[0],10000);     //supplier
     s.AddRel(relName[1],800000);    //partsupp
@@ -842,6 +842,7 @@ void Statistics::PrepareStatisticsFile(char* fileName)
     s.AddRel(relName[5],25);        //nation
     s.AddRel(relName[6], 200000);   //part
     s.AddRel(relName[7], 5);        //region
+    s.AddRel(relName[8], 3);        //mal_test
 
 
     s.AddAtt(relName[0], "s_suppkey",10000);
@@ -917,6 +918,11 @@ void Statistics::PrepareStatisticsFile(char* fileName)
     s.AddAtt(relName[7], "r_regionkey",5);
     s.AddAtt(relName[7], "r_name",5);
     s.AddAtt(relName[7], "r_comment",5);
+
+    s.AddAtt(relName[8], "col1",3);
+    s.AddAtt(relName[8], "col2",3);
+    s.AddAtt(relName[8], "col3",3);
+    s.AddAtt(relName[8], "col4",3);
 
     s.Write(fileName);
 }

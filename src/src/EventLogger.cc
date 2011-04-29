@@ -2,7 +2,6 @@
  * ErrorLogger.cc
  *
  *  Created on: Jan 19, 2011
- *      Author: arpit
  */
 
 #include "EventLogger.h"

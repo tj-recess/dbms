@@ -50,6 +50,7 @@ Optimizer::~Optimizer()
 //		delete [] m_aTableNames;
 //		m_aTableNames = NULL;
 //	}
+// final query node
 }
 
 // Sort alias and push them in m_vSortedAlias vector
@@ -742,10 +743,14 @@ void Optimizer::MakeQueryPlan()
             // Read data from left schema and right schema and write to sName.schema file
             ConcatSchemas(&LeftSchema, &RightSchema, sName);
             pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
+		
+			CNF * pCNF = new CNF();
+			Record * pRec = new Record();
+			AndList * new_AndList = m_mAliasToAndList[sName];
+			pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pRec);
 
             // Make join node
-            QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */,
-                                                       pFinalSchema, NULL /*record literal */);
+            QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, pCNF, pFinalSchema, pRec); 
 
             pFinalJoin = m_mJoinEstimate[min_order].queryPlanNode;
             pFinalJoin->left = m_mJoinEstimate[min_join_left].queryPlanNode;
@@ -755,37 +760,6 @@ void Optimizer::MakeQueryPlan()
 		}
 		else if (m_nNumTables == 3)
 		{
-			// ------ optimal join : left deep --------
-			int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
-			int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
-			int op = m_nGlobalPipeID++; 
-
-            // Make the schema
-            Schema LeftSchema("catalog", (char*) m_mAliasToTable[min_third].c_str());
-                // Read the schema from min_order.schema, where table name is min_order
-            Schema RightSchema((char*)(min_order + ".schema").c_str(), (char*)min_order.c_str());
-            string sName = min_third + "." + min_order;
-            // Read data from left schema and right schema and write to sName.schema file
-            ConcatSchemas(&LeftSchema, &RightSchema, sName);
-            pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
-
-            // Make the join node
-            QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, NULL /* cnf */,
-                                                       pFinalSchema, NULL /*record literal */);
-
-            // set child pointers of Final Join Node
-            pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode; 	// left ptr
-            pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode; 	// right ptr
-
-            // set child pointers of min_order (intermediate order node)
-            QueryPlanNode * pIntermediate = m_mJoinEstimate[min_order].queryPlanNode;
-            pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;		// left ptr
-            pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;	// right ptr
-
-			// Set this join node as the top-most node
-            pFinalNode = pFinalJoin;
-
-
 			#ifdef _DEBUG_OPTIMIZER
 			//print both the maps
 			//1. m_mAndList to boolean
@@ -837,6 +811,42 @@ void Optimizer::MakeQueryPlan()
 			//2. m_mAliasToAndList
 			PrintAliasToAndListMap();
 			#endif
+
+			// -------------------- now make the upper join node ----------------------
+
+            // ------ optimal join : left deep --------
+            int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
+            int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
+            int op = m_nGlobalPipeID++;
+
+            // Make the schema
+            // Read the schema from min_order.schema, where table name is min_order
+            Schema LeftSchema((char*)(min_order + ".schema").c_str(), (char*)min_order.c_str());
+            Schema RightSchema("catalog", (char*) m_mAliasToTable[min_third].c_str());
+            string sName = min_order + "." + min_third;
+            // Read data from left schema and right schema and write to sName.schema file
+            ConcatSchemas(&LeftSchema, &RightSchema, sName);
+            pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
+
+            CNF * pCNF = new CNF();
+            Record * pRec = new Record();
+            AndList * new_AndList = m_mAliasToAndList[sName];
+            pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pRec);
+
+            // Make join node
+            QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, pCNF, pFinalSchema, pRec);
+
+            // set child pointers of Final Join Node
+            pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;    // left ptr
+            pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;   // right ptr
+
+            // set child pointers of min_order (intermediate order node)
+            QueryPlanNode * pIntermediate = m_mJoinEstimate[min_order].queryPlanNode;
+            pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;     // left ptr
+            pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;   // right ptr
+
+            // Set this join node as the top-most node
+            pFinalNode = pFinalJoin;
 
 		}
 	}
@@ -911,8 +921,8 @@ void Optimizer::MakeQueryPlan()
 		if (size != 0)
 			attsToKeep = new int[size];
 
-		for (int j = 0; j < size; j++)
-			attsToKeep[j] = vec_AttsToKeepNum.at(j);
+		for (int j = 0, i = size-1; i >= 0; j++, i--)
+			attsToKeep[j] = vec_AttsToKeepNum.at(i);	// Need to rever the order
 
 		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, numAttsToSelect, numTotAtts);	
 	

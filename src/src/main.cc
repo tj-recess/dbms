@@ -230,14 +230,14 @@ void ReadSession(struct CurrSession & cs)
 			 << "-------------------------\n";
 
 		if (print_on_screen == 1)
-			cout << "Print query plan on screen : true\n";
+			cout << "Print query plan on screen : TRUE\n";
 		else
-			cout << "Print query plan on screen : false\n";
+			cout << "Print query plan on screen : FALSE\n";
 	
 		if (execute_plan == 1)
-			cout << "Execute query plan : true\n";
+			cout << "Execute query plan : TRUE\n";
         else
-            cout << "Execute query plan : false\n";
+            cout << "Execute query plan : FALSE\n";
 
 		cout << "Write query plan in file: " << file_name.c_str() << endl;
 
