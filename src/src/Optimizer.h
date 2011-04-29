@@ -37,7 +37,7 @@ private:
 	int m_nNumTables, m_nGlobalPipeID;
 	vector <string> m_vSortedAlias;
 	vector <string> m_vTabCombos;
-    QueryPlanNode *m_pFinalJoin;
+    QueryPlanNode *m_pFinalNode;
 
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
@@ -53,34 +53,35 @@ private:
 	Statistics m_Stats;								// master copy of the stats object
     map <string, string> m_mAliasToTable;           // alias to original table name
 	map <int, string> m_mOutPipeToCombo;			// map of outpipe to combo name
-    map <string, AndList*> m_mAliasToAndList;       //map of alias and their corresponding AndList
-    map <AndList*, bool> m_mAndListToUsage;         //map of AndList* to track if they have been used already or not
+    map <string, AndList*> m_mAliasToAndList;       // map of alias and their corresponding AndList
+    map <AndList*, bool> m_mAndListToUsage;         // map of AndList* to track if they have been used already or not
+
 
 	// -------------- Member functions
 	Optimizer();
 	int SortAlias();
 	void TokenizeAndList(AndList*);
-	void PopulateTableNames(vector<string> & vec_rels);		// in m_aTableNames char** array
+	void PopulateTableNames(vector<string> & vec_rels);		// Populate m_aTableNames char** array from vec
 	void ComboToVector(string, vector <string> & vec_rels); // break A.B.C into vector(A,B,C)
-	void TableComboBaseCase(vector <string> &);
-	int ComboAfterCurrTable(vector<string> &, string);
-	void PrintFuncOpRecur(struct FuncOperator *func_node);
+	void TableComboBaseCase(vector <string> &);				// combo of 2 tables
+	int ComboAfterCurrTable(vector<string> &, string);		// find the next combo to join with curr table
 	AndList* GetSelectionsFromAndList(string aTableName);
 	AndList* GetJoinsFromAndList(vector<string>&);
     void RemoveAliasFromColumnName(AndList* parseTreeNode);
 	void ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName);
+	void FindFirstAttInTable(Schema &sch, string &);
+    //pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
+    void FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree, pair<string, string> &);
+	vector<string> PrintTableCombinations(int combo_len);
 
 	// Functions for debugging
-	void PrintTokenizedAndList();	// TODO: delete this
+	void PrintTokenizedAndList();	
 	void print_map();
-
+	void PrintFuncOpRecur(struct FuncOperator *func_node);
     void PrintOrList(struct OrList *pOr);
     void PrintComparisonOp(struct ComparisonOp *pCom);
     void PrintOperand(struct Operand *pOperand);
     void PrintAndList(struct AndList *pAnd);
-    //pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
-    void FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree, pair<string, string> &);
-
     void PrintAndListToUsageMap();
     void PrintAliasToAndListMap();
 
@@ -98,8 +99,7 @@ public:
 	void PrintFuncOperator();
 	void PrintTableList();
 	void MakeQueryPlan();
-        void ExecuteQuery();
-	vector<string> PrintTableCombinations(int combo_len);
+    void ExecuteQuery();
 	
 };
 
