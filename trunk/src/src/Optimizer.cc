@@ -850,17 +850,47 @@ void Optimizer::MakeQueryPlan()
 
 		}
 	}
-    // group by
-    if (m_pGroupingAtts)
+
+    // group by and sum
+    if (m_pGroupingAtts && m_pFuncOp)
     {
-            OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
-            int in = pFinalNode->m_nOutPipe;
-            int out = m_nGlobalPipeID++; 
-            QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, NULL /* Function */, pGrpOrder);
-            pGrpNode->left = pFinalNode;    // make join the left child of group-by
-            pFinalNode = pGrpNode;          // now final node is group by (its on top!)
+		// Remove aliases
+		RemoveAliasFromColumnName(m_pFuncOp);
+
+		// Make function		
+		Function * pFunc = new Function();
+		pFunc->GrowFromParseTree (m_pFuncOp, *pFinalSchema);
+
+		// Make order maker
+        OrderMaker * pGrpOrder = new OrderMaker(pFinalSchema);
+        int in = pFinalNode->m_nOutPipe;
+        int out = m_nGlobalPipeID++; 
+
+		// create new node
+        QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, pFunc, pGrpOrder);
+    	pGrpNode->left = pFinalNode;    // make join the left child of group-by
+        pFinalNode = pGrpNode;          // now final node is group by (its on top!)
     }
-    // sum
+
+    // only sum, no group by
+	else if (m_pFuncOp)
+	{	
+        // Remove aliases
+        RemoveAliasFromColumnName(m_pFuncOp);
+
+		// Make function
+        Function * pFunc = new Function();
+        pFunc->GrowFromParseTree (m_pFuncOp, *pFinalSchema);
+
+		int in = pFinalNode->m_nOutPipe;
+        int out = m_nGlobalPipeID++;    
+	
+		// create new node
+        QueryPlanNode * pSumNode = new Node_Sum(in, out, pFunc);
+		pSumNode->left = pFinalNode;    // make join the left child of group-by
+        pFinalNode = pSumNode;          // now final node is group by (its on top!)
+	}
+
     // project
 	if (m_pAttsToSelect)
 	{
@@ -1019,9 +1049,6 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-            //remove dots from column name in the selected node
-            //RemoveAliasFromColumnName(prvsNode);
-
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
             newAndList = prvsNode;
@@ -1105,9 +1132,6 @@ AndList* Optimizer::GetJoinsFromAndList(vector<string>& aliases)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-            //remove dots from column name in the selected node
-            //RemoveAliasFromColumnName(prvsNode);
-            
             while(newAndList != NULL)
                 newAndList = newAndList->rightAnd;
             newAndList = prvsNode;
@@ -1150,6 +1174,28 @@ void Optimizer::RemoveAliasFromColumnName(AndList* parseTreeNode)
     }
 }
 
+// Remove alias from the column names in FuncOperator* m_pFuncOp
+// Caveat: Modifies m_pFuncOp permanently
+void Optimizer::RemoveAliasFromColumnName(FuncOperator * func_node)
+{
+	FuncOperator * temp = func_node;
+
+    if (func_node == NULL)
+        return;
+
+	if (temp->leftOperand != NULL)
+	{
+		// if it is column name, remove table alias
+		if (temp->leftOperand->code == NAME)
+		{
+			string sFullName = temp->leftOperand->value;
+			strcpy(temp->leftOperand->value, (char*)sFullName.substr(sFullName.find(".") + 1).c_str());
+		}
+	}
+	
+	RemoveAliasFromColumnName(temp->leftOperator);
+	RemoveAliasFromColumnName(temp->right);
+}
 
 void Optimizer::FindOptimalPairing(vector<string> & vAliases, AndList* parseTree, 
 								   pair<string, string> & pair_optimal)
