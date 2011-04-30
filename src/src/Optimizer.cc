@@ -907,7 +907,21 @@ void Optimizer::MakeQueryPlan()
 		bool bPrintHere = false;
 		if (m_pAttsToSelect == NULL)
 			bPrintHere = true;
-	
+
+		// Need to print the sum here, but user says print in file
+		// So make projection.schema, which will be read by write-out node
+		if (bPrintHere && m_nPrintPlanOnScreen == 0)	
+		{
+	        // Make schema for projection
+    	    string sFileName = "projection.schema";
+        	FILE *outSchemaFile = fopen (sFileName.c_str(), "w");
+	        fprintf(outSchemaFile, "BEGIN\n%s\nwherever", "projection");
+			fprintf(outSchemaFile, "\nSum Double");
+    	    fprintf (outSchemaFile, "\nEND\n");
+        	fclose(outSchemaFile);
+			bPrintHere = false;
+		}
+
 		// create new node
         QueryPlanNode * pSumNode = new Node_Sum(in, out, pFunc, bPrintHere);
 		pSumNode->left = pFinalNode;    // make join the left child of group-by
