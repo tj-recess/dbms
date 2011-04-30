@@ -142,16 +142,17 @@ void Node_Project::ExecuteNode()
             P.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]),
                   atts_list, m_nTotalAtts, m_nAttsToKeep);
 
-			cout << "\nOut of project.run\n";
-            //P.WaitUntilDone();
-            Record rec;
-            int count = 0;
-            while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
-            {
-				//cout << "\ntrying to fetch recs after project\n";
-                count++;
-            }
-            cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+			if (m_bPrintHere == true)
+			{
+	            Record rec;
+    	        int count = 0;
+        	    while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
+            	{
+					//cout << "\ntrying to fetch recs after project\n";
+	                count++;
+    	        }
+        	    cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+			}
         }
         else
             cout << "\nInsufficient parameters!\n";
@@ -351,6 +352,16 @@ void Node_Distinct::ExecuteNode()
     if (m_pSchema != NULL)
     {
         DR.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pSchema);
+
+		// Clear the pipe here
+        Record rec;
+        int count = 0;
+        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
+        {
+    	    //cout << "\ntrying to fetch recs after project\n";
+	         count++;
+        }
+        cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
 	}	
 }
 

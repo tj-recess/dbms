@@ -910,17 +910,8 @@ void Optimizer::MakeQueryPlan()
         pFinalNode = pSumNode;          // now final node is group by (its on top!)
 	}
 
-	// distinct
-	if (m_nDistinctAtts)
-	{
-        int in = pFinalNode->m_nOutPipe;
-        int out = m_nGlobalPipeID++;
-		
-		// Make node for distinct
-		QueryPlanNode * pDistinct = new Node_Distinct(in, out, pFinalSchema);
-        pDistinct->left = pFinalNode;    // make prev node  left child of distinct
-        pFinalNode = pDistinct;          // now final node is distinct (its on top!)
-	}
+	// Start making the schema for distinct
+	vector <Attribute *> vec_dis_atts;
 
     // project
 	if (m_pAttsToSelect)
@@ -939,7 +930,7 @@ void Optimizer::MakeQueryPlan()
 			vec_AttsToKeepName.push_back(temp->name);
 			temp = temp->next;
 		}
-		
+	
 		Schema * pTempSchema = NULL;	
 		// Find total atts: sum of total atts in each table
 		for (int i = 0; i < m_vSortedAlias.size(); i++)
@@ -967,7 +958,16 @@ void Optimizer::MakeQueryPlan()
 				// find column name in this schema
 				int found_pos = pTempSchema->Find((char*)sColName.c_str());
 				if (found_pos != -1)
+				{
 					vec_AttsToKeepNum.push_back(numTotAtts + found_pos);
+
+					// for use by distinct
+					Attribute * pAtt = new Attribute;
+					pAtt->name = new char[sColName.length()];
+					strcpy(pAtt->name, (char*)sColName.c_str());
+					pAtt->myType = pTempSchema->FindType((char*)sColName.c_str());
+					vec_dis_atts.push_back(pAtt);
+				}
 			}
 
 			// increment num of atts count
@@ -983,14 +983,22 @@ void Optimizer::MakeQueryPlan()
 			attsToKeep = new int[size];
 
 		for (int j = 0, i = size-1; i >= 0; j++, i--)
-			attsToKeep[j] = vec_AttsToKeepNum.at(i);	// Need to rever the order
+			attsToKeep[j] = vec_AttsToKeepNum.at(i);	// Need to reverse the order
 
-		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, numAttsToSelect, numTotAtts);	
+		// If project is the top-most node, print record here
+		// Otheriwse distinct will print them
+		bool bPrintInProject = true;
+		if (m_nDistinctAtts == 1)
+			bPrintInProject = false;
+
+		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, numAttsToSelect, 
+													  numTotAtts, bPrintInProject);	
 	
 		pProjection->left = pFinalNode;
 		// Make this node top most
 		pFinalNode = pProjection;
 	}
+
 /*	else if (m_pAttsToSelect == NULL && m_pFuncOp != NULL && pFunc != NULL)
 	{
         int in = pFinalNode->m_nOutPipe;
@@ -1002,6 +1010,44 @@ void Optimizer::MakeQueryPlan()
         // Make this node top most
         pFinalNode = pProjection;		
 	}*/
+
+
+    // distinct
+    if (m_nDistinctAtts == 1)
+    {
+		// write distinct schema in a file and read it back to make schema object
+
+	    string sFileName = "distinct.schema";
+    	FILE *outSchemaFile = fopen (sFileName.c_str(), "w");
+	    fprintf(outSchemaFile, "BEGIN\n%s\nwherever", "distinct");
+		// go over the vector and write attributes to file
+		int numAtts = vec_dis_atts.size();
+    	for (int i = 0; i < numAtts; i++)
+	    {
+		    Attribute * pAtts = vec_dis_atts.at(i);
+        	fprintf(outSchemaFile, "\n%s", pAtts[i].name);
+	        if (pAtts[i].myType == Int)
+    	        fprintf(outSchemaFile, " Int");
+        	else if (pAtts[i].myType == Double)
+	            fprintf(outSchemaFile, " Double");
+    	    else if (pAtts[i].myType == String)
+        	     fprintf(outSchemaFile, " String");
+	    }
+    	// Done
+	    fprintf (outSchemaFile, "\nEND\n");
+    	fclose(outSchemaFile);
+
+		Schema *pDistinctSchema = new Schema("distinct.schema", "distinct");
+
+        int in = pFinalNode->m_nOutPipe;
+        int out = m_nGlobalPipeID++;
+
+        // Make node for distinct
+        QueryPlanNode * pDistinct = new Node_Distinct(in, out, pDistinctSchema);
+        pDistinct->left = pFinalNode;    // make prev node  left child of distinct
+        pFinalNode = pDistinct;          // now final node is distinct (its on top!)
+    }
+
 
 	// Print the final query plan
     if (pFinalNode != NULL)
