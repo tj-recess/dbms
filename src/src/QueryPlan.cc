@@ -3,7 +3,6 @@
 using namespace std;
 
 // Initialize static map
-
 map<int, Pipe*> QueryPlanNode::m_mPipes;
 
 // -------------------------------------- select pipe ------------------
@@ -144,12 +143,12 @@ void Node_Project::ExecuteNode()
                   atts_list, m_nTotalAtts, m_nAttsToKeep);
 
 			cout << "\nOut of project.run\n";
-            P.WaitUntilDone();
+            //P.WaitUntilDone();
             Record rec;
             int count = 0;
             while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
             {
-				cout << "\ntrying to fetch recs after project\n";
+				//cout << "\ntrying to fetch recs after project\n";
                 count++;
             }
             cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
@@ -197,18 +196,6 @@ void Node_Join::ExecuteNode()
         {
             J.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nRightInPipe]), 
                    *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
-
-            //J.WaitUntilDone ();
-            //if (m_nOutPipe == 4)
-/*            {
-                Record rec;
-                int count = 0;
-                while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
-                {
-                    count++;
-                }
-                cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
-            }*/
         }
         else
             cout << "\nInsufficient parameters!\n";
@@ -330,6 +317,41 @@ void Node_Sum::ExecuteNode()
     }
     else
         cout << "\nInsufficient parameters!\n";
+}
+
+// -------------------------------------- Distinct ------------------
+void Node_Distinct::PrintNode()
+{
+    if (this->left != NULL)
+        this->left->PrintNode();
+
+    cout << "\n*** Distinct Operation ***";
+    cout << "\nInput pipe ID: " << m_nInPipe;
+    cout << "\nOutput pipe ID: " << m_nOutPipe;
+    cout << endl << endl;
+
+    if (this->right != NULL)
+        this->right->PrintNode();
+}
+
+void Node_Distinct::ExecutePostOrder()
+{
+    if (this->left)
+        this->left->ExecutePostOrder();
+    if (this->right)
+        this->right->ExecutePostOrder();
+    this->ExecuteNode();
+}
+
+void Node_Distinct::ExecuteNode()
+{
+    cout << "\nExecuteNode of Distinct\n";
+    DuplicateRemoval DR;
+    DR.Use_n_Pages(QUERY_USE_PAGES);
+    if (m_pSchema != NULL)
+    {
+        DR.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pSchema);
+	}	
 }
 
 // -------------------------------------- write out ------------------
