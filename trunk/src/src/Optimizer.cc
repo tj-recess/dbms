@@ -910,6 +910,18 @@ void Optimizer::MakeQueryPlan()
         pFinalNode = pSumNode;          // now final node is group by (its on top!)
 	}
 
+	// distinct
+	if (m_nDistinctAtts)
+	{
+        int in = pFinalNode->m_nOutPipe;
+        int out = m_nGlobalPipeID++;
+		
+		// Make node for distinct
+		QueryPlanNode * pDistinct = new Node_Distinct(in, out, pFinalSchema);
+        pDistinct->left = pFinalNode;    // make prev node  left child of distinct
+        pFinalNode = pDistinct;          // now final node is distinct (its on top!)
+	}
+
     // project
 	if (m_pAttsToSelect)
 	{

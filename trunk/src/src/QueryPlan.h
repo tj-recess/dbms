@@ -29,11 +29,14 @@ public:
 	QueryPlanNode * right;
 
 	QueryPlanNode() : m_nInPipe(-1), m_nOutPipe(-1), m_sInFileName(), m_sOutFileName(),
-					left(NULL), right(NULL)
+					  left(NULL), right(NULL)
 	{}
 
+	// Will be in-order traversal
 	virtual void PrintNode() {}
+	// Will be post order traversal
     virtual void ExecutePostOrder() {}
+	// do the actual execution
     virtual void ExecuteNode() {}
 	virtual ~QueryPlanNode() {}	
 };
@@ -225,6 +228,34 @@ public:
 			delete m_pOM; m_pOM = NULL;
 		}*/
 	}
+
+    void PrintNode();
+    void ExecutePostOrder();
+    void ExecuteNode();
+};
+
+
+class Node_Distinct : public QueryPlanNode
+{
+public:
+	Schema *m_pSchema;
+
+    Node_Distinct(int ip, int op, Schema * pSch)
+    {
+        m_nInPipe = ip;
+        m_nOutPipe = op;
+		m_pSchema = pSch;
+        QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
+    }
+
+    ~Node_Distinct()
+    {
+		if (m_pSchema)
+		{
+			delete m_pSchema;
+			m_pSchema = NULL;
+		}
+    }
 
     void PrintNode();
     void ExecutePostOrder();
