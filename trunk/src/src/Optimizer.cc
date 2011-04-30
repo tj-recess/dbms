@@ -25,7 +25,6 @@ Optimizer::Optimizer(Statistics & s,
 {
 	// Store alias in sorted fashion in m_vSortedAlias
 	// and the number of tables/alias in m_nNumTables
-	//m_nNumTables = SortTables();
 	m_nNumTables = SortAlias();
 	if (m_nNumTables != -1)
 	{	
@@ -684,7 +683,7 @@ void Optimizer::MakeQueryPlan()
 				{
 						map<string, TableInfo> relStatsMap = (*pStats->GetRelStats());
 						double est = relStatsMap[sFirst].numTuples;
-						if (min_est = -1)
+						if (min_est == -1)
 						{
 								min_est = est;
 								min_order = sCombo;
@@ -864,8 +863,7 @@ void Optimizer::MakeQueryPlan()
         Function * pFunc = new Function();
         pFunc->GrowFromParseTree (m_pFuncOp, *pFinalSchema);
 
-        // Make order maker
-        //find the column name in schema, create OrderMaker manually
+        // Find the column name in schema, create OrderMaker manually
         OrderMaker *pGrpOrder = new OrderMaker();   //pGrpOrder->numAtts = 0 (initially)
         NameList* pTempGroupingAtts = m_pGroupingAtts;
         while(pTempGroupingAtts != NULL)
@@ -903,15 +901,19 @@ void Optimizer::MakeQueryPlan()
 
 		int in = pFinalNode->m_nOutPipe;
         int out = m_nGlobalPipeID++;    
+
+		// If sum is the only projected column, print the result here
+		// Otherwise projection will print all the projected columns
+		bool bPrintHere = false;
+		if (m_pAttsToSelect == NULL)
+			bPrintHere = true;
 	
 		// create new node
-        QueryPlanNode * pSumNode = new Node_Sum(in, out, pFunc);
+        QueryPlanNode * pSumNode = new Node_Sum(in, out, pFunc, bPrintHere);
 		pSumNode->left = pFinalNode;    // make join the left child of group-by
         pFinalNode = pSumNode;          // now final node is group by (its on top!)
 	}
 
-	// Start making the schema for distinct
-	vector <Attribute *> vec_dis_atts;
 
     // project
 	if (m_pAttsToSelect)
@@ -921,6 +923,7 @@ void Optimizer::MakeQueryPlan()
 		int numAttsToSelect = 0, numTotAtts = 0;
 		vector <int> vec_AttsToKeepNum;
 		vector <string> vec_AttsToKeepName;
+		vector <Attribute *> vec_dis_atts;
 
 		// Find num atts to keep and store names in vec_AttsToKeepName
 		NameList * temp = m_pAttsToSelect;
@@ -961,7 +964,7 @@ void Optimizer::MakeQueryPlan()
 				{
 					vec_AttsToKeepNum.push_back(numTotAtts + found_pos);
 
-					// for use by distinct
+					// for use by project/distinct schema making
 					Attribute * pAtt = new Attribute;
 					pAtt->name = new char[sColName.length()];
 					strcpy(pAtt->name, (char*)sColName.c_str());
@@ -985,14 +988,36 @@ void Optimizer::MakeQueryPlan()
 		for (int j = 0, i = size-1; i >= 0; j++, i--)
 			attsToKeep[j] = vec_AttsToKeepNum.at(i);	// Need to reverse the order
 
-		// If project is the top-most node, print record here
-		// Otheriwse distinct will print them
-		bool bPrintInProject = true;
-		if (m_nDistinctAtts == 1)
-			bPrintInProject = false;
 
+		// Make schema for projection
+        string sFileName = "projection.schema";
+        FILE *outSchemaFile = fopen (sFileName.c_str(), "w");
+        fprintf(outSchemaFile, "BEGIN\n%s\nwherever", "projection");
+        // go over the vector and write attributes to file
+        int numAtts = vec_dis_atts.size();
+        for (int i = 0; i < numAtts; i++)
+        {
+            Attribute * pAtts = vec_dis_atts.at(i);
+            fprintf(outSchemaFile, "\n%s", pAtts->name);
+            if (pAtts->myType == Int)
+                fprintf(outSchemaFile, " Int");
+            else if (pAtts->myType == Double)
+                fprintf(outSchemaFile, " Double");
+            else if (pAtts->myType == String)
+                 fprintf(outSchemaFile, " String");
+        }
+        // Done
+        fprintf (outSchemaFile, "\nEND\n");
+        fclose(outSchemaFile);
+
+		// Print result on screen if user wants
+		// But if distinct clause is there... then don't print here
+		int nPrintOnScreen = m_nPrintPlanOnScreen;
+		if (m_nDistinctAtts == 1)
+			nPrintOnScreen = 0;
+        Schema * pProjSch = new Schema("projection.schema", "projection");
 		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, numAttsToSelect, 
-													  numTotAtts, bPrintInProject);	
+													  numTotAtts, pProjSch, nPrintOnScreen);	
 	
 		pProjection->left = pFinalNode;
 		// Make this node top most
@@ -1015,46 +1040,37 @@ void Optimizer::MakeQueryPlan()
     // distinct
     if (m_nDistinctAtts == 1)
     {
-		// write distinct schema in a file and read it back to make schema object
-
-	    string sFileName = "distinct.schema";
-    	FILE *outSchemaFile = fopen (sFileName.c_str(), "w");
-	    fprintf(outSchemaFile, "BEGIN\n%s\nwherever", "distinct");
-		// go over the vector and write attributes to file
-		int numAtts = vec_dis_atts.size();
-    	for (int i = 0; i < numAtts; i++)
-	    {
-		    Attribute * pAtts = vec_dis_atts.at(i);
-        	fprintf(outSchemaFile, "\n%s", pAtts[i].name);
-	        if (pAtts[i].myType == Int)
-    	        fprintf(outSchemaFile, " Int");
-        	else if (pAtts[i].myType == Double)
-	            fprintf(outSchemaFile, " Double");
-    	    else if (pAtts[i].myType == String)
-        	     fprintf(outSchemaFile, " String");
-	    }
-    	// Done
-	    fprintf (outSchemaFile, "\nEND\n");
-    	fclose(outSchemaFile);
-
-		Schema *pDistinctSchema = new Schema("distinct.schema", "distinct");
-
+		Schema * pProjSch = new Schema("projection.schema", "projection");
         int in = pFinalNode->m_nOutPipe;
         int out = m_nGlobalPipeID++;
 
         // Make node for distinct
-        QueryPlanNode * pDistinct = new Node_Distinct(in, out, pDistinctSchema);
+        QueryPlanNode * pDistinct = new Node_Distinct(in, out, pProjSch, m_nPrintPlanOnScreen);
         pDistinct->left = pFinalNode;    // make prev node  left child of distinct
         pFinalNode = pDistinct;          // now final node is distinct (its on top!)
     }
 
 
+	// Print the result in file
+	// So create a write out node on top of everything now.
+	if (m_nPrintPlanOnScreen == 0)
+	{
+        Schema * pProjSch = new Schema("projection.schema", "projection");
+        int in = pFinalNode->m_nOutPipe;
+		
+		// Make node for writeout
+        QueryPlanNode * pWriteOutNode = new Node_WriteOut(in, m_sPrintPlanFile, pProjSch);
+		pWriteOutNode->left = pFinalNode;    // make prev node  left child of distinct
+        pFinalNode = pWriteOutNode;          // now final node is writeout (its on top!)
+
+		cout << "\n\nQuery output will be written to file : " << m_sPrintPlanFile.c_str() << "\n\n";
+	}
+
 	// Print the final query plan
     if (pFinalNode != NULL)
 	{
 		m_pFinalNode = pFinalNode;
-		if (m_nPrintPlanOnScreen == 1)		// Check if user wants the plan printed on screen
-        	m_pFinalNode->PrintNode();
+       	m_pFinalNode->PrintNode();
 	}
 	else
 		cout << "\nERROR! No Query Plan possible!\n\n";

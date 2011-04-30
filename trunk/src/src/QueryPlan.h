@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 
+#define DEBUG_QUERY_NODE 1
 #define QUERY_PIPE_SIZE 1000
 #define QUERY_USE_PAGES 100
 
@@ -58,6 +59,11 @@ public:
  
 	~Node_SelectPipe()
     {
+		if (this->left)
+        	delete this->left;
+	    if (this->right)
+			delete this->right;
+
 		if (m_pCNF)
 		{
         	delete m_pCNF; m_pCNF = NULL;
@@ -91,14 +97,19 @@ public:
 
 	~Node_SelectFile()
 	{
-/*        if (m_pCNF)
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+	
+        if (m_pCNF)
         {
             delete m_pCNF; m_pCNF = NULL;
         }
         if (m_pLiteral)
         {
             delete m_pLiteral; m_pLiteral = NULL;
-        }*/
+        }
 	}
 
     void PrintNode();
@@ -110,27 +121,33 @@ class Node_Project : public QueryPlanNode
 {
 public:
 	int * atts_list;
-	int m_nAttsToKeep, m_nTotalAtts;
-	bool m_bPrintHere;
+	int m_nAttsToKeep, m_nTotalAtts, m_nPrintOnScreen;
+	Schema * m_pSchema;
 
-	Node_Project(int ip, int op, int *atk, int nKeep, int nTot, bool bPrint)
+	Node_Project(int ip, int op, int *atk, int nKeep, int nTot, Schema * pSch, int nPrintOnScreen)
 	{
 		m_nInPipe = ip;
 		m_nOutPipe = op;
 		atts_list = atk;
 		m_nAttsToKeep = nKeep;
 		m_nTotalAtts = nTot;
-		m_bPrintHere = bPrint;
+		m_pSchema = pSch;
+		m_nPrintOnScreen = nPrintOnScreen;
 		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 		
 	~Node_Project()
 	{
-/*		if (atts_list)
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+
+		if (atts_list)
 		{
 			delete [] atts_list; 
 			atts_list = NULL;
-		}*/
+		}
 	}
 
     void PrintNode();
@@ -159,7 +176,12 @@ public:
 	
 	~Node_Join()
     {
-/*        if (m_pCNF)
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+
+        if (m_pCNF)
         {
             delete m_pCNF; m_pCNF = NULL;
         }
@@ -170,7 +192,7 @@ public:
 		if (m_pSchema)
 		{
     	    delete m_pSchema; m_pSchema = NULL;
-		}*/
+		}
     }
 
     void PrintNode();
@@ -182,17 +204,24 @@ class Node_Sum : public QueryPlanNode
 {
 public:
 	Function * m_pFunc;
+	bool m_bPrintHere;
 
-	Node_Sum(int ip, int op, Function *pF)
+	Node_Sum(int ip, int op, Function *pF, bool bPrint)
 	{
 		m_nInPipe = ip;
 		m_nOutPipe = op;
 		m_pFunc = pF;
+		m_bPrintHere = bPrint;
 		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 
 	~Node_Sum()
 	{
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+
 		if (m_pFunc)
 		{
 			delete m_pFunc; m_pFunc = NULL;
@@ -221,14 +250,19 @@ public:
 
 	~Node_GroupBy()
 	{
-/*		if (m_pFunc)
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+
+		if (m_pFunc)
 		{
 			delete m_pFunc; m_pFunc = NULL;
 		}
 		if (m_pOM)
 		{
 			delete m_pOM; m_pOM = NULL;
-		}*/
+		}
 	}
 
     void PrintNode();
@@ -241,17 +275,24 @@ class Node_Distinct : public QueryPlanNode
 {
 public:
 	Schema *m_pSchema;
+	int m_nPrintOnScreen;
 
-    Node_Distinct(int ip, int op, Schema * pSch)
+    Node_Distinct(int ip, int op, Schema * pSch, int nPrintOnScreen)
     {
         m_nInPipe = ip;
         m_nOutPipe = op;
 		m_pSchema = pSch;
+		m_nPrintOnScreen = nPrintOnScreen;
         QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
     }
 
     ~Node_Distinct()
     {
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+
 		if (m_pSchema)
 		{
 			delete m_pSchema;
@@ -278,6 +319,11 @@ public:
 
 	~Node_WriteOut()
 	{
+        if (this->left)
+            delete this->left;
+        if (this->right)
+            delete this->right;
+
 		if (m_pSchema)
 		{
 			delete m_pSchema; m_pSchema = NULL;
