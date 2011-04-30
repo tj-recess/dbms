@@ -1070,28 +1070,38 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
         }
 
 
-        prvsNode = parseTree;
-        parseTree = parseTree->rightAnd;
-        //if lastAndList was not skipped, append it to newAndList which will be returned
+                //if lastAndList was not skipped, append it to newAndList which will be returned
         if(!skipped)
         {
             //update head if first node is removed
-            if(prvsNode == m_pCNF)
-                m_pCNF = parseTree;
+            if(parseTree == m_pCNF)
+                m_pCNF = parseTree->rightAnd;
 
             if(newAndList == NULL)
             {
-                newAndList = prvsNode;
+                newAndList = parseTree;
+                if(prvsNode != NULL)
+                    prvsNode->rightAnd = parseTree->rightAnd;
+                parseTree = parseTree->rightAnd;
                 newAndList->rightAnd = NULL;
+
             }
             else
             {
                 AndList* temp = newAndList;
                 while(temp->rightAnd != NULL)
                     temp = temp->rightAnd;
-                temp->rightAnd = prvsNode;
-                prvsNode->rightAnd = NULL;
+                temp->rightAnd = parseTree;
+                if(prvsNode != NULL)
+                    prvsNode->rightAnd = parseTree->rightAnd;
+                parseTree = parseTree->rightAnd;
+                temp->rightAnd->rightAnd = NULL;
             }
+        }
+        else
+        {
+            prvsNode = parseTree;
+            parseTree = parseTree->rightAnd;
         }
     }
     return newAndList;
