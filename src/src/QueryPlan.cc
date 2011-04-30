@@ -36,7 +36,18 @@ void Node_SelectPipe::ExecutePostOrder()
 
 void Node_SelectPipe::ExecuteNode()
 {
+	#ifdef DEBUG_QUERY_NODE
 	cout << "\nExecuteNode of SelectPipe\n";
+	#endif
+
+	SelectPipe selPipe;
+    selPipe.Use_n_Pages(QUERY_USE_PAGES);
+    if (m_pCNF != NULL && m_pLiteral != NULL)
+    {
+    	selPipe.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
+	}
+    else
+		cout << "\nInsufficient parameters!\n";
 }
 
 // -------------------------------------- select file ------------------
@@ -74,27 +85,15 @@ void Node_SelectFile::ExecuteNode()
         DBFile * pFile = new DBFile;
         pFile->Open(const_cast<char*>(m_sInFileName.c_str()));
 
-        cout << "\n IN selectFile for " << m_sInFileName.c_str() << endl;
+		#ifdef DEBUG_QUERY_NODE
+        cout << "\n In ExecuteNode selectFile for " << m_sInFileName.c_str() << endl;
+		#endif
+
         SelectFile * pSF = new SelectFile;
         pSF->Use_n_Pages(QUERY_USE_PAGES);
         if (m_pCNF != NULL && m_pLiteral != NULL)
         {
             pSF->Run(*pFile, *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pCNF, *m_pLiteral);
-
-            //sf.WaitUntilDone();
-/*
-            int dotPos = m_sInFileName.find(".");
-            string sTabName = m_sInFileName.substr(0, dotPos);
-            Schema Sch("catalog", (char*)sTabName.c_str());
-            Record rec;
-            int count = 0;
-            while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
-            {
-                //rec.Print(&Sch);
-                count++;
-            }
-            cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
-*/
         }
         else
             cout << "\nInsufficient parameters!\n";
@@ -133,22 +132,25 @@ void Node_Project::ExecutePostOrder()
 }
 
 void Node_Project::ExecuteNode()
-{
-        cout << "\nExecuteNode of Node_Project\n";
+{	
+		#ifdef DEBUG_QUERY_NODE
+        cout << "\nIn ExecuteNode of Node_Project\n";
+		#endif
+
         Project P;
         P.Use_n_Pages(QUERY_USE_PAGES);
         if (atts_list != NULL)
         {
             P.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]),
                   atts_list, m_nTotalAtts, m_nAttsToKeep);
-
-			if (m_bPrintHere == true)
+			
+			if (m_nPrintOnScreen == 1)
 			{
 	            Record rec;
     	        int count = 0;
         	    while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
             	{
-					//cout << "\ntrying to fetch recs after project\n";
+					rec.Print(m_pSchema);
 	                count++;
     	        }
         	    cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
@@ -189,7 +191,9 @@ void Node_Join::ExecutePostOrder()
 
 void Node_Join::ExecuteNode()
 {
+		#ifdef DEBUG_QUERY_NODE
         cout << "\n IN Join Node with outpipe " << m_nOutPipe << endl;
+		#endif
 
         Join J; 
         J.Use_n_Pages(QUERY_USE_PAGES);
@@ -240,13 +244,16 @@ void Node_GroupBy::ExecutePostOrder()
 
 void Node_GroupBy::ExecuteNode()
 {
-	cout << "\nExecuteNode of Node_GroupBy\n";
+	#ifdef DEBUG_QUERY_NODE
+	cout << "\nIn ExecuteNode of Node_GroupBy\n";
+	#endif
+
 	GroupBy G;        
     G.Use_n_Pages(QUERY_USE_PAGES);
     if (m_pFunc != NULL && m_pOM != NULL)
     {
 		G.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pOM, *m_pFunc);
-		cout << "\nOut of group.run\n";
+		/*cout << "\nOut of group.run\n";
 		Record rec;
 		Attribute DA = {"double", Double};
 		Schema sum_sch ("sum_sch", 1, &DA);
@@ -254,7 +261,7 @@ void Node_GroupBy::ExecuteNode()
 		{
 			cout << "\nTrying to fetch sum\n";
             rec.Print (&sum_sch);
-        }
+        }*/
     }
     else
     	cout << "\nInsufficient parameters!\n";
@@ -289,31 +296,40 @@ void Node_Sum::ExecutePostOrder()
 
 void Node_Sum::ExecuteNode()
 {
+	#ifdef DEBUG_QUERY_NODE
 	cout << "\nExecuteNode of Node_Sum\n";
+	#endif
+
     Sum S;
     S.Use_n_Pages(QUERY_USE_PAGES);
     if (m_pFunc != NULL)
     {
         S.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pFunc);
-		if (m_pFunc->ReturnsInt() == 1)
+		
+		// see if we have to print the result right here
+		if (m_bPrintHere)
 		{
-            Record rec;
-            Attribute IA = {"integer", Int};
-            Schema sum_sch ("sum_sch", 1, &IA);
-            while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
-            {
-                rec.Print (&sum_sch);
-            }
-		}
-		else
-		{
-	        Record rec;
-    	    Attribute DA = {"double", Double};
-        	Schema sum_sch ("sum_sch", 1, &DA);
-	        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
-    	    {
-            	rec.Print (&sum_sch);
-	        }
+			// Sum output is int, so make schema with one int column
+			if (m_pFunc->ReturnsInt() == 1)
+			{
+        	    Record rec;
+            	Attribute IA = {"integer", Int};
+	            Schema sum_sch ("sum_sch", 1, &IA);
+    	        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
+        	    {
+            	    rec.Print (&sum_sch);
+		        }
+			}
+			else	// Sum output is double, so make schema with one double column
+			{
+	    	    Record rec;
+    	    	Attribute DA = {"double", Double};
+	        	Schema sum_sch ("sum_sch", 1, &DA);
+		        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
+    		    {
+            		rec.Print (&sum_sch);
+		        }
+			}
 		}
     }
     else
@@ -346,7 +362,10 @@ void Node_Distinct::ExecutePostOrder()
 
 void Node_Distinct::ExecuteNode()
 {
+	#ifdef DEBUG_QUERY_NODE
     cout << "\nExecuteNode of Distinct\n";
+	#endif
+
     DuplicateRemoval DR;
     DR.Use_n_Pages(QUERY_USE_PAGES);
     if (m_pSchema != NULL)
@@ -354,14 +373,17 @@ void Node_Distinct::ExecuteNode()
         DR.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), *(QueryPlanNode::m_mPipes[m_nOutPipe]), *m_pSchema);
 
 		// Clear the pipe here
-        Record rec;
-        int count = 0;
-        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
-        {
-    	    //cout << "\ntrying to fetch recs after project\n";
-	         count++;
-        }
-        cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+		if (m_nPrintOnScreen == 1)
+		{
+	        Record rec;
+    	    int count = 0;
+        	while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove(&rec))
+	        {
+				rec.Print(m_pSchema);
+		        count++;
+        	}
+	        cout << endl << count << " records removed from pipe " << m_nOutPipe << endl;
+		}
 	}	
 }
 
@@ -375,7 +397,6 @@ void Node_WriteOut::PrintNode()
         cout << "\n*** WriteOut Operation ***";
         cout << "\nInput pipe ID: " << m_nInPipe;
         cout << "\nOutput file: " << m_sOutFileName;
-//        cout << "\nSchema: " << m_pSchema->Print();
         cout << endl << endl;
 
         if (this->right != NULL)
@@ -393,5 +414,19 @@ void Node_WriteOut::ExecutePostOrder()
 
 void Node_WriteOut::ExecuteNode()
 {
-	cout << "\nExecuteNode of Node_WriteOut\n";
+    #ifdef DEBUG_QUERY_NODE
+    cout << "\nExecuteNode of Node_WriteOut\n";
+    #endif
+
+	WriteOut W;
+    if (m_pSchema != NULL && !m_sOutFileName.empty())
+    {
+		int count = 0;
+		FILE * pFILE = fopen((char*)m_sOutFileName.c_str(), "w");
+		W.Run(*(QueryPlanNode::m_mPipes[m_nInPipe]), pFILE, *m_pSchema, &count);
+		W.WaitUntilDone();
+		fclose(pFILE);
+
+		//cout << endl << count << " records written to file " << m_sOutFileName.c_str() << endl;
+    }
 }

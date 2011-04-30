@@ -219,18 +219,20 @@ class WriteOut : public RelationalOp
             Pipe *inputPipe;
 			Schema *pSchema;
 			FILE *pFILE;
+			int *pCount;
 
-            Params(Pipe *inPipe, Schema *pMySchema, FILE *outFile)
+            Params(Pipe *inPipe, Schema *pMySchema, FILE *outFile, int *cnt = NULL)
             {
                 inputPipe = inPipe;
 				pSchema = pMySchema;
 				pFILE = outFile;
+				pCount = cnt;
             }
         };
         static void* DoOperation(void*);
 
 	public:
-	void Run (Pipe &inPipe, FILE *outFile, Schema &mySchema);
+	void Run (Pipe &inPipe, FILE *outFile, Schema &mySchema, int *cnt);
 	void WaitUntilDone ();
 	void Use_n_Pages (int n) { }
 };

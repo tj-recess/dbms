@@ -580,11 +580,11 @@ void Project::WaitUntilDone()
  *					It has been opened already
  *		  mySchema = the schema to use for writing records			
  */
-void WriteOut::Run (Pipe &inPipe, FILE *outFile, Schema &mySchema)
+void WriteOut::Run (Pipe &inPipe, FILE *outFile, Schema &mySchema, int *count)
 {
 	// Create thread to do the project operation
 	pthread_create(&m_thread, NULL, &DoOperation, 
-				   (void*) new Params(&inPipe, &mySchema, outFile));
+				   (void*) new Params(&inPipe, &mySchema, outFile, count));
 	
 	return;
 }
@@ -592,11 +592,15 @@ void WriteOut::Run (Pipe &inPipe, FILE *outFile, Schema &mySchema)
 void * WriteOut::DoOperation(void * p)
 {
 	Params* param = (Params*)p;
-	Record rec;	
+	Record rec;
+	int count = 0;	
 	// While records are coming from inPipe, 
 	// Write out the attributes in text form in outFile
 	while(param->inputPipe->Remove(&rec))
 	{
+		// Increment the count
+		count++;
+
 		// Basically copy the code from Record.cc (Record::Print function)
 	    int n = param->pSchema->GetNumAtts();
 	    Attribute *atts = param->pSchema->GetAtts();
@@ -644,6 +648,8 @@ void * WriteOut::DoOperation(void * p)
     	}		// end of for loop
 		fprintf(param->pFILE, "\n");
 	}			// no more records in the inPipe
+
+	param->pCount = &count;
 
 	delete param;
 	param = NULL;
@@ -775,20 +781,25 @@ void * DuplicateRemoval::DoOperation(void * p)
 	{
 		if (bLastSeenRecSet == false)
 		{
-			lastSeenRec = currentRec;
+			lastSeenRec.Copy(&currentRec);
 			bLastSeenRecSet = true;
 		}
 
 		// compare currentRec with lastSeenRec
 		// if same, do nothing
-		// if different, send currentRec to param->outputPipe
+		// if different, send last seem rec to param->outputPipe
 		//				 and update lastSeenRec
+
 		if (ce.Compare(&lastSeenRec, &currentRec, &sortOrder) != 0)
 		{
-			lastSeenRec = currentRec;
-			param->outputPipe->Insert(&currentRec);
+			// send the last seen rec out and then update last seen rec
+			param->outputPipe->Insert(&lastSeenRec);
+			lastSeenRec.Copy(&currentRec);
 		}
 	}
+
+	// always push last rec to pipe	
+	param->outputPipe->Insert(&lastSeenRec);
 
     //Shut down the outpipe
 	localOutPipe.ShutDown();
@@ -839,15 +850,16 @@ void* GroupBy::DoOperation(void* p)
     bool currentGroupActive = false;
     ComparisonEngine ce;
     double sum = 0.0;
-#ifdef _RELOP_DEBUG
-    bool printed = false;
-    int recordsInAGroup = 0;
-    ofstream log_file("log_file");
-    ofstream groupRecordLogFile("groupRecordLogFile");
-#endif
+		#ifdef _RELOP_DEBUG
+	    bool printed = false;
+    	int recordsInAGroup = 0;
+	    ofstream log_file("log_file");
+    	ofstream groupRecordLogFile("groupRecordLogFile");
+		#endif
+
     while(localOutPipe.Remove(&rec) || currentGroupActive)
     {
-#ifdef _RELOP_DEBUG
+		#ifdef _RELOP_DEBUG
         Schema suppSchema("catalog", "supplier");
         if(!printed)
         {
@@ -857,15 +869,16 @@ void* GroupBy::DoOperation(void* p)
             cout<<"columns in Record = "<<((int*)rec.bits)[1]/sizeof(int) - 1<<endl;
             printed = true;
         }
-#endif
+		#endif
+
         if(!currentGroupActive)
         {
             currentGroupRecord->Copy(&rec);
             currentGroupActive = true;
-#ifdef _RELOP_DEBUG
+			#ifdef _RELOP_DEBUG
             rec.PrintToFile(&suppSchema, log_file);
             currentGroupRecord->PrintToFile(&suppSchema, groupRecordLogFile);
-#endif
+			#endif
         }
         
         //either no new record fetched (end of pipe) or new group started so just go to else part and finish the last group
@@ -876,16 +889,16 @@ void* GroupBy::DoOperation(void* p)
             sum += (ival + dval);
             delete rec.bits;
             rec.bits = NULL;
-#ifdef _RELOP_DEBUG
+			#ifdef _RELOP_DEBUG
             recordsInAGroup++;
-#endif
+			#endif
 	}
         else
         {
-#ifdef _RELOP_DEBUG
+			#ifdef _RELOP_DEBUG
             cout<<"Records in a Group = "<<recordsInAGroup<<", and sum = "<<sum<<endl;
-//            recordsInAGroup = 0;
-#endif
+            //recordsInAGroup = 0;
+			#endif
             //store old sum and group-by attribtues concatenated in outputPipe
             //and also start new group from here
 
@@ -906,10 +919,11 @@ void* GroupBy::DoOperation(void* p)
             sumRec.SuckNextRecord(&sum_schema, sum_file);
             fclose(sum_file);
 
-#ifdef _RELOP_DEBUG
-//            cout<<"Sum Record : ";
-//            sumRec.Print(&sum_schema);
-#endif
+			#ifdef _RELOP_DEBUG
+			//            cout<<"Sum Record : ";
+			//            sumRec.Print(&sum_schema);
+			#endif
+
             //glue this record with the one we have from groupAttribute - not needed in q6
             int numAttsToKeep = param->groupAttributes->numAtts + 1;
             int attsToKeep[numAttsToKeep];
@@ -941,14 +955,16 @@ void* GroupBy::DoOperation(void* p)
             perror("\nError in removing tmp_sum_data_file!");
         }
     }
-#ifdef _RELOP_DEBUG
+
+	#ifdef _RELOP_DEBUG
     log_file.flush();
     log_file.close();
     groupRecordLogFile.flush();
     groupRecordLogFile.close();
     cout<<"sum in last group (after finish) = "<< sum<<endl;
     cout<<"recs in last group (after finish) = "<< recordsInAGroup<<endl;
-#endif
+	#endif
+
     // Shut down the outpipe
     param->outputPipe->ShutDown();
     delete param;
