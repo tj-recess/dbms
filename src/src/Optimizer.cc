@@ -851,6 +851,9 @@ void Optimizer::MakeQueryPlan()
 		}
 	}
 
+	// define function here, coz it will be needed for projection later
+	Function * pFunc = NULL;	
+
     // group by and sum
     if (m_pGroupingAtts && m_pFuncOp)
     {
@@ -895,7 +898,7 @@ void Optimizer::MakeQueryPlan()
         RemoveAliasFromColumnName(m_pFuncOp);
 
 		// Make function
-        Function * pFunc = new Function();
+        pFunc = new Function();
         pFunc->GrowFromParseTree (m_pFuncOp, *pFinalSchema);
 
 		int in = pFinalNode->m_nOutPipe;
@@ -976,6 +979,17 @@ void Optimizer::MakeQueryPlan()
 		// Make this node top most
 		pFinalNode = pProjection;
 	}
+/*	else if (m_pAttsToSelect == NULL && m_pFuncOp != NULL && pFunc != NULL)
+	{
+        int in = pFinalNode->m_nOutPipe;
+        int out = m_nGlobalPipeID++;
+
+		int * attsToKeep = {0};
+		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, 1, 1);
+        pProjection->left = pFinalNode;
+        // Make this node top most
+        pFinalNode = pProjection;		
+	}*/
 
 	// Print the final query plan
     if (pFinalNode != NULL)
