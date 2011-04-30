@@ -111,14 +111,16 @@ class Node_Project : public QueryPlanNode
 public:
 	int * atts_list;
 	int m_nAttsToKeep, m_nTotalAtts;
+	bool m_bPrintHere;
 
-	Node_Project(int ip, int op, int *atk, int nKeep, int nTot)
+	Node_Project(int ip, int op, int *atk, int nKeep, int nTot, bool bPrint)
 	{
 		m_nInPipe = ip;
 		m_nOutPipe = op;
 		atts_list = atk;
 		m_nAttsToKeep = nKeep;
 		m_nTotalAtts = nTot;
+		m_bPrintHere = bPrint;
 		QueryPlanNode::m_mPipes[m_nOutPipe] = new Pipe(QUERY_PIPE_SIZE);
 	}
 		
