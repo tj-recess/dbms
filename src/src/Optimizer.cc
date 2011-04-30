@@ -1065,10 +1065,19 @@ AndList* Optimizer::GetSelectionsFromAndList(string alias)
             if(prvsNode == m_pCNF)
                 m_pCNF = parseTree;
 
-            while(newAndList != NULL)
-                newAndList = newAndList->rightAnd;
-            newAndList = prvsNode;
-            newAndList->rightAnd = NULL;
+            if(newAndList == NULL)
+            {
+                newAndList = prvsNode;
+                newAndList->rightAnd = NULL;
+            }
+            else
+            {
+                AndList* temp = newAndList;
+                while(temp->rightAnd != NULL)
+                    temp = temp->rightAnd;
+                temp->rightAnd = prvsNode;
+                prvsNode->rightAnd = NULL;
+            }
         }
     }
     return newAndList;
