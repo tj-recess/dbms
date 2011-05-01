@@ -19,7 +19,8 @@ int DDL_DML::CreateTable(string sTabName, vector<Attribute> & col_atts_vec,
 	fprintf (out, "\nBEGIN\n%s\n%s.tbl", sTabName.c_str(), sTabName.c_str());
 	// The loop needs to be in the reverse order as the attributes coming from 
 	// the parser in "col_atts" are in reverse order.
-	for (int i = nNumAtts-1; i >= 0; i--)
+	//for (int i = nNumAtts-1; i >= 0; i--)
+	for (int i = 0; i < nNumAtts; i++)
 	{
 		fprintf (out, "\n%s ", col_atts_vec[i].name);
 		if (col_atts_vec[i].myType == Int)
