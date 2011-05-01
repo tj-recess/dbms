@@ -435,7 +435,7 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
                 RemoveAliasFromColumnName(new_AndList);
                 pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pLit);
 
-				// Read data from left schema and right schema and write to sName.schema file
+		// Read data from left schema and right schema and write to sName.schema file
                 ConcatSchemas(&LeftSchema, &RightSchema, sName);
                 pSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
             }
@@ -517,7 +517,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
         {
 			int loc = -1;
             loc = ComboAfterCurrTable(vTempCombos, m_vSortedAlias.at(i));
-            // if lec = -1 --> error
+            // if loc = -1 --> error
             if (loc != -1)
             {
                 // Append current table with the other combinations (see logic above)
@@ -532,7 +532,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                     cout << sName.c_str() << endl;
 					#endif
 
-                    int in_pipe_left = m_mJoinEstimate[sLeftAlias].queryPlanNode->m_nOutPipe;
+                    /*int in_pipe_left = m_mJoinEstimate[sLeftAlias].queryPlanNode->m_nOutPipe;
                     int in_pipe_right = m_mJoinEstimate[sRightAlias].queryPlanNode->m_nOutPipe;
                     int out_pipe = m_nGlobalPipeID++; 
                     CNF * pCNF = NULL;
@@ -602,6 +602,7 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
 //                    jv.joinOrder = ;
 //                    jv.schema = ;
                     m_mJoinEstimate[sName] = *jv;
+                     */
                     vNewCombo.push_back(sName);
                 }
             }
@@ -684,7 +685,31 @@ void Optimizer::MakeQueryPlan()
 						two_tab_combos.push_back(m_vTabCombos.at(i));
 		}
 
-		// go over two_tab_combos and find the combo with min estimate
+                /*
+                pair<string, string> optimal;
+
+                //print all comibnations
+                cout << "\n-------<print all comibnations>-------\n";
+                for(int i = 0; i < m_vTabCombos.size(); i++)
+                {
+                    cout << i << " = " << m_vTabCombos.at(i) << "\t";
+                }
+                cout << "\n-------</print all comibnations>-------\n";
+                vector<string> vec_rels;
+                ComboToVector(m_vTabCombos.at(0),vec_rels);
+                // copy alias as well as table names in a new vector
+                vector <string> rel_names;
+                for (int i = 0; i < vec_rels.size(); i++)
+                {
+                        rel_names.push_back(vec_rels.at(i));
+                        rel_names.push_back(m_mAliasToTable[vec_rels.at(i)]);
+                }
+                // This function will fill up m_aTableNames
+	        PopulateTableNames(rel_names);
+                FindOptimalPairing(vec_rels, NULL, optimal);
+
+		*/
+                 // go over two_tab_combos and find the combo with min estimate
 		double min_est = -1;
 		string min_order, min_first, min_second;
 		for (int i = 0; i < two_tab_combos.size(); i++)
@@ -773,9 +798,9 @@ void Optimizer::MakeQueryPlan()
             pFinalJoin->right = m_mJoinEstimate[min_join_right].queryPlanNode;
 
             pFinalNode = pFinalJoin;
-		}
-		else if (m_nNumTables == 3)
-		{
+            }
+            else if (m_nNumTables == 3)
+            {
 			#ifdef _DEBUG_OPTIMIZER
 			//print both the maps
 			//1. m_mAndList to boolean
@@ -830,41 +855,66 @@ void Optimizer::MakeQueryPlan()
 
 			// -------------------- now make the upper join node ----------------------
 
-            // ------ optimal join : left deep --------
-            int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
-            int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
-            int op = m_nGlobalPipeID++;
+                // ------ optimal join : left deep --------
+                int ip1 = m_mJoinEstimate[min_order].queryPlanNode->m_nOutPipe;
+                int ip2 = m_mJoinEstimate[min_third].queryPlanNode->m_nOutPipe;
+                int op = m_nGlobalPipeID++;
 
-            // Make the schema
-            // Read the schema from min_order.schema, where table name is min_order
-            Schema LeftSchema((char*)(min_order + ".schema").c_str(), (char*)min_order.c_str());
-            Schema RightSchema("catalog", (char*) m_mAliasToTable[min_third].c_str());
-            string sName = min_order + "." + min_third;
-            // Read data from left schema and right schema and write to sName.schema file
-            ConcatSchemas(&LeftSchema, &RightSchema, sName);
-            pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
+                // Make the schema
+                // Read the schema from min_order.schema, where table name is min_order
+                Schema LeftSchema((char*)(min_order + ".schema").c_str(), (char*)min_order.c_str());
+                Schema RightSchema("catalog", (char*) m_mAliasToTable[min_third].c_str());
+                string sName = min_order + "." + min_third;
+                // Read data from left schema and right schema and write to sName.schema file
+                ConcatSchemas(&LeftSchema, &RightSchema, sName);
+                pFinalSchema = new Schema((char*)(sName + ".schema").c_str(), (char*)sName.c_str());
 
-            CNF * pCNF = new CNF();
-            Record * pRec = new Record();
-            AndList * new_AndList = m_mAliasToAndList[sName];
-            pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pRec);
+                CNF * pCNF = new CNF();
+                Record * pRec = new Record();
+                AndList * new_AndList = m_mAliasToAndList[sName];
+                pCNF->GrowFromParseTree(new_AndList, &LeftSchema, &RightSchema, *pRec);
 
-            // Make join node
-            QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, pCNF, pFinalSchema, pRec);
+                // Make join node
+                QueryPlanNode * pFinalJoin = new Node_Join(ip1, ip2, op, pCNF, pFinalSchema, pRec);
 
-            // set child pointers of Final Join Node
-            pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;    // left ptr
-            pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;   // right ptr
+                // set child pointers of Final Join Node
+                pFinalJoin->left = m_mJoinEstimate[min_order].queryPlanNode;    // left ptr
+                pFinalJoin->right = m_mJoinEstimate[min_third].queryPlanNode;   // right ptr
 
-            // set child pointers of min_order (intermediate order node)
-            QueryPlanNode * pIntermediate = m_mJoinEstimate[min_order].queryPlanNode;
-            pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;     // left ptr
-            pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;   // right ptr
+                // set child pointers of min_order (intermediate order node)
+                QueryPlanNode * pIntermediate = m_mJoinEstimate[min_order].queryPlanNode;
+                pIntermediate->left = m_mJoinEstimate[min_join_left].queryPlanNode;     // left ptr
+                pIntermediate->right = m_mJoinEstimate[min_join_right].queryPlanNode;   // right ptr
 
-            // Set this join node as the top-most node
-            pFinalNode = pFinalJoin;
+                // Set this join node as the top-most node
+                pFinalNode = pFinalJoin;
 
-		}
+                //if anything is still left in boolean, include it as select pipe over final join
+                //schema will be same but remember to remove "." before column names in AndList
+                if(m_pCNF != NULL)
+                {
+                    RemoveAliasFromColumnName(m_pCNF);
+                    #ifdef _DEBUG_OPTIMIZER
+                    cout << "\n---rest of andList before select pipe--------\n";
+                    PrintAndList(m_pCNF);
+                    cout << "\n-----------END--------\n";
+                    #endif
+                    CNF * pCNF = new CNF();
+                    Record * pRec = new Record();
+                    AndList * new_AndList = m_pCNF;
+                    pCNF->GrowFromParseTree(new_AndList, pFinalSchema, *pRec);
+
+                    int in = pFinalNode->m_nOutPipe;
+                    int out = m_nGlobalPipeID++;
+
+                    // create new node
+                    QueryPlanNode * pSelectPipeNode = new Node_SelectPipe(in, out, pCNF, pRec);
+                    pSelectPipeNode->left = pFinalNode;    // make join the left child of group-by
+                    pFinalNode = pSelectPipeNode;          // now final node is group by (its on top!)
+
+
+                }
+            }
 	}
 
 	// define function here, coz it will be needed for projection later
@@ -904,6 +954,35 @@ void Optimizer::MakeQueryPlan()
         QueryPlanNode * pGrpNode = new Node_GroupBy(in, out, pFunc, pGrpOrder);
     	pGrpNode->left = pFinalNode;    // make join the left child of group-by
         pFinalNode = pGrpNode;          // now final node is group by (its on top!)
+
+        //if control is in group by then we need to add 1st column as sum in the schema for project
+        Attribute* schemaAtts = pFinalSchema->GetAtts();
+        int schemaNumAtts = pFinalSchema->GetNumAtts();
+        
+        //add first column as sum and recreate schema
+        Attribute *newAtts = new Attribute[schemaNumAtts + 1];
+        newAtts[0].name = "sum";
+        newAtts[0].myType = Double;
+        //copy rest of the atts from pSchema
+        for (int i = 1; i <= schemaNumAtts; i++)
+        {
+//            newAtts[i].name = new char[strlen(schemaAtts[i-1].name) + 1];
+            newAtts[i].name = strdup(schemaAtts[i-1].name);
+            newAtts[i].myType = schemaAtts[i-1].myType;
+        }
+
+        //now delete old schema and create new one from newAtts
+        delete pFinalSchema;
+        pFinalSchema = NULL;
+        string temp("finalSchema");
+        Schema *sch = new Schema((char*)temp.c_str(), schemaNumAtts + 1, newAtts);
+        pFinalSchema = sch;
+
+        //now add sum node at the head of NamesList for projection
+        NameList* node = new NameList();
+        node->name = "sum";
+        node->next = m_pAttsToSelect;
+        m_pAttsToSelect = node;
     }
 
     // only sum, no group by
@@ -951,7 +1030,7 @@ void Optimizer::MakeQueryPlan()
 	{
 		int in = pFinalNode->m_nOutPipe;
 		int out = m_nGlobalPipeID++; 
-		int numAttsToSelect = 0, numTotAtts = 0;
+		int numAttsToSelect = 0, numTotAtts = 1;
 		vector <int> vec_AttsToKeepNum;
 		vector <string> vec_AttsToKeepName;
 		vector <Attribute *> vec_dis_atts;
@@ -964,17 +1043,21 @@ void Optimizer::MakeQueryPlan()
 			vec_AttsToKeepName.push_back(temp->name);
 			temp = temp->next;
 		}
-	
+
+                
 		Schema * pTempSchema = NULL;	
 		// Find total atts: sum of total atts in each table
-		for (int i = 0; i < m_vSortedAlias.size(); i++)
+//		for (int i = 0; i < m_vSortedAlias.size(); i++)
 		{
-			pTempSchema = new Schema("catalog", (char*) m_mAliasToTable[m_vSortedAlias.at(i)].c_str());
-
+                        if(pFinalSchema != NULL)
+                            pTempSchema = pFinalSchema;
+                        else
+                            pTempSchema = new Schema("catalog", (char*) m_mAliasToTable[m_vSortedAlias.at(0)].c_str());
+                        
 			if (pTempSchema == NULL)
 			{
-				cerr << "\n\nERRPR! Schema for " << m_vSortedAlias.at(i) << " not found!\n\n";
-				break;
+				cerr << "\n\nERRoR!";// Schema for " << m_vSortedAlias.at(i) << " not found!\n\n";
+//				break;
 			}
 
 			// iterate over att-to-keep vector and see if that attribute belongs to this table
@@ -993,7 +1076,7 @@ void Optimizer::MakeQueryPlan()
 				int found_pos = pTempSchema->Find((char*)sColName.c_str());
 				if (found_pos != -1)
 				{
-					vec_AttsToKeepNum.push_back(numTotAtts + found_pos);
+					vec_AttsToKeepNum.push_back(/*numTotAtts + */found_pos);
 
 					// for use by project/distinct schema making
 					Attribute * pAtt = new Attribute;
@@ -1005,12 +1088,12 @@ void Optimizer::MakeQueryPlan()
 			}
 
 			// increment num of atts count
-			numTotAtts += pTempSchema->GetNumAtts();
+			//numTotAtts += pTempSchema->GetNumAtts();
 
-			delete pTempSchema;			
+			//delete pTempSchema;
 		}
 
-		// convert vector vec_AttsToKeepNum to int*[]
+                // convert vector vec_AttsToKeepNum to int*[]
 		int size = vec_AttsToKeepNum.size();
 		int *attsToKeep = NULL;
 		if (size != 0)
@@ -1382,19 +1465,52 @@ void Optimizer::FindOptimalPairing(vector<string> & vAliases, AndList* parseTree
         //get Stats object of second, make a copy, apply estimate
         //put all estimates in a map, find minimum and return corresponding
         Statistics *tempStats = new Statistics(*(m_mJoinEstimate[joinOrder.second].stats));
-		
-		string sOrderedNames = joinOrder.first + "." + joinOrder.second;
+
+        /*
+        //arpit : hack for 3 tables
+        //if passed AndList* parseTree is NULL, get all the unused AndLists from the map
+        //and concatenate them into one for estimation.
+        // DO REMEMBER TO PUT THEM BACK IN MAP AS IS.
+
+        if(parseTree == NULL)
+        {
+            map<string, AndList*>::iterator it = m_mAliasToAndList.begin();
+            parseTree = it->second;
+            AndList* temp = parseTree;
+            //loop through map, take everything except joinOrder.second's AndList
+            for(; it != m_mAliasToAndList.end(); it++)
+            {
+                if(it->second != m_mAliasToAndList[joinOrder.second])
+                {
+                    while(temp->rightAnd != NULL)
+                        temp = temp->rightAnd;
+                    temp->rightAnd = it->second;
+                }
+            }
+        }
+        */
+
+	string sOrderedNames = joinOrder.first + "." + joinOrder.second;
         allEstimates[sOrderedNames] = tempStats->Estimate(parseTree, m_aTableNames, vAliases.size()*2);
-		//cout << "\n*** order: " << sOrderedNames.c_str();
-		//cout << "\t Estimate: "<< allEstimates[sOrderedNames];
+#ifdef _DEBUG_OPTIMIZER
+//		cout << "\n*** order: " << sOrderedNames.c_str();
+//		cout << "\t Estimate: "<< allEstimates[sOrderedNames];
+#endif
         //m_aTableNames is expected to be filled by caller
     }
 
+        #ifdef _DEBUG_OPTIMIZER
+        cout << "\n------All estimates-------\n";
+        #endif
+
     map <string, double>::iterator it = allEstimates.begin();
     double minTuples = -1.0;
-	string sOptimalOrder;
-	for (; it != allEstimates.end(); it++)
+    string sOptimalOrder;
+    for (; it != allEstimates.end(); it++)
     {
+        #ifdef _DEBUG_OPTIMIZER
+            cout << it->first << " : " << it->second << endl;
+        #endif
         if (minTuples == -1.0)
         {
             minTuples = it->second;
