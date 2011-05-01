@@ -17,7 +17,7 @@
 using namespace std;
 
 
-#define _DEBUG_OPTIMIZER 1
+//#define _DEBUG_OPTIMIZER 1
 
 class Optimizer
 {
@@ -41,14 +41,13 @@ private:
 
 	char ** m_aTableNames;
 	vector <string> m_vWholeCNF;	// break the AndList into tokens
-        struct JoinValue
-        {
-            Statistics *stats;
-            QueryPlanNode *queryPlanNode;
-            string joinOrder;
-//            Schema schema;
-        };
-//	map <string, pair <Statistics *, QueryPlanNode*> > m_mJoinEstimate;
+    struct JoinValue
+    {
+        Statistics *stats;
+        QueryPlanNode *queryPlanNode;
+        string joinOrder;
+        //Schema schema;
+    };
     map <string, JoinValue> m_mJoinEstimate;
 	Statistics m_Stats;								// master copy of the stats object
     map <string, string> m_mAliasToTable;           // alias to original table name
@@ -71,7 +70,6 @@ private:
     void RemoveAliasFromColumnName(FuncOperator * func_node);
 	void ConcatSchemas(Schema *pRSch, Schema *pLSch, string sName);
 	void FindFirstAttInTable(Schema &sch, string &);
-    //pair<string, string>* FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree);
     void FindOptimalPairing(vector<string>& vAliases,  AndList* parseTree, pair<string, string> &);
 	vector<string> PrintTableCombinations(int combo_len);
 
@@ -103,7 +101,5 @@ public:
     void ExecuteQuery();
 	
 };
-
-//
 
 #endif

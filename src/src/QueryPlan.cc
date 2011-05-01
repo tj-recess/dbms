@@ -315,6 +315,7 @@ void Node_Sum::ExecuteNode()
         	    Record rec;
             	Attribute IA = {"integer", Int};
 	            Schema sum_sch ("sum_sch", 1, &IA);
+				S.WaitUntilDone();
     	        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
         	    {
             	    rec.Print (&sum_sch);
@@ -325,6 +326,7 @@ void Node_Sum::ExecuteNode()
 	    	    Record rec;
     	    	Attribute DA = {"double", Double};
 	        	Schema sum_sch ("sum_sch", 1, &DA);
+				S.WaitUntilDone();
 		        while (QueryPlanNode::m_mPipes[m_nOutPipe]->Remove (&rec))
     		    {
             		rec.Print (&sum_sch);

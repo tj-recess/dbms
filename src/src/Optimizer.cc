@@ -333,7 +333,10 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 	//print_map();
 	#endif
 
+	#ifdef _DEBUG_OPTIMIZER 
     cout << "\n\n--- Table combinations ---\n";
+	#endif
+
     for (int i = 0; i < m_nNumTables; i++)
     {
         for (int j = i+1; j < m_nNumTables; j++)
@@ -342,7 +345,10 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
 			string sRightAlias = m_vSortedAlias.at(j);
 
             string sName = sLeftAlias + "." + sRightAlias;
+
+			#ifdef _DEBUG_OPTIMIZER 
             cout << sName.c_str() << endl;
+			#endif
 
             int in_pipe_left;
             int in_pipe_right;
@@ -450,7 +456,10 @@ void Optimizer::TableComboBaseCase(vector <string> & vTempCombos)
             vTempCombos.push_back(sName);		// Push this combination in the combination-vector
         }
     }
+
+	#ifdef _DEBUG_OPTIMIZER 
     cout << endl;
+	#endif
 }
 
 /* ABCDE
@@ -518,7 +527,10 @@ vector<string> Optimizer::PrintTableCombinations(int combo_len)
                     string sLeftAlias = m_vSortedAlias.at(i);
                     string sRightAlias = vTempCombos.at(j);
                     string sName = sLeftAlias + "." + sRightAlias;
+
+					#ifdef _DEBUG_OPTIMIZER 
                     cout << sName.c_str() << endl;
+					#endif
 
                     int in_pipe_left = m_mJoinEstimate[sLeftAlias].queryPlanNode->m_nOutPipe;
                     int in_pipe_right = m_mJoinEstimate[sRightAlias].queryPlanNode->m_nOutPipe;
@@ -654,7 +666,10 @@ void Optimizer::MakeQueryPlan()
 	// take care of joins
 	else if (m_nNumTables == 2 || m_nNumTables == 3)
 	{
+		#ifdef _DEBUG_OPTIMIZER 
 		print_map();
+		#endif
+
 		/* LOGIC:
 		   Scan the m_mJoinEstimate map and find X.Y pairs for min estimate
 		   The remaining table is Z in ...  Z join (x.Y)
@@ -674,7 +689,9 @@ void Optimizer::MakeQueryPlan()
 		string min_order, min_first, min_second;
 		for (int i = 0; i < two_tab_combos.size(); i++)
 		{
+				#ifdef _DEBUG_OPTIMIZER 
 				cout << endl << two_tab_combos.at(i);
+				#endif
 				string sCombo = two_tab_combos.at(i);
 				int dotPos = sCombo.find(".");
 				string sFirst = sCombo.substr(0, dotPos);
@@ -1083,6 +1100,7 @@ void Optimizer::MakeQueryPlan()
 	// Print the final query plan
     if (pFinalNode != NULL)
 	{
+		cout << "\n\n--------------- Logical Query Plan ------------------- \n\n";
 		m_pFinalNode = pFinalNode;
        	m_pFinalNode->PrintNode();
 	}
@@ -1101,7 +1119,9 @@ void Optimizer::ExecuteQuery()
 	if (m_pFinalNode == NULL)
 		return;
 
+	cout << "\n\n--------------- Execution Result ---------------\n\n";
 	m_pFinalNode->ExecutePostOrder();		
+	cout << endl << endl;
 }
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
@@ -1392,7 +1412,9 @@ void Optimizer::FindOptimalPairing(vector<string> & vAliases, AndList* parseTree
 
 	// break the string sOptimalOrder into optimal_pair
 	int dotPos = sOptimalOrder.find(".");
+	#ifdef _DEBUG_OPTIMIZER 
 	cout << "\n\n" << sOptimalOrder.c_str();
+	#endif
 	if (dotPos == string::npos)
 		cerr << "\n\nError in FindOptimalPairs!!\n";
 	else

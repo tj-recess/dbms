@@ -11,8 +11,8 @@
 #include <iostream>
 #include <map>
 
-#define DEBUG_QUERY_NODE 1
-#define QUERY_PIPE_SIZE 1000
+//#define DEBUG_QUERY_NODE 1
+#define QUERY_PIPE_SIZE 100
 #define QUERY_USE_PAGES 100
 
 using namespace std;
@@ -176,7 +176,7 @@ public:
 	
 	~Node_Join()
     {
-        if (this->left)
+/*        if (this->left)
             delete this->left;
         if (this->right)
             delete this->right;
@@ -192,7 +192,7 @@ public:
 		if (m_pSchema)
 		{
     	    delete m_pSchema; m_pSchema = NULL;
-		}
+		}*/
     }
 
     void PrintNode();
