@@ -24,6 +24,15 @@ private:
 	bool m_bIsAlive;
 
 public:
+	Run()
+	{
+        pPage = NULL;
+        m_nCurrPage = 0;
+        m_nPagesFetched = 0;
+        m_nRunLen = 0;
+        m_bIsAlive = true;
+	}
+
     Run(int nRunLen)
     {
         pPage = new Page();
