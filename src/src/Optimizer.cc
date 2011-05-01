@@ -1,4 +1,6 @@
 #include "Optimizer.h"
+#include <time.h>
+
 using namespace std;
 
 Optimizer::Optimizer() : m_pFuncOp(NULL), m_pTblList(NULL), m_pCNF(NULL),
@@ -917,6 +919,30 @@ void Optimizer::MakeQueryPlan()
             }
 	}
 
+	// Need to reverse the order of m_pAttsToSelect if it exists
+/*	if (m_pAttsToSelect)
+	{
+		NameList *temp1 = m_pAttsToSelect;
+		NameList *temp2 = NULL;
+		NameList *temp3 = NULL;
+
+		while ( temp1 )
+		{
+			m_pAttsToSelect = temp1;//set the head to last node
+			temp2= temp1->next; 	// save the next ptr in temp2
+			temp1->next = temp3; 	// change next to privous
+			temp3 = temp1;
+			temp1 = temp2;
+		}		
+	
+		NameList * node = m_pAttsToSelect;
+		while (	node )
+		{
+			cout << node->name;
+			node = node->next;
+		}
+	}*/
+
 	// define function here, coz it will be needed for projection later
 	Function * pFunc = NULL;	
 
@@ -1049,17 +1075,13 @@ void Optimizer::MakeQueryPlan()
 		// Find total atts: sum of total atts in each table
 //		for (int i = 0; i < m_vSortedAlias.size(); i++)
 		{
-                        if(pFinalSchema != NULL)
-                            pTempSchema = pFinalSchema;
-                        else
-                            pTempSchema = new Schema("catalog", (char*) m_mAliasToTable[m_vSortedAlias.at(0)].c_str());
-                        
-			if (pTempSchema == NULL)
-			{
-				cerr << "\n\nERRoR!";// Schema for " << m_vSortedAlias.at(i) << " not found!\n\n";
-//				break;
-			}
+			if(pFinalSchema != NULL)
+            	pTempSchema = pFinalSchema;
+            else
+                pTempSchema = new Schema("catalog", (char*) m_mAliasToTable[m_vSortedAlias.at(0)].c_str());
 
+			numTotAtts = pTempSchema->GetNumAtts();
+                        
 			// iterate over att-to-keep vector and see if that attribute belongs to this table
 			// if it does, save its number (offsetted number)
 			for (int j = 0; j < vec_AttsToKeepName.size(); j++)
@@ -1076,7 +1098,7 @@ void Optimizer::MakeQueryPlan()
 				int found_pos = pTempSchema->Find((char*)sColName.c_str());
 				if (found_pos != -1)
 				{
-					vec_AttsToKeepNum.push_back(/*numTotAtts + */found_pos);
+					vec_AttsToKeepNum.push_back(found_pos);
 
 					// for use by project/distinct schema making
 					Attribute * pAtt = new Attribute;
@@ -1086,11 +1108,6 @@ void Optimizer::MakeQueryPlan()
 					vec_dis_atts.push_back(pAtt);
 				}
 			}
-
-			// increment num of atts count
-			//numTotAtts += pTempSchema->GetNumAtts();
-
-			//delete pTempSchema;
 		}
 
                 // convert vector vec_AttsToKeepNum to int*[]
@@ -1137,19 +1154,6 @@ void Optimizer::MakeQueryPlan()
 		// Make this node top most
 		pFinalNode = pProjection;
 	}
-
-/*	else if (m_pAttsToSelect == NULL && m_pFuncOp != NULL && pFunc != NULL)
-	{
-        int in = pFinalNode->m_nOutPipe;
-        int out = m_nGlobalPipeID++;
-
-		int * attsToKeep = {0};
-		Node_Project * pProjection = new Node_Project(in, out, attsToKeep, 1, 1);
-        pProjection->left = pFinalNode;
-        // Make this node top most
-        pFinalNode = pProjection;		
-	}*/
-
 
     // distinct
     if (m_nDistinctAtts == 1)
@@ -1203,8 +1207,14 @@ void Optimizer::ExecuteQuery()
 		return;
 
 	cout << "\n\n--------------- Execution Result ---------------\n\n";
+	clock_t begin = clock();
 	m_pFinalNode->ExecutePostOrder();		
+	clock_t end = clock();
 	cout << endl << endl;
+	double diffticks = end - begin;
+	double diffms = (diffticks*1000)/CLOCKS_PER_SEC;
+
+	cout << "Time elapsed: " << double(diffms/1000) << " secs \n\n\n";
 }
 
 AndList* Optimizer::GetSelectionsFromAndList(string alias)
