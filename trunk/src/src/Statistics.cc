@@ -920,9 +920,9 @@ void Statistics::PrepareStatisticsFile(char* fileName)
     s.AddAtt(relName[7], "r_comment",5);
 
     s.AddAtt(relName[8], "col1",3);
-    s.AddAtt(relName[8], "col2",3);
-    s.AddAtt(relName[8], "col3",3);
-    s.AddAtt(relName[8], "col4",3);
+    s.AddAtt(relName[8], "col2",6);
+    s.AddAtt(relName[8], "col3",6);
+    s.AddAtt(relName[8], "col4",6);
 
     s.Write(fileName);
 }
